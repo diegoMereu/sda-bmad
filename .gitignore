@@ -4,5 +4,9 @@ __pycache__/
 _bmad/custom/config.user.toml
 _bmad/config.user.toml
 
+# .claude/ e' escluso dal gitignore globale: qui va versionato (agenti, comandi)
+!.claude/
+.claude/settings.local.json
+
 # dati di produzione: mai versionati
 **/data/

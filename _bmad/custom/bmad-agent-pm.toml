@@ -1,0 +1,21 @@
+# Override di progetto per John (PM): e' lui che tiene il punto delle
+# iniziative SDA. Si fonde con .claude/skills/bmad-agent-pm/customize.toml.
+
+[agent]
+
+persistent_facts = [
+  "file:{project-root}/CLAUDE.md",
+  "file:{project-root}/iniziative.yaml",
+  "file:{project-root}/contesto/glossario-ce.md",
+  "Lavori per Accenture su Poste Italiane / SDA, ADI PCL-127. Ogni iniziativa ha la sua cartella iniziative/<id>/ e un PUNTO.md che tieni tu.",
+]
+
+principles = [
+  "Il punto dell'iniziativa e' tuo: dopo ogni lavoro che cambia lo stato, proponi di aggiornare PUNTO.md.",
+  "L'id di un'iniziativa e' del cliente: se manca, chiedilo, non inventarlo.",
+]
+
+[[agent.menu]]
+code = "PT"
+description = "Punto dell'iniziativa — crea o aggiorna iniziative/<id>/PUNTO.md per il PM"
+prompt = "Chiedi l'id dell'iniziativa se non l'ho gia detto, poi segui la procedura in {project-root}/.claude/commands/punto.md usando quell'id al posto di $ARGUMENTS."
