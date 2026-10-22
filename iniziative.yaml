@@ -1,0 +1,71 @@
+# Anagrafica iniziative SDA — ADI PCL-127 (Poste Italiane / SDA, fornitore PCLS)
+# Unica fonte di verita su id, titolo, stato e referenti.
+# Aggiungi campi solo quando ti servono davvero.
+#
+# stato: aperta | in_corso | sospesa | chiusa
+
+adi: PCL-127
+pm_accenture: "Diego Mereu"
+
+iniziative:
+
+  - id: "138972"
+    titolo: "Preadvising Fast"
+    prj: PRJ0042840
+    stato: in_corso
+    owner_cliente: "Raimondo Malatesta"
+    perimetro: >-
+      No-regression del processo Preadvising Fast: dichiarato via
+      INVIOSYSTEM/INVIOFILE, catena ms-dichiarato (builder, validatore,
+      orchestratore, normalizzatore, smistatore, state-machine-handler),
+      output su SEW_SPEDIZIONI_WORK_2 e Kafka preadvising.completed.sda.
+      Include ILP inbound e palmari.
+
+  - id: "138975"
+    titolo: "Dashboard business LdV"
+    prj: PRJ0042841
+    stato: in_corso
+    owner_cliente: "Raimondo Malatesta"
+    perimetro: >-
+      Dashboard di business sulle lettere di vettura: indicatori di volume e
+      stato LdV per le funzioni commerciali.
+
+  - id: "144191"
+    titolo: "PDW Boxless — VAS Boxless su Poste Delivery Web"
+    prj: PRJ0049407
+    stato: in_corso
+    owner_cliente: "Gianluca Cece"
+    perimetro: >-
+      Nuovo VAS Boxless (spedizione senza imballaggio, max 3kg, 35x25x7 cm) su
+      PDW, RDS Pacchi, Poste.it e App Poste: listini, funnel, Datamatrix
+      Paperless (cod_servizio=BXL), accettazione OMP e Click&Collect, flussi
+      verso BEP, PRE-WEB, Universo Dati Pacchi, EDWH, fatturazione.
+      Requisiti: 29 DREQ (DREQ0062515-DREQ0062550) in "20260429 - PDW Boxless.xls".
+
+  - id: "144208"
+    titolo: "Disponibilita ed utilizzo dati da palmari PTL"
+    prj: PRJ0049421
+    stato: in_corso
+    owner_cliente: "Raimondo Malatesta"
+    perimetro: >-
+      Dati di preavviso online disponibili e corretti su palmari SDA e DSX.
+      Parallel run legacy vs nuovo (sew_sped_pre_adv_online_out_tot vs _2)
+      prima del go-live. Prerequisito di PRJ0051188 (Validazione CAP/Localita).
+
+  - id: "144213"
+    titolo: "Area Quadrature — Dashboard tecnica file preavviso"
+    prj: PRJ0049426
+    stato: aperta
+    owner_cliente: "Raimondo Malatesta"
+    perimetro: >-
+      Dashboard tecnica di quadratura sui file di preavviso: conteggi, scarti e
+      riconciliazione fra flussi.
+
+  - id: "144216"
+    titolo: "Assistenza Clienti — Customer Journey preavviso"
+    prj: PRJ0049429
+    stato: aperta
+    owner_cliente: "Raimondo Malatesta"
+    perimetro: >-
+      Customer journey del preavviso lato assistenza clienti: visibilita dello
+      stato di preavviso agli operatori.

@@ -1,0 +1,16 @@
+# Text files: normalizza LF nel repo, checkout con le convenzioni del SO
+* text=auto
+
+# Script bash: sempre LF (devono girare su macOS/Linux)
+*.sh text eol=lf
+
+# Python: sempre LF
+*.py text eol=lf
+
+# Markdown e testi: auto
+*.md text
+*.txt text
+*.yml text
+*.yaml text
+*.json text
+*.toml text
