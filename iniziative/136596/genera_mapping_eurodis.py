@@ -156,6 +156,55 @@ R.update({
     S + "collo.peso": (T, "collis[].weightOfUnit", f"kg -> grammi (x1000): peso 2000 {EX}", ""),
 })
 
+# Decisioni del 23-Oct dai commenti di Diego (colonna "Commenti" del foglio Mapping inverso).
+# I dubbi funzionali aperti sono in punti-aperti-analisi-2026-10-23.md (DF-nn).
+K = "commento Diego 23-Oct"
+for p in (M, DE):
+    R[p + "codice_nazione_iso_2"] = (D, ("shipperAddress" if p == M else "consigneeAddress") + ".countryCode",
+                                     f"countryCode e' ISO2: va solo qui ({K})", "")
+    for f in ("codice_nazione", "nazione", "codice_nazione_poste"):
+        R[p + f] = (NV, "", f"countryCode va solo in codice_nazione_iso_2 ({K})", "DF-12")
+for f in ("importi.nazione_mittente_iso_cc", "importi.nazione_mittente_descrizione",
+          "collo.nazionalita", "internazionale.nazionalita"):
+    R[S + f] = (NV, "", f"countryCode va solo in codice_nazione_iso_2 ({K})", "")
+for f, why in (("verso", "shipmentTypeIndicator da ignorare"), ("tipo_spedizione", "non deriva dal paese del mittente"),
+               ("data_ordine", "clearanceTimestamp da ignorare"), ("codice_servizio_pagamento", "termsOfDeliveryText da non mappare"),
+               ("internazionale.addebito_oneri", "termsOfDeliveryText da non mappare")):
+    R[S + f] = (NV, "", f"{why} ({K})", "")
+# Prodotto e servizi sono interni SDA: l'applicativo li recupera chiamando ce-rules con id_ldv
+for p, r in list(R.items()):
+    if r[0] == CE:
+        R[p] = (CE, "", f"Interno SDA: ce-rules chiamato con id_ldv in ingresso ({K})", "PA-03")
+R[S + "codici_servizi"] = (CE, "", f"Da ce-rules con id_ldv. Aperto: come si riflettono servizio di consegna EURODIS e contrassegno ({K})", "DF-05, DF-07")
+R.update({
+    S + "data_spedizione": (T, "entranceTimestamp", f"yyyy-MM-dd ({K}: clearanceTimestamp si ignora)", "DF-01"),
+    S + "ora_spedizione": (T, "entranceTimestamp", f"HH:mm:ss ({K})", "DF-01"),
+    DE + "prefisso_cellulare": (NV, "", f"contactSMS va tutto in cellulare, prefisso compreso ({K})", ""),
+    S + "consegna.note": (T, "consigneeAddress.additionalConsigneeInfo, shipperAddress.additionalConsigneeInfo",
+                          f"Istruzioni di consegna: concatenare i due campi se entrambi presenti ({K})", ""),
+    "cliente.no_firma": (T, "deliveryService.deliveryType", f'S (firma richiesta) -> "N"; N (firma non richiesta) -> "S"; altri valori -> vuoto ({K})', ""),
+    S + "consegna.data_consegna": (T, "deliveryService.deliveryDateWindowStart", f"yyyy-MM-dd ({K})", "DF-06"),
+    S + "assicurata.importo_assicurata": (D, "customsService.commercialValueOfGoods", f"Valore merce 'for insurance reasons' secondo lo swagger ({K})", "DF-08"),
+    S + "assicurata.spedizione_assicurata": (DD, "customsService.commercialValueOfGoods", f'"S" se il valore merce e\' presente? ({K})', "DF-08"),
+    S + "id_ldv_associata": (D, "collis[].referencedEuroplateBarcode", f"Solo resi. ICD: campo di spedizione di 3 caratteri, il barcode e' per collo e di 24 ({K})", "DF-10"),
+    S + "notifiche_sms": (T, "consigneePreAdvice.smsPreAdvice", f'true -> "S", false -> "N" ({K}: mappato cosi, da confermare)', "DF-09"),
+    S + "notifiche_email": (T, "consigneePreAdvice.eMailPreAdvice", f'true -> "S", false -> "N" ({K}: mappato cosi, da confermare)', "DF-09"),
+})
+R["progressivo"] = (G, "", "Progressivo 1..n della spedizione nell'esecuzione batch: obbligatorio per BEP (fileRecordOrder). Da confermare", "")
+GAP_23 = {
+    "shipmentTypeIndicator": ("", "", f"Da ignorare ({K})", ""),
+    "lineHaulIndicator": ("", "", f"Da ignorare ({K})", ""),
+    "clearanceTimestamp": ("", "", f"Da ignorare: per data e ora spedizione si usa entranceTimestamp ({K})", ""),
+    "truckLicensePlate": ("", "", f"Non interessa ({K})", ""),
+    "termsOfDeliveryText": ("", "", f"Da non mappare ({K})", ""),
+    "consigneeAddress.gatewayAssigned": ("", "", f"Da non mappare ({K})", ""),
+    "shipperAddress.gatewayAssigned": ("", "", f"Da non mappare ({K})", ""),
+    "consigneeAddress.pudoID": ("", "", f"Da non mappare per ora ({K})", "DF-14"),
+    "consigneeAddress.alternativeContactTelephone": ("", "", f"Il tracciato non ha un secondo numero di telefono: da chiedere se serve ({K})", "DF-15"),
+    "shipperAddress.alternativeContactTelephone": ("", "", f"Il tracciato non ha un secondo numero di telefono: da chiedere se serve ({K})", "DF-15"),
+    "deliveryService.deliveryService": ("", "", f"Come si traduce in servizi SDA ({K})", "DF-05"),
+}
+
 def default(path, name):
     if "normalizzat" in name or name.endswith("_tipo") and name.split("_")[0] in ("cellulare", "telefono") \
             or ".linee_alternative" in path or ".frazionario_inesito" in path \
@@ -314,7 +363,116 @@ EF = [
     ("collis[].volumetric", "integer", "", "NO"), ("collis[].volumetricWeight", "number", "", "NO"),
     ("collis[].boxType / boxDimensionCategory / boxId", "string", "", "NO"),
 ]
-import re
+import re, json, os
+
+# Descrizioni originali dallo swagger EURODIS salvato accanto a questo script
+SWAGGER = os.path.join(os.path.dirname(PATH), "eurodis-receive-pan-swagger-v1.json")
+_sc = json.load(open(SWAGGER, encoding="utf-8"))["components"]["schemas"]
+SCHEMA_OF = {"": "GetShipmentResponse2", "consigneeAddress": "GetShipmentAddressPudoResponse",
+             "shipperAddress": "GetShipmentAddressResponse", "deliveryService": "GetShipmentDeliveryServiceResponse",
+             "cashOnDeliveryService": "GetShipmentCashOnDeliveryServiceResponse",
+             "customsService": "GetShipmentCustomsServiceResponse",
+             "consigneePreAdvice": "GetShipmentConsigneePreAdviceResponse", "collis[]": "GetShipmentColliDataResponse2"}
+
+def desc_en(field):
+    obj, _, leaf = field.rpartition(".")
+    if " / " in leaf:
+        leaf = leaf.split(" / ")[0]
+    props = _sc[SCHEMA_OF.get(obj, "GetShipmentResponse2")].get("properties", {})
+    d = (props.get(leaf) or {}).get("description") or ""
+    return re.sub(r"\s*<br\s*/?>\s*", " ", d).strip()
+
+# Traduzioni italiane. Chiave: campo EURODIS; per gli indirizzi "addr.<campo>" vale per tutti gli indirizzi.
+IT = {
+    "edReference": "Numero univoco della spedizione nella rete EURODIS. Per la definizione di dettaglio vedere il documento A02 del manuale di rete EURODIS.",
+    "referencedEurodisShipmentNumber": "Numero EURODIS della spedizione originaria. Obbligatorio per i tipi \"R\", \"D\" e \"A\"; condizionato per \"P\"; facoltativo per \"E\".",
+    "shipmentTypeIndicator": "N = normale; A = ordine di ritiro; P = spedizione risultante da un ordine di ritiro; R = reso; X = AUX-PAN; B = spedizione normale in neighbourhood business (NB); D = reso in NB; E = ritiro in NB; C = spedizione B2C (facoltativo, da concordare fra partner mittente e partner di consegna); Y = B2C in NB; L = richiesta di reso; M = reso dal destinatario (solo verso il partner di consegna iniziale; trasmesso come \"R\" ai partner di transito e consegna, come \"E\" in NB); W = spedizione distribuita senza EUROPLATE.",
+    "lineHaulIndicator": "Deve essere \"N\" (normale), \"D\" (iniezione diretta) o \"L\" (trazione diretta).",
+    "clearanceTimestamp": "Data e ora di creazione del dataset PAN della spedizione. Es. \"2000-01-31T18:30:00.000Z\" = 31/01/2000 ore 18:30.",
+    "entranceTimestamp": "Data di ingresso della spedizione nel sistema domestico del partner, cioè quando è stata fisicamente consegnata. Es. \"2000-01-31T18:30:00.000Z\".",
+    "numberOfHandlingUnits": "Totale di colli e pallet. Deve coincidere con il numero di colli trasmessi.",
+    "shipmentWeight": "Peso in chilogrammi con due decimali.",
+    "consignorsCustomerNumberAtDispatchPartner": "(Nessuna descrizione nello swagger) Codice cliente del mittente presso il partner che spedisce.",
+    "consignorsReference": "(Nessuna descrizione nello swagger) Riferimento del mittente.",
+    "dispatchPartnersDomesticShipmentNumber": "(Nessuna descrizione nello swagger) Numero di spedizione domestico del partner che spedisce.",
+    "truckLicensePlate": "Targa del camion (e del rimorchio).",
+    "termsOfDeliveryText": "Facoltativo per spedizioni intra-UE, obbligatorio per paesi extra-UE. Deve essere un Incoterm ufficiale DPU o EXW (per ritiri e resi) oppure uno degli Incoterm interni di rete DDC e DDX.",
+    "addr.contactName": "Nome del contatto all'indirizzo, stampato sulla 2a riga indirizzo dell'EUROPLATE.",
+    "consigneeAddress.contactName": "Nome del contatto all'indirizzo, stampato sulla 2a riga indirizzo dell'EUROPLATE. Per le spedizioni PUDO contiene il nome del negozio.",
+    "addr.contactTelephone": "Condizione per il servizio di prenotazione consegna: se il servizio è concordato fra i partner e il flag di prenotazione è presente in DeliveryService.",
+    "addr.alternativeContactTelephone": "Telefono di contatto alternativo (alfanumerico per ammettere il prefisso internazionale).",
+    "addr.contactSMS": "Numero SMS del contatto principale. Formato: prefisso internazionale (+XX) seguito dal numero. Es. +491711234567.",
+    "addr.contactEMail": "Indirizzo email del contatto principale; vedere anche l'allegato A09 - matrice del servizio di preavviso via email.",
+    "addr.companyName": "Per spedizioni \"toB\" nome dell'azienda o organizzazione; per spedizioni \"toC\" nome del destinatario. Stampato sulla 1a riga indirizzo dell'EUROPLATE.",
+    "addr.additionalAddressInfo1": "Informazioni aggiuntive sull'indirizzo (reparto, edificio, piano, codice porta, stanza, numero locker...). Stampato sulla 3a riga indirizzo dell'EUROPLATE.",
+    "addr.additionalAddressInfo2": "Informazioni aggiuntive sull'indirizzo (reparto, edificio, piano, codice porta, stanza, numero locker...). Stampato sulla 4a riga indirizzo dell'EUROPLATE.",
+    "consigneeAddress.additionalAddressInfo2": "Informazioni aggiuntive sull'indirizzo (reparto, edificio, piano, codice porta, stanza, numero locker...). Stampato sulla 4a riga indirizzo dell'EUROPLATE. Per le spedizioni PUDO contiene PS (Parcel Shop) o PT (Parcel Terminal).",
+    "addr.street": "Via + numero civico, se il civico non è trasmesso a parte nel campo StreetNumber. Stampato sulla 5a riga indirizzo dell'EUROPLATE.",
+    "addr.streetNumber": "Numero civico, stampato sulla 5a riga dell'EUROPLATE. Solo se il sistema del partner mittente supporta la trasmissione separata del civico; altrimenti il civico va nello stesso campo della via.",
+    "addr.region": "Regione, provincia o contea.",
+    "addr.city": "Città o località postale, stampata sulla 6a riga dell'EUROPLATE troncata a 30 caratteri.",
+    "addr.zipcode": "CAP, stampato sulla 6a riga dell'EUROPLATE (alfanumerico per il Regno Unito, senza indicatore di nazione; formato validato, corrispondenza con l'indirizzo no).",
+    "addr.countryCode": "Codice nazione ISO 3166 alpha-2, verificato sul database della piattaforma. Stampato sulla 6a riga dell'EUROPLATE.",
+    "addr.additionalConsigneeInfo": "Informazioni aggiuntive del mittente per il destinatario o istruzioni di consegna.",
+    "addr.gatewayAssigned": "Codice del gateway assegnato all'indirizzo (gateway di ingresso per l'indirizzo di consegna, di uscita per quello del mittente), come da manuale di rete A12.",
+    "consigneeAddress.pudoID": "Id della stazione PUDO (punto di ritiro e consegna) per le spedizioni con servizio di consegna Z.",
+    "returnAddress": "(Oggetto) Indirizzo di reso.",
+    "remunerationAddress": "(Oggetto) Indirizzo di fatturazione/remunerazione.",
+    "bookingInAddress": "(Oggetto) Indirizzo per la prenotazione della consegna.",
+    "deliveryService.deliveryService": "Deve essere D (giorno), T (a orario), M (mattina), A (pomeriggio), E (sera), 6 (sabato), 7 (domenica), B (su prenotazione), W (finestra di consegna), F (entro le 10:00) o Z (consegna in punto PUDO).",
+    "deliveryService.deliveryType": "Deve essere S (firma richiesta), N (firma non richiesta), D (deposito sicuro), I (identificazione sicura), B (consolidamento presso il partner di drop-off) o C (consolidamento presso il partner di consegna diverso dall'iniziatore). B e C valgono solo per resi via PUDO.",
+    "deliveryService.secureDeliveryId": "Id del deposito sicuro o id da usare per la consegna sicura.",
+    "deliveryService.deliveryBookInRequired": "Vero/falso: il partner di consegna deve concordare la prenotazione della consegna.",
+    "deliveryService.deliveryTimeWindowStart": "Solo per il servizio a finestra di consegna e per servizi a orario specifico. Formato HH:mm:ss.",
+    "deliveryService.deliveryTimeWindowEnd": "Solo per il servizio a finestra di consegna. Formato HH:mm:ss.",
+    "deliveryService.deliveryDateWindowStart": "Solo per il servizio a finestra di consegna con data specifica. Formato yyyy-MM-dd.",
+    "deliveryService.deliveryDateWindowEnd": "Solo per il servizio a finestra di consegna. Formato yyyy-MM-dd.",
+    "deliveryService.completeDeliveryOnly": "Vero se il cliente vuole tutti i colli in un'unica consegna, altrimenti falso.",
+    "deliveryService.additionalNotification": "Dati di contatto di un terzo da avvisare della consegna.",
+    "cashOnDeliveryService": "(Oggetto) Contrassegno: presente se la spedizione è in contrassegno.",
+    "cashOnDeliveryService.iban": "Obbligatorio se IdentifierForCODCollection = 3.",
+    "cashOnDeliveryService.bic": "Obbligatorio se IdentifierForCODCollection = 3.",
+    "cashOnDeliveryService.accountHolder": "Intestatario del conto.",
+    "cashOnDeliveryService.paymentReason": "Attualmente, per il contrassegno fra Post AT e TOF-DE, si usano solo 13 cifre (numero spedizione EURODIS).",
+    "cashOnDeliveryService.paymentReference": "Attualmente, per il contrassegno fra Post AT e TOF-DE, si usano solo 12 cifre (numero spedizione EURODIS).",
+    "cashOnDeliveryService.amount": "Importo nella valuta indicata, con due decimali.",
+    "cashOnDeliveryService.currency": "EUR o altro codice valuta ISO.",
+    "cashOnDeliveryService.identifierForCODCollection": "Contrassegno incassato in contanti o con assegno; i contanti sono lo standard per Post AT e la maggior parte dei partner. Deve essere 3 (contanti) o 5 (assegno).",
+    "customsService": "(Oggetto) Dati doganali.",
+    "customsService.commercialValueOfGoods": "Per motivi assicurativi; obbligatorio se non si tratta di documenti.",
+    "customsService.currency": "Codice valuta se il valore commerciale è valorizzato (EUR o altro codice ISO).",
+    "customsService.dutyCode": "Obbligatorio per extra-UE (= codice della tariffa doganale).",
+    "customsService.sign": "Descrizione aggiuntiva facoltativa della spedizione (numero di identificazione/riferimento).",
+    "customsService.number": "Descrizione aggiuntiva facoltativa della spedizione (numero di identificazione/riferimento).",
+    "customsService.descriptionOfGoods": "Informazione facoltativa sui camion di trasporto, es. per la Svizzera. NB: la descrizione dello swagger non corrisponde al nome del campo (\"descrizione merce\"), da chiarire con EURODIS.",
+    "hazardousADRServices[]": "(Array) Dati delle merci pericolose ADR: classe di pericolo, numero ONU, gruppo di imballaggio, peso lordo ADR, codice galleria, categoria di trasporto, denominazione.",
+    "hazardousCollis[]": "(Array) Colli ADR: numero di colli per tipo e descrizione ADR del tipo di collo.",
+    "consigneePreAdvice.smsPreAdvice": "Se vero, ContactSMS in ConsigneeAddress deve essere valorizzato.",
+    "consigneePreAdvice.eMailPreAdvice": "Se vero, ContactEMail in ConsigneeAddress deve essere valorizzato.",
+    "consigneePreAdvice.telephonePreAdvice": "Se vero, ContactTelephone in ConsigneeAddress deve essere valorizzato.",
+    "collis[]": "(Array) Dati dei colli: un elemento per collo o pallet.",
+    "collis[].identifierPalletOrCollo": "\"P\" (pallet), \"C\" (collo), \"P+\" (pallet+) o \"C+\" (collo+).",
+    "collis[].weightOfUnit": "In chilogrammi.",
+    "collis[].europlateBarcode": "Barcode EURODIS del collo; valore di default (0) in caso di neighbourhood business.",
+    "collis[].referencedEuroplateBarcode": "Valorizzato solo se il collo fa parte di un reso: riporta il barcode EURODIS del collo originario.",
+    "collis[].consignorsColloBarcode": "Barcode domestico di reso del partner di consegna originario, generato/assegnato dalla soluzione resi EURODIS, oppure barcode del cliente o del partner mittente. Per il neighbourhood business va fornito il barcode domestico del partner secondo la SOP Neighbourhood business.",
+    "collis[].length": "In centimetri.",
+    "collis[].width": "In centimetri.",
+    "collis[].height": "In centimetri.",
+    "collis[].volumetric": "Metri cubi.",
+    "collis[].volumetricWeight": "In chilogrammi.",
+    "collis[].boxType / boxDimensionCategory / boxId": "Forse obsoleti, da discutere.",
+}
+
+def desc_it(field):
+    if field in IT:
+        return IT[field]
+    obj, _, leaf = field.rpartition(".")
+    return IT.get("addr." + leaf, "") if obj in ("consigneeAddress", "shipperAddress") else ""
+
+def descrizione(field):
+    en, it = desc_en(field), desc_it(field)
+    return f"{en}\n\nIT: {it}" if en else f"IT: {it}"
 
 def tokens(source):
     return [t for t in re.split(r"[\s,/?()]+", source or "") if t]
@@ -334,38 +492,65 @@ for g in gaps:
     for k in gap_keys(g[0]):
         gap_by_field[k] = g
 gap_by_field["collis[].boxType / boxDimensionCategory / boxId"] = gaps[-1]
+gap_by_field.update(GAP_23)
+
+# Commenti scritti a mano nella colonna A del foglio: si conservano a ogni rigenerazione.
+# Chiave (campo EURODIS, campo ICD); se la coppia non esiste piu' il commento va sulla
+# prima riga del campo EURODIS, con l'indicazione della riga originaria.
+old_comments = {}
+if "Mapping inverso EURODIS" in wb.sheetnames:
+    _old = wb["Mapping inverso EURODIS"]
+    _h = [c.value for c in _old[1]]
+    if _h and _h[0] == "Commenti":
+        _ie, _ii = _h.index("Campo EURODIS"), _h.index("Campo ICD")
+        for r in _old.iter_rows(min_row=2, values_only=True):
+            if r[0]:
+                old_comments[(r[_ie], r[_ii])] = r[0]
 
 name_inv = "Mapping inverso EURODIS"
 if name_inv in wb.sheetnames:
     del wb[name_inv]
 wi = wb.create_sheet(name_inv, index=1)
-wi.append(["Campo EURODIS", "Tipo", "Max", "Obbl. EURODIS", "Campo ICD", "Obbl. ICD", "Dim. ICD",
-           "Categoria", "Regola / note", "Punto aperto"])
+wi.append(["Commenti", "Campo EURODIS", "Descrizione EURODIS (originale / IT)", "Tipo", "Max", "Obbl. EURODIS",
+           "Campo ICD", "Obbl. ICD", "Dim. ICD", "Categoria", "Regola / note", "Punto aperto"])
 inv_counts = {"mappati": 0, "non mappati": 0}
+no_it = []
 for field, tp, ln, ob in EF:
+    if not desc_it(field):
+        no_it.append(field)
+    ds = descrizione(field)
     targets = [(p, r) for p, r in R.items() if any(matches(field, t) for t in tokens(r[1]))]
     if targets:
         inv_counts["mappati"] += 1
         for p, r in sorted(targets):
             o, _, dim = icd_info.get(p, ("", "", ""))
-            wi.append([field, tp, ln, ob, p, o, dim, r[0], r[2], r[3]])
+            wi.append([old_comments.pop((field, p), None), field, ds, tp, ln, ob, p, o, dim, r[0], r[2], r[3]])
     else:
         inv_counts["non mappati"] += 1
         g = gap_by_field.get(field)
-        wi.append([field, tp, ln, ob, "—", "", "", "NON MAPPATO",
+        wi.append([old_comments.pop((field, "—"), None), field, ds, tp, ln, ob, "—", "", "", "NON MAPPATO",
                    g[2] if g else "Nessun campo ICD", g[3] if g else ""])
+# commenti rimasti orfani (la coppia EURODIS -> ICD non esiste piu')
+for (field, icd), txt in old_comments.items():
+    for r in wi.iter_rows(min_row=2):
+        if r[1].value == field:
+            r[0].value = ((r[0].value + "\n") if r[0].value else "") + f"[era su {icd}] {txt}"
+            break
 fills_inv = {"NON MAPPATO": "F8CBAD"}
 
 fills = {D: "C6EFCE", T: "DDEBF7", C: "E2EFDA", G: "E2EFDA", F1: "FFF2CC", CE: "FFF2CC",
          AV: "EDEDED", NA: "EDEDED", DD: "F8CBAD", NV: "FFFFFF"}
 for r in wi.iter_rows(min_row=2):
-    cat = r[7].value
+    cat = r[9].value
     color = fills.get(cat) or fills_inv.get(cat)
     if color:
-        r[7].fill = PatternFill("solid", fgColor=color)
-    r[8].alignment = Alignment(wrap_text=True, vertical="top")
+        r[9].fill = PatternFill("solid", fgColor=color)
+    for c in r:
+        c.alignment = Alignment(wrap_text=c.column in (1, 3, 11), vertical="top")
+    if r[0].value:
+        r[0].fill = PatternFill("solid", fgColor="FFF2CC")
 for sheet, widths in ((ws, [45, 14, 14, 14, 14, 9, 10, 7, 16, 45, 70, 12]),
-                      (wi, [48, 10, 6, 9, 45, 9, 8, 16, 70, 12]),
+                      (wi, [40, 44, 70, 10, 6, 9, 42, 9, 8, 16, 60, 12]),
                       (wg, [45, 40, 60, 12]), (wl, [18, 100])):
     for c in sheet[1]:
         c.font = Font(bold=True, color="FFFFFF")
@@ -390,3 +575,4 @@ wb.save(PATH)
 print("righe:", ws.max_row - 1, counts)
 print("regole non agganciate:", missing)
 print("mapping inverso:", inv_counts, "righe:", wi.max_row - 1)
+print("campi senza traduzione:", no_it)

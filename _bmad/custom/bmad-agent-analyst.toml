@@ -7,7 +7,7 @@ persistent_facts = [
   "file:{project-root}/CLAUDE.md",
   "file:{project-root}/iniziative.yaml",
   "file:{project-root}/contesto/glossario-ce.md",
-  "Tieni tu il mapping EURODIS -> ICD dell'iniziativa 136596: iniziative/136596/ICD_PREADVISING_LDV_EVENT_SOURCE_v11.xlsx (fogli 'Mapping EURODIS', 'EURODIS non mappati', 'Legenda mapping'), rigenerabile con iniziative/136596/genera_mapping_eurodis.py. Il foglio originale dell'ICD non si tocca. Registro punti aperti in iniziative/136596/analisi.md.",
+  "Tieni tu il mapping EURODIS -> ICD dell'iniziativa 136596: iniziative/136596/ICD_PREADVISING_LDV_EVENT_SOURCE_v11.xlsx (fogli 'Mapping EURODIS', 'EURODIS non mappati', 'Legenda mapping'), rigenerabile con iniziative/136596/genera_mapping_eurodis.py. Il foglio originale dell'ICD non si tocca. Registro punti aperti in iniziative/136596/analisi.md, dubbi funzionali in iniziative/136596/punti-aperti-analisi-<data>.md. Il master e' nel repo; dopo ogni aggiornamento ricopia mapping, punti aperti, analisi e swagger in 'C:/Users/diego.mereu/Accenture/SDA - General/07.  Iniziative/2026/02.Documenti/EURODIS/136596 - EURODIS - INBOUND INVIOSYSTEM/mary' (SharePoint del team). La colonna 'Commenti' del foglio Mapping inverso la scrive Diego: va conservata.",
 ]
 
 principles = [

@@ -101,7 +101,9 @@ Decisioni da girare agli sviluppatori di `ce-dichiarato-eurodis-in`:
 ## Cosa dice l'API (fonte: swagger Release v1, letto il 2026-10-22)
 
 Fonte: `https://testapi.eurodis.com/receive-pan/swagger/Release%20v1/swagger.json`
-(ambiente TEST). Autenticazione con `X-API-Key` assegnata al partner.
+(ambiente TEST). Copia salvata in `eurodis-receive-pan-swagger-v1.json`: da lì
+vengono le descrizioni dei campi (in originale e in italiano) del foglio
+"Mapping inverso EURODIS". Autenticazione con `X-API-Key` assegnata al partner.
 
 | Endpoint | Uso | Note |
 |---|---|---|
@@ -164,6 +166,9 @@ receive-tracking, send-pod, receive-pod, get-label, pickup, receive-clearing.
    `customsService`, ADR e `pudoID`.
 
 ## Registro punti aperti
+
+I **dubbi funzionali** sul mapping (DF-nn) sono raccolti a parte in
+[punti-aperti-analisi-2026-10-23.md](punti-aperti-analisi-2026-10-23.md).
 
 Owner RTI = chi lo porta avanti lato fornitore; Rif. Poste = referente lato cliente.
 

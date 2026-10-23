@@ -1,0 +1,1547 @@
+{
+  "x-generator": "NSwag v14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))",
+  "openapi": "3.0.0",
+  "info": {
+    "title": "EURODIS Platform TEST-API - Receive PAN data from EURODIS (before: PAN Import)",
+    "description": "<hr />\n<h4 id=\"edApiReferencesHeadline\">Other EURODIS Platform APIs:</h4>\n<ul id=\"edApiReferences\">\n<li><a href=\"/send-pan/documentation\" target=\"_blank\">Send PAN data to EURODIS (before: PAN Export)</a></li>\n<li><a href=\"/pudo/documentation\" target=\"_blank\">PUDO (Pick-up and Drop-off)</a></li>\n<li><a href=\"/send-tracking/documentation\" target=\"_blank\">Send Tracking data to EURODIS (before: Tracking Export)</a></li>\n<li><a href=\"/receive-tracking/documentation\" target=\"_blank\">Receive Tracking data from EURODIS (before: Tracking Import)</a></li>\n<li><a href=\"/send-pod/documentation\" target=\"_blank\">Send POD (Proof of delivery) to EURODIS</a></li>\n<li><a href=\"/receive-pod/documentation\" target=\"_blank\">Receive POD (Proof of delivery) from EURODIS</a></li>\n<li><a href=\"/get-label/documentation\" target=\"_blank\">Get Label from EURODIS</a></li>\n<li><a href=\"/pickup/documentation\" target=\"_blank\">Send and receive Pick-up orders</a></li>\n<li><a href=\"/receive-clearing/documentation\" target=\"_blank\">Receive Clearing data from EURODIS</a></li>\n</ul>\n<hr />\n<h4 id=\"edApiAuthHeadline\">Authentication:</h4>\n<p id=\"edApiAuthText\">Authentication takes place via an API key assigned to the partner.<br />This must be transferred via the request header as <b>X-API-Key</b>.</p>\n<p id=\"edApiAuthExampleText\">Example using the <a href=\"https://testapi.eurodis.com/pudo/documentation\" target=\"_blank\">EURODIS Platform TEST-API - PUDO (Pick-up and Drop-off)</a> to receive all parcel stations (<b>remember to replace ******** with your <u>TEST-API</u> key!</b>):</p>\n<code id=\"edApiAuthExample\"><span id=\"comment\">### Returns all parcel stations of the other partners</span>\n<span id=\"key\">GET</span>&nbsp;<span id=\"value\">https://testapi.eurodis.com/pudo/parcel-stations/v1</span>\n<span id=\"key\">X-API-Key</span><span id=\"value\">:&nbsp;<b>********</b></span></code>\n<span id=\"edApiAuthExampleHint\">-&nbsp;<b>Hint</b>: If you save the content of the example in a .http or .rest file, you can execute the request with Visual Studio 2022 (provided a valid key has been inserted). Further information can be found <a target=\"_blank\" href=\"https://learn.microsoft.com/en-us/aspnet/core/test/http-files?view=aspnetcore-8.0\">here</a>.</span>\n<hr />\n",
+    "version": "1"
+  },
+  "servers": [
+    {
+      "url": "https://testapi.eurodis.com/receive-pan"
+    }
+  ],
+  "paths": {
+    "/shipment/{edReference}/v1": {
+      "get": {
+        "tags": [
+          "Shipment"
+        ],
+        "summary": "Gets a shipment in the system",
+        "description": "Gets a shipment in the system.",
+        "operationId": "GetShipmentEndpoint",
+        "parameters": [
+          {
+            "name": "edReference",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "format": "decimal"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Authorization failed (API key missing or invalid)"
+          },
+          "500": {
+            "description": "An unexpected error occurs"
+          },
+          "424": {
+            "description": "An error occurred while determining the current partner"
+          },
+          "451": {
+            "description": "Your partner does not have access to the requested shipment"
+          },
+          "200": {
+            "description": "Shipment found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetShipmentResponse2"
+                },
+                "example": {
+                  "edReference": 7319003746401.0,
+                  "referencedEurodisShipmentNumber": 1234567890123,
+                  "shipmentTypeIndicator": "N",
+                  "lineHaulIndicator": "L",
+                  "clearanceTimestamp": "2024-03-29T00:00:00",
+                  "entranceTimestamp": "2024-03-29T06:53:55",
+                  "numberOfHandlingUnits": 1,
+                  "shipmentWeight": 15.00,
+                  "consignorsCustomerNumberAtDispatchPartner": "933499999",
+                  "consignorsReference": "30151111",
+                  "dispatchPartnersDomesticShipmentNumber": "30151111",
+                  "truckLicensePlate": "LK 773319",
+                  "termsOfDeliveryText": "EXW",
+                  "consigneeAddress": null,
+                  "returnAddress": {
+                    "contactName": "Erika Mustermann",
+                    "additionalAddressInfo2": "Additional Info 1",
+                    "pudoID": "",
+                    "contactTelephone": "+990000000001",
+                    "alternativeContactTelephone": "+990000000002",
+                    "contactSMS": "+880000000002",
+                    "contactEMail": "e.mustermann@muster-company.de",
+                    "companyName": "Muster Company",
+                    "additionalAddressInfo1": "Additional Info 1",
+                    "street": "Demo street",
+                    "streetNumber": "1",
+                    "region": "",
+                    "city": "Berlin",
+                    "zipcode": "12345",
+                    "countryCode": "DE",
+                    "additionalConsigneeInfo": "",
+                    "gatewayAssigned": "GET"
+                  },
+                  "shipperAddress": null,
+                  "remunerationAddress": null,
+                  "bookingInAddress": null,
+                  "deliveryService": {
+                    "deliveryService": "N",
+                    "deliveryType": "S",
+                    "secureDeliveryId": "1234567890",
+                    "deliveryBookInRequired": false,
+                    "deliveryTimeWindowStart": "08:00:00",
+                    "deliveryTimeWindowEnd": "18:00:00",
+                    "deliveryDateWindowStart": "2024-04-01",
+                    "deliveryDateWindowEnd": "2024-04-03",
+                    "completeDeliveryOnly": true,
+                    "additionalNotification": false
+                  },
+                  "cashOnDeliveryService": {
+                    "iban": "AA1234567890123456789012",
+                    "bic": "ABCDEFGI",
+                    "accountHolder": "INTIME",
+                    "paymentReason": "9990000000001",
+                    "paymentReference": "9990000000001",
+                    "amount": 1111.50,
+                    "currency": "EUR",
+                    "identifierForCODCollection": 3
+                  },
+                  "customsService": {
+                    "commercialValueOfGoods": 1000.50,
+                    "currency": "EUR",
+                    "dutyCode": "9876543210",
+                    "sign": "AA11-00001",
+                    "number": 0,
+                    "descriptionOfGoods": "FORSCHUNGSCHEMIKALIE"
+                  },
+                  "hazardousADRServices": [
+                    {
+                      "billOfDanger": "8",
+                      "additionalBillOfDanger1": "61",
+                      "additionalBillOfDanger2": "0",
+                      "additionalBillOfDanger3": "0",
+                      "tunnelLimitationCode": "C/D",
+                      "packingGroup": 1,
+                      "adrGrossWeight": 10.00,
+                      "unNumber": "1831",
+                      "transportCategory": "1",
+                      "materialDescription": "SCHWEFELSAEURE, RAUCHEND",
+                      "technicalName": "(EPOXYDHARZ)",
+                      "identifierMassOrVolume": "kg"
+                    }
+                  ],
+                  "consigneePreAdvice": {
+                    "smsPreAdvice": false,
+                    "eMailPreAdvice": false,
+                    "telephonePreAdvice": false
+                  },
+                  "collis": [
+                    {
+                      "identifierPalletOrCollo": "C",
+                      "weightOfUnit": 15.00,
+                      "boxType": "8",
+                      "boxDimensionCategory": "A",
+                      "boxId": "99887766551",
+                      "europlateBarcode": "123459000003770904301090",
+                      "referencedEuroplateBarcode": "123456789012345678901234",
+                      "volumetric": null,
+                      "consignorsColloBarcode": "",
+                      "length": 33,
+                      "width": 44,
+                      "height": 55,
+                      "volumetricWeight": null
+                    }
+                  ],
+                  "hazardousCollis": [
+                    {
+                      "numberOfParcelType": 1,
+                      "explanationOfParcelType": "Druckgefaess"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The ED reference transferred is invalid"
+          },
+          "404": {
+            "description": "Shipment was not found"
+          }
+        }
+      }
+    },
+    "/shipments/v1": {
+      "get": {
+        "tags": [
+          "Shipments"
+        ],
+        "summary": "Deploys all new shipments, that have not already been deployed to the partner",
+        "description": "Deploys all new shipments, that have not already been deployed to the partner.",
+        "operationId": "GetShipmentsEndpoint",
+        "responses": {
+          "401": {
+            "description": "Authorization failed (API key missing or invalid)"
+          },
+          "500": {
+            "description": "An unexpected error occurs"
+          },
+          "424": {
+            "description": "An error occurred while determining the current partner"
+          },
+          "451": {
+            "description": "Your partner does not have access to the requested shipment"
+          },
+          "200": {
+            "description": "Shipments found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GetShipmentResponse2"
+                  }
+                },
+                "example": [
+                  {
+                    "edReference": 7319003746401.0,
+                    "referencedEurodisShipmentNumber": 1234567890123,
+                    "shipmentTypeIndicator": "N",
+                    "lineHaulIndicator": "L",
+                    "clearanceTimestamp": "2024-03-29T00:00:00",
+                    "entranceTimestamp": "2024-03-29T06:53:55",
+                    "numberOfHandlingUnits": 1,
+                    "shipmentWeight": 15.00,
+                    "consignorsCustomerNumberAtDispatchPartner": "933499999",
+                    "consignorsReference": "30151111",
+                    "dispatchPartnersDomesticShipmentNumber": "30151111",
+                    "truckLicensePlate": "LK 773319",
+                    "termsOfDeliveryText": "EXW",
+                    "consigneeAddress": null,
+                    "returnAddress": {
+                      "contactName": "Erika Mustermann",
+                      "additionalAddressInfo2": "Additional Info 1",
+                      "pudoID": "",
+                      "contactTelephone": "+990000000001",
+                      "alternativeContactTelephone": "+990000000002",
+                      "contactSMS": "+880000000002",
+                      "contactEMail": "e.mustermann@muster-company.de",
+                      "companyName": "Muster Company",
+                      "additionalAddressInfo1": "Additional Info 1",
+                      "street": "Demo street",
+                      "streetNumber": "1",
+                      "region": "",
+                      "city": "Berlin",
+                      "zipcode": "12345",
+                      "countryCode": "DE",
+                      "additionalConsigneeInfo": "",
+                      "gatewayAssigned": "GET"
+                    },
+                    "shipperAddress": null,
+                    "remunerationAddress": null,
+                    "bookingInAddress": null,
+                    "deliveryService": {
+                      "deliveryService": "N",
+                      "deliveryType": "S",
+                      "secureDeliveryId": "1234567890",
+                      "deliveryBookInRequired": false,
+                      "deliveryTimeWindowStart": "08:00:00",
+                      "deliveryTimeWindowEnd": "18:00:00",
+                      "deliveryDateWindowStart": "2024-04-01",
+                      "deliveryDateWindowEnd": "2024-04-03",
+                      "completeDeliveryOnly": true,
+                      "additionalNotification": false
+                    },
+                    "cashOnDeliveryService": {
+                      "iban": "AA1234567890123456789012",
+                      "bic": "ABCDEFGI",
+                      "accountHolder": "INTIME",
+                      "paymentReason": "9990000000001",
+                      "paymentReference": "9990000000001",
+                      "amount": 1111.50,
+                      "currency": "EUR",
+                      "identifierForCODCollection": 3
+                    },
+                    "customsService": {
+                      "commercialValueOfGoods": 1000.50,
+                      "currency": "EUR",
+                      "dutyCode": "9876543210",
+                      "sign": "AA11-00001",
+                      "number": 0,
+                      "descriptionOfGoods": "FORSCHUNGSCHEMIKALIE"
+                    },
+                    "hazardousADRServices": [
+                      {
+                        "billOfDanger": "8",
+                        "additionalBillOfDanger1": "61",
+                        "additionalBillOfDanger2": "0",
+                        "additionalBillOfDanger3": "0",
+                        "tunnelLimitationCode": "C/D",
+                        "packingGroup": 1,
+                        "adrGrossWeight": 10.00,
+                        "unNumber": "1831",
+                        "transportCategory": "1",
+                        "materialDescription": "SCHWEFELSAEURE, RAUCHEND",
+                        "technicalName": "(EPOXYDHARZ)",
+                        "identifierMassOrVolume": "kg"
+                      }
+                    ],
+                    "consigneePreAdvice": {
+                      "smsPreAdvice": false,
+                      "eMailPreAdvice": false,
+                      "telephonePreAdvice": false
+                    },
+                    "collis": [
+                      {
+                        "identifierPalletOrCollo": "C",
+                        "weightOfUnit": 15.00,
+                        "boxType": "8",
+                        "boxDimensionCategory": "A",
+                        "boxId": "99887766551",
+                        "europlateBarcode": "123459000003770904301090",
+                        "referencedEuroplateBarcode": "123456789012345678901234",
+                        "volumetric": null,
+                        "consignorsColloBarcode": "",
+                        "length": 33,
+                        "width": 44,
+                        "height": 55,
+                        "volumetricWeight": null
+                      }
+                    ],
+                    "hazardousCollis": [
+                      {
+                        "numberOfParcelType": 1,
+                        "explanationOfParcelType": "Druckgefaess"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "404": {
+            "description": "No new shipments available"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "GetShipmentResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "edReference",
+          "shipmentTypeIndicator",
+          "lineHaulIndicator",
+          "clearanceTimestamp",
+          "numberOfHandlingUnits",
+          "shipmentWeight",
+          "dispatchPartnersDomesticShipmentNumber"
+        ],
+        "properties": {
+          "edReference": {
+            "type": "number",
+            "description": "The unique shipment number inside the Eurodis network.<br />For a detail definition of the Eurodis shipment number please refer to document A02 of the Eurodis network manual.",
+            "format": "decimal",
+            "maximum": 9999999999999.0,
+            "minimum": 1.0
+          },
+          "referencedEurodisShipmentNumber": {
+            "type": "integer",
+            "description": "EURODIS shipment number of the original shipment. Mandatory for Type \"R\", \"D\" and \"A\"; conditional for \"P\"; optional for \"E\"",
+            "format": "int64",
+            "maximum": 9999999999999.0,
+            "minimum": 1.0,
+            "nullable": true
+          },
+          "initiatingPartnerId": {
+            "type": "integer",
+            "description": "EURODIS initiating partner id",
+            "format": "int64",
+            "maximum": 99.0,
+            "minimum": 1.0,
+            "nullable": true
+          },
+          "shipmentTypeIndicator": {
+            "type": "string",
+            "description": "N = Normal; A = Pickup Orders; P = Result shipment of a pickup order; R = Return shipment; X = AUX-Pan; B = normal shipment in neighbourhood business (NB) setup; D = return shipment in neighbourhood business (NB) setup; E = pickup shipment in neighbourhood business (NB) setup; C = B to C shipment flag (flag “C” can be used on optional basis and must be prior agreed between dispatch partner and delivery partner); Y = B to C shipment in neighbourhood business (NB) set up; L = Return request; M = Return from consignee shipment (only used for transmission to initial delivery partner, transmitted as “R” for transit partner and for delivery partner), as “E” to delivery partner in neighbourhood business (NB) W = shipment distributed without EUROPLATE",
+            "maxLength": 1,
+            "minLength": 1
+          },
+          "lineHaulIndicator": {
+            "type": "string",
+            "description": "Must be \"N\" (Normal), \"D\" (Direct Injection) or  \"L\" (Direct line haul)",
+            "default": "N",
+            "maxLength": 1,
+            "minLength": 1
+          },
+          "clearanceTimestamp": {
+            "type": "string",
+            "description": "Date time when the shipment PAN-dataset was created<br />For example \"2000-01-31T18:30:00.000Z\" for the 31.01.2000 at 18:30",
+            "format": "date-time",
+            "minLength": 1
+          },
+          "entranceTimestamp": {
+            "type": "string",
+            "description": "Entrance date of the shipment in partners domestic system; Time when the shipment was physically consigned<br />For example \"2000-01-31T18:30:00.000Z\" for the 31.01.2000 at 18:30",
+            "format": "date-time",
+            "nullable": true
+          },
+          "numberOfHandlingUnits": {
+            "type": "integer",
+            "description": "Total sum of colli and pallets <br />The number of handling units must match the number of collis transferred!",
+            "default": 1,
+            "maximum": 1000.0,
+            "minimum": 1.0
+          },
+          "shipmentWeight": {
+            "type": "number",
+            "description": "Weight in kilogram with two decimals",
+            "format": "decimal",
+            "default": 0.0,
+            "maximum": 9999999.99,
+            "minimum": 0.01
+          },
+          "consignorsCustomerNumberAtDispatchPartner": {
+            "type": "string",
+            "maxLength": 35,
+            "nullable": true
+          },
+          "consignorsReference": {
+            "type": "string",
+            "maxLength": 35,
+            "nullable": true
+          },
+          "dispatchPartnersDomesticShipmentNumber": {
+            "type": "string",
+            "default": "",
+            "maxLength": 35,
+            "minLength": 1
+          },
+          "truckLicensePlate": {
+            "type": "string",
+            "description": "License plate of the truck (and trailer)",
+            "maxLength": 40,
+            "nullable": true
+          },
+          "termsOfDeliveryText": {
+            "type": "string",
+            "description": "Optional for shipments within the EU, mandatory for non-EUcountries:<br />Must be one the official Incoterms DPU or EXW (for PickUps and Returns) or one of the network-internal Incoterms DDC and DDX",
+            "maxLength": 35,
+            "nullable": true
+          },
+          "routingCode": {
+            "type": "string",
+            "description": "If corresponding logic has been stored for your partner at Eurodis, the determined routing code will be displayed here.",
+            "maxLength": 10,
+            "nullable": true
+          },
+          "shipmentFlexField1": {
+            "type": "string",
+            "description": "Field for flexible shipment informations. Can only be used in coordination with Eurodis!",
+            "maxLength": 200,
+            "nullable": true
+          },
+          "shipmentFlexField2": {
+            "type": "string",
+            "description": "Field for flexible shipment informations. Can only be used in coordination with Eurodis!",
+            "maxLength": 200,
+            "nullable": true
+          },
+          "shipmentFlexField3": {
+            "type": "string",
+            "description": "Field for flexible shipment informations. Can only be used in coordination with Eurodis!",
+            "maxLength": 200,
+            "nullable": true
+          },
+          "shipmentFlexField4": {
+            "type": "string",
+            "description": "Field for flexible shipment informations. Can only be used in coordination with Eurodis!",
+            "maxLength": 200,
+            "nullable": true
+          },
+          "consigneeAddress": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GetShipmentAddressPudoResponse"
+              }
+            ]
+          },
+          "returnAddress": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GetShipmentAddressPudoResponse"
+              }
+            ]
+          },
+          "shipperAddress": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GetShipmentAddressResponse"
+              }
+            ]
+          },
+          "remunerationAddress": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GetShipmentAddressResponse"
+              }
+            ]
+          },
+          "bookingInAddress": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GetShipmentAddressResponse"
+              }
+            ]
+          },
+          "deliveryService": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GetShipmentDeliveryServiceResponse"
+              }
+            ]
+          },
+          "cashOnDeliveryService": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GetShipmentCashOnDeliveryServiceResponse"
+              }
+            ]
+          },
+          "customsService": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GetShipmentCustomsServiceResponse"
+              }
+            ]
+          },
+          "hazardousADRServices": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/GetShipmentHazardousADRServiceResponse"
+            }
+          },
+          "consigneePreAdvice": {
+            "$ref": "#/components/schemas/GetShipmentConsigneePreAdviceResponse"
+          },
+          "collis": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GetShipmentColliDataResponse"
+            }
+          },
+          "hazardousCollis": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/GetShipmentHazardousColliResponse"
+            }
+          }
+        }
+      },
+      "GetShipmentAddressPudoResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "companyName",
+          "street",
+          "city",
+          "zipcode",
+          "countryCode"
+        ],
+        "properties": {
+          "contactName": {
+            "type": "string",
+            "description": "Contact name at the address, printed on EUROPLATE address 2. line<br />If PUDO shipment, contains name of shop.",
+            "maxLength": 40,
+            "nullable": true
+          },
+          "contactTelephone": {
+            "type": "string",
+            "description": "Condition for booking-in service: if booking in service is bil. agreed between partners and booking in flag is provided in DeliveryService",
+            "maxLength": 30,
+            "nullable": true
+          },
+          "alternativeContactTelephone": {
+            "type": "string",
+            "description": "Alternative contact telephone (alpha to account for international dialling code)",
+            "maxLength": 20,
+            "nullable": true
+          },
+          "contactSMS": {
+            "type": "string",
+            "description": "SMS number for primary contact. Format: country prefix (+XX) followed by the phone number.<br />Example +491711234567",
+            "maxLength": 35,
+            "nullable": true
+          },
+          "contactEMail": {
+            "type": "string",
+            "description": "EMail address of primary contact, see also Annex A09 - E-Mail Pre-advice Service Matrix",
+            "maxLength": 80,
+            "nullable": true
+          },
+          "companyName": {
+            "type": "string",
+            "description": "For \"toB\" shipments name of the company or organisation; for \"toC\" shipments name of the receiver; printed on EUROPLATE address 1.line",
+            "default": "",
+            "maxLength": 40,
+            "minLength": 1
+          },
+          "additionalAddressInfo1": {
+            "type": "string",
+            "description": "To be used to indicate additional address information like department, building name, floor, door code (i.e digicode France), room number, parcel machine number etc.<br />printed on EUROPLATE address 3.line",
+            "maxLength": 40,
+            "nullable": true
+          },
+          "additionalAddressInfo2": {
+            "type": "string",
+            "description": "To be used to indicate additional address information like department, building name, flor, door code (i.e digicode France), room number, parcel machine number etc.<br />printed on EUROPLATE address 4.line<br />If PUDO shipment, contains PS (for Parcel Shop) or PT (for Parcel Terminal)",
+            "maxLength": 40,
+            "nullable": true
+          },
+          "street": {
+            "type": "string",
+            "description": "Street + Street number, if street number is not transmitted separately in field StreetNumber; printed on EUROPLATE address 5 line",
+            "default": "",
+            "maxLength": 40,
+            "minLength": 1
+          },
+          "streetNumber": {
+            "type": "string",
+            "description": "Street number printed on EUROPLATE address 5. line<br />Condition: In case the dispatch partner's IT system supports the separated transmission of the street number.<br />If the dispatch partner’s IT system does not support a separate transmission for street number, the street number must be provided in the same field as for the street name",
+            "maxLength": 40,
+            "nullable": true
+          },
+          "region": {
+            "type": "string",
+            "description": "Field to indicate region, province, county",
+            "maxLength": 40,
+            "nullable": true
+          },
+          "city": {
+            "type": "string",
+            "description": "City or Post Town printed on EUROPLATE address 6. line cut down to 30 digits",
+            "default": "",
+            "maxLength": 35,
+            "minLength": 1
+          },
+          "zipcode": {
+            "type": "string",
+            "description": "Zip code printed on EUROPLATE address 6. line (alpha to account for UK, no country indicator to be included, post code format to be validated but not validated to address)",
+            "default": "",
+            "maxLength": 9,
+            "minLength": 1
+          },
+          "countryCode": {
+            "type": "string",
+            "description": "Country code (ISO 3166- 2 alpha country code list checked against platform database); printed on EUROPLATE address 6. line",
+            "default": "",
+            "maxLength": 2,
+            "minLength": 1
+          },
+          "additionalConsigneeInfo": {
+            "type": "string",
+            "description": "Additional information from shipper to consignee or delivery instructions ",
+            "maxLength": 70,
+            "nullable": true
+          },
+          "gatewayAssigned": {
+            "type": "string",
+            "description": "Gateway code assigned to the address (e.g. Inbound gateway for delivery address, Outbound gateway for shippers’ address) as defined in A12 Network manual ",
+            "maxLength": 3,
+            "nullable": true
+          },
+          "pudoID": {
+            "type": "string",
+            "description": "Id of the PUDO (Pick-up and Drop-off) station for shipments with delivery service Z",
+            "maxLength": 35,
+            "nullable": true
+          }
+        }
+      },
+      "GetShipmentAddressResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "companyName",
+          "street",
+          "city",
+          "zipcode",
+          "countryCode"
+        ],
+        "properties": {
+          "contactName": {
+            "type": "string",
+            "description": "Contact name at the address, printed on EUROPLATE address 2. line",
+            "maxLength": 40,
+            "nullable": true
+          },
+          "contactTelephone": {
+            "type": "string",
+            "description": "Condition for booking-in service: if booking in service is bil. agreed between partners and booking in flag is provided in DeliveryService",
+            "maxLength": 30,
+            "nullable": true
+          },
+          "alternativeContactTelephone": {
+            "type": "string",
+            "description": "Alternative contact telephone (alpha to account for international dialling code)",
+            "maxLength": 20,
+            "nullable": true
+          },
+          "contactSMS": {
+            "type": "string",
+            "description": "SMS number for primary contact. Format: country prefix (+XX) followed by the phone number.<br />Example +491711234567",
+            "maxLength": 35,
+            "nullable": true
+          },
+          "contactEMail": {
+            "type": "string",
+            "description": "EMail address of primary contact, see also Annex A09 - E-Mail Pre-advice Service Matrix",
+            "maxLength": 80,
+            "nullable": true
+          },
+          "companyName": {
+            "type": "string",
+            "description": "For \"toB\" shipments name of the company or organisation; for \"toC\" shipments name of the receiver; printed on EUROPLATE address 1.line",
+            "default": "",
+            "maxLength": 40,
+            "minLength": 1
+          },
+          "additionalAddressInfo1": {
+            "type": "string",
+            "description": "To be used to indicate additional address information like department, building name, floor, door code (i.e digicode France), room number, parcel machine number etc.<br />printed on EUROPLATE address 3.line",
+            "maxLength": 40,
+            "nullable": true
+          },
+          "additionalAddressInfo2": {
+            "type": "string",
+            "description": "To be used to indicate additional address information like department, building name, flor, door code (i.e digicode France), room number, parcel machine number etc.<br />printed on EUROPLATE address 4.line",
+            "maxLength": 40,
+            "nullable": true
+          },
+          "street": {
+            "type": "string",
+            "description": "Street + Street number, if street number is not transmitted separately in field StreetNumber; printed on EUROPLATE address 5 line",
+            "default": "",
+            "maxLength": 40,
+            "minLength": 1
+          },
+          "streetNumber": {
+            "type": "string",
+            "description": "Street number printed on EUROPLATE address 5. line<br />Condition: In case the dispatch partner's IT system supports the separated transmission of the street number.<br />If the dispatch partner’s IT system does not support a separate transmission for street number, the street number must be provided in the same field as for the street name",
+            "maxLength": 40,
+            "nullable": true
+          },
+          "region": {
+            "type": "string",
+            "description": "Field to indicate region, province, county",
+            "maxLength": 40,
+            "nullable": true
+          },
+          "city": {
+            "type": "string",
+            "description": "City or Post Town printed on EUROPLATE address 6. line cut down to 30 digits",
+            "default": "",
+            "maxLength": 35,
+            "minLength": 1
+          },
+          "zipcode": {
+            "type": "string",
+            "description": "Zip code printed on EUROPLATE address 6. line (alpha to account for UK, no country indicator to be included, post code format to be validated but not validated to address)",
+            "default": "",
+            "maxLength": 9,
+            "minLength": 1
+          },
+          "countryCode": {
+            "type": "string",
+            "description": "Country code (ISO 3166- 2 alpha country code list checked against platform database); printed on EUROPLATE address 6. line",
+            "default": "",
+            "maxLength": 2,
+            "minLength": 1
+          },
+          "additionalConsigneeInfo": {
+            "type": "string",
+            "description": "Additional information from shipper to consignee or delivery instructions ",
+            "maxLength": 70,
+            "nullable": true
+          },
+          "gatewayAssigned": {
+            "type": "string",
+            "description": "Gateway code assigned to the address (e.g. Inbound gateway for delivery address, Outbound gateway for shippers’ address) as defined in A12 Network manual ",
+            "maxLength": 3,
+            "nullable": true
+          }
+        }
+      },
+      "GetShipmentDeliveryServiceResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "deliveryService",
+          "deliveryType"
+        ],
+        "properties": {
+          "deliveryService": {
+            "type": "string",
+            "description": "Must be D (Day), T (Timed), M (Morning), A (Afternoon), E (Evening), 6 (Saturday), 7 (Sunday), B (Book in), W (Delivery window), F (Delivery before 10:00) or Z (Pick-up and Drop-off Delivery)",
+            "default": "D",
+            "maxLength": 1,
+            "minLength": 1
+          },
+          "deliveryType": {
+            "type": "string",
+            "description": "Must be S (Signature required), N (Signature not required), D (Secure drop), I (Secure id), B (Consolidation at the drop-off partner is required) or C (Consolidation at the delivery partner (which is not the initiating partner) is required). B and C are only valid in the case of a return via PUDO!",
+            "default": "N",
+            "maxLength": 1,
+            "minLength": 1
+          },
+          "secureDeliveryId": {
+            "type": "string",
+            "description": "Secure drop id or id to be used for secure delivery",
+            "maxLength": 40,
+            "nullable": true
+          },
+          "deliveryBookInRequired": {
+            "type": "boolean",
+            "description": "Logical true or false delivery partner is to arrange delivery book in details",
+            "nullable": true
+          },
+          "deliveryTimeWindowStart": {
+            "type": "string",
+            "description": "Only to be used on delivery window service. Only to be entered when service is a time specific delivery service such as timed services<br />Format HH:mm:ss",
+            "default": "08:00:00",
+            "maxLength": 8,
+            "nullable": true
+          },
+          "deliveryTimeWindowEnd": {
+            "type": "string",
+            "description": "Only to be used on delivery window service<br />Format HH:mm:ss",
+            "default": "18:00:00",
+            "maxLength": 8,
+            "nullable": true
+          },
+          "deliveryDateWindowStart": {
+            "type": "string",
+            "description": "Only to be used on delivery window service. Only to be used for date specific delivery service<br />Format yyyy-MM-dd (For example 2000-01-31 for 31.01.2000)",
+            "format": "date",
+            "nullable": true
+          },
+          "deliveryDateWindowEnd": {
+            "type": "string",
+            "description": "Only to be used on delivery window service<br />Format yyyy-MM-dd (For example 2000-01-31 for 31.01.2000)",
+            "format": "date",
+            "nullable": true
+          },
+          "completeDeliveryOnly": {
+            "type": "boolean",
+            "description": "If customer requires delivery of all colli in one delivery set as true otherwise false",
+            "nullable": true
+          },
+          "additionalNotification": {
+            "type": "boolean",
+            "description": "Contact details if a third party needs contacting to inform of delivery",
+            "nullable": true
+          }
+        }
+      },
+      "GetShipmentCashOnDeliveryServiceResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "accountHolder",
+          "amount",
+          "currency",
+          "identifierForCODCollection"
+        ],
+        "properties": {
+          "iban": {
+            "type": "string",
+            "description": "Must be filled if IdentifierForCODCollection = 3",
+            "maxLength": 34,
+            "nullable": true
+          },
+          "bic": {
+            "type": "string",
+            "description": "Must be filled if IdentifierForCODCollection = 3",
+            "maxLength": 11,
+            "nullable": true
+          },
+          "accountHolder": {
+            "type": "string",
+            "description": "Name of the account holder",
+            "default": "",
+            "maxLength": 35,
+            "minLength": 1
+          },
+          "paymentReason": {
+            "type": "string",
+            "description": "Actually for COD between Post AT and TOF-DE only 13 digits (EURODIS Shipment Nr) used",
+            "maxLength": 140,
+            "nullable": true
+          },
+          "paymentReference": {
+            "type": "string",
+            "description": "Actually for COD between Post AT and TOF-DE only 12 digits (EURODIS Shipment Nr) used",
+            "maxLength": 35,
+            "nullable": true
+          },
+          "amount": {
+            "type": "number",
+            "description": "Amount in given currency with two decimals",
+            "format": "decimal",
+            "default": 0.0
+          },
+          "currency": {
+            "type": "string",
+            "description": "EUR or other ISO Currency Codes",
+            "default": "",
+            "maxLength": 3,
+            "minLength": 1
+          },
+          "identifierForCODCollection": {
+            "type": "integer",
+            "description": "COD with cash collection or check collection;<br />Cash collection is standard for Post AT and most partners<br />Must be 3 (Cash) or 5 (Check)",
+            "default": 3
+          }
+        }
+      },
+      "GetShipmentCustomsServiceResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "dutyCode",
+          "descriptionOfGoods"
+        ],
+        "properties": {
+          "commercialValueOfGoods": {
+            "type": "number",
+            "description": "For insurance reasons; mandatory if not documents",
+            "format": "decimal",
+            "maximum": 999999999.99,
+            "minimum": 0.0,
+            "nullable": true
+          },
+          "currency": {
+            "type": "string",
+            "description": "The currency code if commercial value is filled (EUR or other ISO Currency Codes)",
+            "maxLength": 3,
+            "nullable": true
+          },
+          "dutyCode": {
+            "type": "string",
+            "description": "For non EU mandatory (=customs tariff number)",
+            "default": "",
+            "maxLength": 12,
+            "minLength": 1
+          },
+          "sign": {
+            "type": "string",
+            "description": "Additional optional consignment-description (identification/reference-number) ",
+            "maxLength": 10,
+            "nullable": true
+          },
+          "number": {
+            "type": "integer",
+            "description": "Additional optional consignment-description (identification/reference-number) ",
+            "format": "int64",
+            "maximum": 9999999999.0,
+            "minimum": 0.0,
+            "nullable": true
+          },
+          "descriptionOfGoods": {
+            "type": "string",
+            "description": "Optional information about the transporting trucks for e.g. Switzerland ",
+            "default": "",
+            "maxLength": 20,
+            "minLength": 1
+          }
+        }
+      },
+      "GetShipmentHazardousADRServiceResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "adrGrossWeight",
+          "unNumber",
+          "materialDescription",
+          "identifierMassOrVolume"
+        ],
+        "properties": {
+          "billOfDanger": {
+            "type": "string",
+            "description": "Hazardous label; Specification in ADR manual, chapter 3.2, appendix A, column 5. Entering in format N or N.N. Example 3 = 3; 6.1 = 6.1 ",
+            "maxLength": 3,
+            "nullable": true
+          },
+          "additionalBillOfDanger1": {
+            "type": "string",
+            "description": "Additional bill of danger 1 Specification in ADR manual, chapter 3.2, appendix A, column 5, values in brackets. Entering in format N or N.N. Example 3 = 3; 6.1 = 6.1 ",
+            "maxLength": 3,
+            "nullable": true
+          },
+          "additionalBillOfDanger2": {
+            "type": "string",
+            "description": "Additional bill of danger 2 Specification in ADR manual, chapter 3.2, appendix A, column 5, values in brackets. Entering in format N or N.N. Example 3 = 3; 6.1 = 6.1 ",
+            "maxLength": 3,
+            "nullable": true
+          },
+          "additionalBillOfDanger3": {
+            "type": "string",
+            "description": "Additional bill of danger 3 Specification in ADR manual, chapter 3.2, appendix A, column 5, values in brackets. Entering in format N or N.N. Example 3 = 3; 6.1 = 6.1 ",
+            "maxLength": 3,
+            "nullable": true
+          },
+          "tunnelLimitationCode": {
+            "type": "string",
+            "description": "Values B, B/D, B/E, C, C/D, C/E, D, D/E or E are possible",
+            "maxLength": 3,
+            "nullable": true
+          },
+          "packingGroup": {
+            "type": "integer",
+            "description": "Specification in ADR manual, chapter 3.2, appendix A, column 4. Values of 1 – 3 are possible.<br />Please use Arabic notation.",
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "nullable": true
+          },
+          "adrGrossWeight": {
+            "type": "number",
+            "description": "Declaration of the ADR-gross weight in kg or volume in l for the described material according to ADR chapter 1.1.3.6 ",
+            "format": "decimal",
+            "default": 0.0,
+            "maximum": 9999999.99,
+            "minimum": 0.01
+          },
+          "unNumber": {
+            "type": "string",
+            "description": "Specification in ADR manual, chapter 3.2, appendix A, column 1; If LQ, filled with default value",
+            "default": "",
+            "maxLength": 4,
+            "minLength": 1
+          },
+          "transportCategory": {
+            "type": "string",
+            "description": "Specification in ADR manual, chapter 3.2., table A, column 15. Values 0 – 4 are possible.",
+            "maxLength": 1,
+            "nullable": true
+          },
+          "materialDescription": {
+            "type": "string",
+            "description": "Proper shipping name; Specification in ADR manual, chapter 3.2, appendix A, column 2; If LQ, filled with default value",
+            "default": "",
+            "maxLength": 500,
+            "minLength": 1
+          },
+          "technicalName": {
+            "type": "string",
+            "description": "Material, which is subject to special provision 274 in ADR Manual chapter 3.2, appendix A column 6, must be marked with the additional technical name.<br />Example: MaterialDescription would be: \"UN 1993 FLAMMABLE LIQUID, N.O.S.\", then TechnicalName should be: \"(CONTAINS XYLENE AND BENZENE)\"",
+            "maxLength": 500,
+            "nullable": true
+          },
+          "identifierMassOrVolume": {
+            "type": "string",
+            "description": "Here the identifier for mass or volume of ADR-goods has to be transmitted as “kg” or “l”, for LQ goods the entry must be \"kg\" ",
+            "default": "",
+            "maxLength": 2,
+            "minLength": 1
+          }
+        }
+      },
+      "GetShipmentConsigneePreAdviceResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "smsPreAdvice",
+          "eMailPreAdvice",
+          "telephonePreAdvice"
+        ],
+        "properties": {
+          "smsPreAdvice": {
+            "type": "boolean",
+            "description": "If true, ContactSMS in ConsigneeAddress must be filled",
+            "default": false
+          },
+          "eMailPreAdvice": {
+            "type": "boolean",
+            "description": "If true, ContactEMail in ConsigneeAddress must be filled",
+            "default": false
+          },
+          "telephonePreAdvice": {
+            "type": "boolean",
+            "description": "If true, ContactTelephone in ConsigneeAddress must be filled",
+            "default": false
+          }
+        }
+      },
+      "GetShipmentColliDataResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "identifierPalletOrCollo",
+          "weightOfUnit",
+          "length",
+          "width",
+          "height"
+        ],
+        "properties": {
+          "identifierPalletOrCollo": {
+            "type": "string",
+            "description": "\"P\" (Pallet), \"C\" (Colli), \"P+\" (Pallet+) or \"C+\" (Colli+) ",
+            "default": "",
+            "maxLength": 2,
+            "minLength": 1
+          },
+          "weightOfUnit": {
+            "type": "number",
+            "description": "In kilogram",
+            "format": "decimal",
+            "default": 0.0,
+            "maximum": 9999999.99,
+            "minimum": 0.0
+          },
+          "boxType": {
+            "type": "string",
+            "description": "Maybe obsolete, to be discussed",
+            "maxLength": 1,
+            "nullable": true
+          },
+          "boxDimensionCategory": {
+            "type": "string",
+            "description": "Maybe obsolete, to be discussed",
+            "maxLength": 1,
+            "nullable": true
+          },
+          "boxId": {
+            "type": "string",
+            "description": "Maybe obsolete, to be discussed",
+            "maxLength": 16,
+            "nullable": true
+          },
+          "europlateBarcode": {
+            "type": "string",
+            "description": "EURODIS collo barcode<br />default value (0) in case of neighbourhood business",
+            "maxLength": 24,
+            "nullable": true
+          },
+          "referencedEuroplateBarcode": {
+            "type": "string",
+            "description": "Filled only if the unit is part of a return shipment, referencing the original EURODIS collo barcode ",
+            "maxLength": 24,
+            "nullable": true
+          },
+          "volumetric": {
+            "type": "integer",
+            "description": "Cubic meters",
+            "format": "int32",
+            "maximum": 99999.0,
+            "minimum": 0.0,
+            "nullable": true
+          },
+          "consignorsColloBarcode": {
+            "type": "string",
+            "description": "Original delivery partner’s domestic return barcode generated/ allocated by EURODIS return solution, Customer or Despatch partner Barcode ID.<br />For neighbourhood business the domestic barcode of the respective partner must be provide in accordance to SOP – Neighbourhood business.",
+            "maxLength": 50,
+            "nullable": true
+          },
+          "length": {
+            "type": "integer",
+            "description": "In centimeters",
+            "format": "int32",
+            "default": 1,
+            "maximum": 999.0,
+            "minimum": 1.0
+          },
+          "width": {
+            "type": "integer",
+            "description": "In centimeters",
+            "format": "int32",
+            "default": 1,
+            "maximum": 999.0,
+            "minimum": 1.0
+          },
+          "height": {
+            "type": "integer",
+            "description": "In centimeters",
+            "format": "int32",
+            "default": 1,
+            "maximum": 999.0,
+            "minimum": 1.0
+          },
+          "volumetricWeight": {
+            "type": "number",
+            "description": "In kilogram",
+            "format": "decimal",
+            "maximum": 9999999.99,
+            "minimum": 0.0,
+            "nullable": true
+          },
+          "deliveryPartnerBarcode": {
+            "type": "string",
+            "description": "Delivery partner barcode from the central label service (CLS)<br/>Only filled, when the delivery partner is using this service.",
+            "maxLength": 50,
+            "nullable": true
+          },
+          "dispatchPartnerBarcode": {
+            "type": "string",
+            "description": "Dispatch partner barcode from the central label service (CLS)<br/>Only filled, when the dispatch partner is using this service.",
+            "maxLength": 50,
+            "nullable": true
+          },
+          "pudoOpeningCode": {
+            "type": "string",
+            "description": "Barcode, pin or other information to open the drop off point in respective country.",
+            "maxLength": 50,
+            "nullable": true
+          },
+          "colloFlexField1": {
+            "type": "string",
+            "description": "Field for flexible collo  informations. Can only be used in coordination with Eurodis!",
+            "maxLength": 200,
+            "nullable": true
+          },
+          "colloFlexField2": {
+            "type": "string",
+            "description": "Field for flexible collo informations. Can only be used in coordination with Eurodis!",
+            "maxLength": 200,
+            "nullable": true
+          },
+          "colloFlexField3": {
+            "type": "string",
+            "description": "Field for flexible collo informations. Can only be used in coordination with Eurodis!",
+            "maxLength": 200,
+            "nullable": true
+          }
+        }
+      },
+      "GetShipmentHazardousColliResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "numberOfParcelType",
+          "explanationOfParcelType"
+        ],
+        "properties": {
+          "numberOfParcelType": {
+            "type": "integer",
+            "description": "Amount parcels in the shipment of this specific parcel type",
+            "default": 1,
+            "maximum": 999.0,
+            "minimum": 1.0
+          },
+          "explanationOfParcelType": {
+            "type": "string",
+            "description": "Declaration of the ADR-material description under the regulations of ADR for this parcel type.<br />Specifications in ADR subsection 6.1, for intermediate bulk containers in subsection 6.5 and 6.6.",
+            "default": "",
+            "maxLength": 60,
+            "minLength": 1
+          }
+        }
+      },
+      "GetShipmentResponse2": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "edReference",
+          "shipmentTypeIndicator",
+          "lineHaulIndicator",
+          "clearanceTimestamp",
+          "numberOfHandlingUnits",
+          "shipmentWeight",
+          "dispatchPartnersDomesticShipmentNumber"
+        ],
+        "properties": {
+          "edReference": {
+            "type": "number",
+            "description": "The unique shipment number inside the Eurodis network.<br />For a detail definition of the Eurodis shipment number please refer to document A02 of the Eurodis network manual.",
+            "format": "decimal",
+            "maximum": 9999999999999.0,
+            "minimum": 1.0
+          },
+          "referencedEurodisShipmentNumber": {
+            "type": "integer",
+            "description": "EURODIS shipment number of the original shipment. Mandatory for Type \"R\", \"D\" and \"A\"; conditional for \"P\"; optional for \"E\"",
+            "format": "int64",
+            "maximum": 9999999999999.0,
+            "minimum": 1.0,
+            "nullable": true
+          },
+          "shipmentTypeIndicator": {
+            "type": "string",
+            "description": "N = Normal; A = Pickup Orders; P = Result shipment of a pickup order; R = Return shipment; X = AUX-Pan; B = normal shipment in neighbourhood business (NB) setup; D = return shipment in neighbourhood business (NB) setup; E = pickup shipment in neighbourhood business (NB) setup; C = B to C shipment flag (flag “C” can be used on optional basis and must be prior agreed between dispatch partner and delivery partner); Y = B to C shipment in neighbourhood business (NB) set up; L = Return request; M = Return from consignee shipment (only used for transmission to initial delivery partner, transmitted as “R” for transit partner and for delivery partner), as “E” to delivery partner in neighbourhood business (NB) W = shipment distributed without EUROPLATE",
+            "maxLength": 1,
+            "minLength": 1
+          },
+          "lineHaulIndicator": {
+            "type": "string",
+            "description": "Must be \"N\" (Normal), \"D\" (Direct Injection) or  \"L\" (Direct line haul)",
+            "default": "N",
+            "maxLength": 1,
+            "minLength": 1
+          },
+          "clearanceTimestamp": {
+            "type": "string",
+            "description": "Date time when the shipment PAN-dataset was created<br />For example \"2000-01-31T18:30:00.000Z\" for the 31.01.2000 at 18:30",
+            "format": "date-time",
+            "minLength": 1
+          },
+          "entranceTimestamp": {
+            "type": "string",
+            "description": "Entrance date of the shipment in partners domestic system; Time when the shipment was physically consigned<br />For example \"2000-01-31T18:30:00.000Z\" for the 31.01.2000 at 18:30",
+            "format": "date-time",
+            "nullable": true
+          },
+          "numberOfHandlingUnits": {
+            "type": "integer",
+            "description": "Total sum of colli and pallets <br />The number of handling units must match the number of collis transferred!",
+            "default": 1,
+            "maximum": 1000.0,
+            "minimum": 1.0
+          },
+          "shipmentWeight": {
+            "type": "number",
+            "description": "Weight in kilogram with two decimals",
+            "format": "decimal",
+            "default": 0.0,
+            "maximum": 9999999.99,
+            "minimum": 0.01
+          },
+          "consignorsCustomerNumberAtDispatchPartner": {
+            "type": "string",
+            "maxLength": 35,
+            "nullable": true
+          },
+          "consignorsReference": {
+            "type": "string",
+            "maxLength": 35,
+            "nullable": true
+          },
+          "dispatchPartnersDomesticShipmentNumber": {
+            "type": "string",
+            "default": "",
+            "maxLength": 35,
+            "minLength": 1
+          },
+          "truckLicensePlate": {
+            "type": "string",
+            "description": "License plate of the truck (and trailer)",
+            "maxLength": 40,
+            "nullable": true
+          },
+          "termsOfDeliveryText": {
+            "type": "string",
+            "description": "Optional for shipments within the EU, mandatory for non-EUcountries:<br />Must be one the official Incoterms DPU or EXW (for PickUps and Returns) or one of the network-internal Incoterms DDC and DDX",
+            "maxLength": 35,
+            "nullable": true
+          },
+          "consigneeAddress": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GetShipmentAddressPudoResponse"
+              }
+            ]
+          },
+          "returnAddress": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GetShipmentAddressPudoResponse"
+              }
+            ]
+          },
+          "shipperAddress": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GetShipmentAddressResponse"
+              }
+            ]
+          },
+          "remunerationAddress": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GetShipmentAddressResponse"
+              }
+            ]
+          },
+          "bookingInAddress": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GetShipmentAddressResponse"
+              }
+            ]
+          },
+          "deliveryService": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GetShipmentDeliveryServiceResponse"
+              }
+            ]
+          },
+          "cashOnDeliveryService": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GetShipmentCashOnDeliveryServiceResponse"
+              }
+            ]
+          },
+          "customsService": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GetShipmentCustomsServiceResponse"
+              }
+            ]
+          },
+          "hazardousADRServices": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/GetShipmentHazardousADRServiceResponse"
+            }
+          },
+          "consigneePreAdvice": {
+            "$ref": "#/components/schemas/GetShipmentConsigneePreAdviceResponse"
+          },
+          "collis": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GetShipmentColliDataResponse2"
+            }
+          },
+          "hazardousCollis": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/GetShipmentHazardousColliResponse"
+            }
+          }
+        }
+      },
+      "GetShipmentColliDataResponse2": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "identifierPalletOrCollo",
+          "weightOfUnit",
+          "length",
+          "width",
+          "height"
+        ],
+        "properties": {
+          "identifierPalletOrCollo": {
+            "type": "string",
+            "description": "\"P\" (Pallet), \"C\" (Colli), \"P+\" (Pallet+) or \"C+\" (Colli+) ",
+            "default": "",
+            "maxLength": 2,
+            "minLength": 1
+          },
+          "weightOfUnit": {
+            "type": "number",
+            "description": "In kilogram",
+            "format": "decimal",
+            "default": 0.0,
+            "maximum": 9999999.99,
+            "minimum": 0.0
+          },
+          "boxType": {
+            "type": "string",
+            "description": "Maybe obsolete, to be discussed",
+            "maxLength": 1,
+            "nullable": true
+          },
+          "boxDimensionCategory": {
+            "type": "string",
+            "description": "Maybe obsolete, to be discussed",
+            "maxLength": 1,
+            "nullable": true
+          },
+          "boxId": {
+            "type": "string",
+            "description": "Maybe obsolete, to be discussed",
+            "maxLength": 16,
+            "nullable": true
+          },
+          "europlateBarcode": {
+            "type": "string",
+            "description": "EURODIS collo barcode<br />default value (0) in case of neighbourhood business",
+            "maxLength": 24,
+            "nullable": true
+          },
+          "referencedEuroplateBarcode": {
+            "type": "string",
+            "description": "Filled only if the unit is part of a return shipment, referencing the original EURODIS collo barcode ",
+            "maxLength": 24,
+            "nullable": true
+          },
+          "volumetric": {
+            "type": "integer",
+            "description": "Cubic meters",
+            "format": "int32",
+            "maximum": 99999.0,
+            "minimum": 0.0,
+            "nullable": true
+          },
+          "consignorsColloBarcode": {
+            "type": "string",
+            "description": "Original delivery partner’s domestic return barcode generated/ allocated by EURODIS return solution, Customer or Despatch partner Barcode ID.<br />For neighbourhood business the domestic barcode of the respective partner must be provide in accordance to SOP – Neighbourhood business.",
+            "maxLength": 50,
+            "nullable": true
+          },
+          "length": {
+            "type": "integer",
+            "description": "In centimeters",
+            "format": "int32",
+            "default": 1,
+            "maximum": 999.0,
+            "minimum": 1.0
+          },
+          "width": {
+            "type": "integer",
+            "description": "In centimeters",
+            "format": "int32",
+            "default": 1,
+            "maximum": 999.0,
+            "minimum": 1.0
+          },
+          "height": {
+            "type": "integer",
+            "description": "In centimeters",
+            "format": "int32",
+            "default": 1,
+            "maximum": 999.0,
+            "minimum": 1.0
+          },
+          "volumetricWeight": {
+            "type": "number",
+            "description": "In kilogram",
+            "format": "decimal",
+            "maximum": 9999999.99,
+            "minimum": 0.0,
+            "nullable": true
+          }
+        }
+      }
+    }
+  }
+}
