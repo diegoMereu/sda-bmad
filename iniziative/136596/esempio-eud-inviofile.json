@@ -1,0 +1,130 @@
+{
+  "_nota": "Esempio fornito da Diego il 2026-10-22: tracciato unico di una spedizione EURODIS nel flusso esistente in cui la LDV la produce SDA (canale EUD_INVIOFILE). Dati anagrafici di test. Riferimento per allineare il mapping del flusso autoproduttore.",
+  "progressivo": 1,
+  "canale": "EUD_INVIOFILE",
+  "id_file": "9demr62y3-1c4e-478e-8h79-6624c62mr59c",
+  "id_preadvising": "83mar302-abf6-4b3b-99e5-25a8fc8796e9",
+  "codici_servizi": "",
+  "upload_time": "2026-10-21T19:21:10.000+02:00",
+  "link_file_fisico_inviato": "https://logisticcolldiag.blob.core.windows.net/corriere-espresso/preadvising%2Fdalavorare%2Fpdb%2F2406130201_OUP_PREAVVISO_12102026180229_V02_C009_PT_INVIOFILE.json",
+  "cliente": {
+    "codice_login_cliente": "2406130201",
+    "id_cliente": "2406130201",
+    "codice_auc": "2406130201",
+    "tipo_cliente": "",
+    "ragione_sociale": "MITTENTE RAGSOC",
+    "conto_corrente": "",
+    "codice_contratto": "SFA-00633620",
+    "partita_iva": "",
+    "cod_fiscale": "",
+    "casella_postale": ""
+  },
+  "spedizione": [
+    {
+      "flag_stampa_ldv": "",
+      "formato_stampa_ldv": "A4",
+      "numero_colli": 1,
+      "rif_spedizione": "R-MR-D194-22014",
+      "valore": 0,
+      "id_andata_ritorno": "",
+      "centro_costo": "CDC-00000014",
+      "descrizione_contenuto": "documenti",
+      "indirizzo_invio_email": "",
+      "codice_tipo_spedizione": "",
+      "codice_servizio_pagamento": "",
+      "classe_spedizione": "",
+      "flag_attivazione_ritiro": "N",
+      "data_ordine": "",
+      "data_spedizione": "2026-10-12",
+      "tipo_merce": "",
+      "codice_servizio": "",
+      "rif_prodotto_cliente": "APT000902",
+      "servizi_spedizione": "",
+      "mittente": {
+        "ragione_sociale": "MITTENTE RAGSOC",
+        "rif_contatto": "Mittente REF",
+        "indirizzo": "viale viennetta",
+        "numero_civico": "123",
+        "cap": "1010",
+        "provincia": "",
+        "localita": "VIENNA",
+        "telefono": "49132456132",
+        "cellulare": "333132456287",
+        "email": "mail@mail.it",
+        "codice_nazione": "AT",
+        "nazione": "AUSTRIA",
+        "note1": "",
+        "note2": ""
+      },
+      "destinatario": {
+        "id_civico_indirizzo": "",
+        "ragione_sociale": "RAGSOC1",
+        "rif_contatto": "Destinatario REF",
+        "referente": "",
+        "dug": "",
+        "indirizzo": "C. ITALIA 12/B",
+        "numero_civico": "10",
+        "cap": "40121",
+        "provincia": "BO",
+        "localita": "BOLOGNA",
+        "codice_nazione": "IT",
+        "nazione": "Italia",
+        "telefono": "09090909",
+        "prefisso_cellulare": "",
+        "cellulare": "3339877543",
+        "email": "aa@bb.it",
+        "rif_id_destinatario_cliente": "",
+        "id_fiscale": "",
+        "note1": "",
+        "note2": "",
+        "nome_vicino": "",
+        "flag_ascensore": ""
+      },
+      "internazionale": {
+        "b2b_b2c": "",
+        "valuta": "",
+        "valore_spedizione": 0,
+        "addebito_oneri": "",
+        "note": ""
+      },
+      "assicurata": {
+        "spedizione_assicurata": "",
+        "importo_assicurata": 0
+      },
+      "contrassegno": {
+        "flag": "N",
+        "tipo_pagamento_contrassegno": "",
+        "importo_contrassegno": 0
+      },
+      "consegna": {
+        "filiale": "",
+        "codice_frazionario": "",
+        "denominazione_frazionario": "",
+        "codice_servizio_accessorio": "",
+        "servizi_spedizione": "",
+        "mancata_consegna": "",
+        "id_consegna_programmata": "",
+        "data_consegna": "",
+        "inizio_ora_consegna": "",
+        "fine_ora_consegna": "",
+        "giorno_orario_consegna": "",
+        "note": ""
+      },
+      "collo": [
+        {
+          "id_ldv": "",
+          "id_collo": "C-MR-C012-15702",
+          "descrizione": "",
+          "peso": 2000,
+          "altezza": 10,
+          "lunghezza": 10,
+          "profondita": 10,
+          "codice_contenuto": "",
+          "codice_imballo": "",
+          "nazionalita": "",
+          "articolo": []
+        }
+      ]
+    }
+  ]
+}

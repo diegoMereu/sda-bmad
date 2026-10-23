@@ -2,12 +2,24 @@
 # Unica fonte di verita su id, titolo, stato e referenti.
 # Aggiungi campi solo quando ti servono davvero.
 #
-# stato: aperta | in_corso | sospesa | chiusa
+# stato: aperta | in_analisi | in_corso | sospesa | chiusa
 
 adi: PCL-127
 pm_accenture: "Diego Mereu"
 
 iniziative:
+
+  - id: "136596"
+    titolo: "Eurodis autoproduttore"
+    prj: null  # non ancora assegnato
+    stato: in_analisi
+    owner_cliente: "Piergentili"
+    perimetro: >-
+      Presa in carico delle spedizioni del consorzio EURODIS: batch schedulato
+      (ms collection) che scarica i PAN dall'API EURODIS receive-pan, li
+      converte nel tracciato unico e li pubblica su Kafka
+      preadvising.pre-enrichment. Da chiarire il ritorno tracking/esiti verso
+      EURODIS. Analisi in iniziative/136596/analisi.md.
 
   - id: "138972"
     titolo: "Preadvising Fast"

@@ -23,7 +23,7 @@ deve capire in due minuti dove siamo, senza aprire altri file.
 ```markdown
 # <id> — <titolo>
 
-**Data**: <YYYY-MM-DD> · **Stato**: <aperta|in_corso|sospesa|chiusa> · **Semaforo**: 🟢|🟡|🔴
+**Data**: <YYYY-MM-DD> · **Stato**: <aperta|in_analisi|in_corso|sospesa|chiusa> · **Semaforo**: 🟢|🟡|🔴
 **Owner cliente**: <nome> · **PRJ**: <codice>
 
 ## In una riga

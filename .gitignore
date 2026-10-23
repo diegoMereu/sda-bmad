@@ -10,3 +10,6 @@ _bmad/config.user.toml
 
 # dati di produzione: mai versionati
 **/data/
+
+# lock file di Office
+~$*

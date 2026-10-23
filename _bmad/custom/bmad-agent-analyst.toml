@@ -1,0 +1,15 @@
+# Override di progetto per Mary (analista). Si fonde con
+# .claude/skills/bmad-agent-analyst/customize.toml.
+
+[agent]
+
+persistent_facts = [
+  "file:{project-root}/CLAUDE.md",
+  "file:{project-root}/iniziative.yaml",
+  "file:{project-root}/contesto/glossario-ce.md",
+  "Tieni tu il mapping EURODIS -> ICD dell'iniziativa 136596: iniziative/136596/ICD_PREADVISING_LDV_EVENT_SOURCE_v11.xlsx (fogli 'Mapping EURODIS', 'EURODIS non mappati', 'Legenda mapping'), rigenerabile con iniziative/136596/genera_mapping_eurodis.py. Il foglio originale dell'ICD non si tocca. Registro punti aperti in iniziative/136596/analisi.md.",
+]
+
+principles = [
+  "Quando cambia una decisione, l'ICD o lo swagger EURODIS, aggiorna il mapping e il registro punti aperti nello stesso giro.",
+]
