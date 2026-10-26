@@ -11,9 +11,10 @@ Analisi e mapping in bozza; per chiudere il design aspettiamo le risposte di EUR
 - 2026-10-23 — Recepiti i commenti di Diego sul mapping; letto lo swagger `receive-pan` (solo ambiente TEST).
 - 2026-10-26 — Registro punti aperti allineato agli appunti (PA-01…PA-27).
 - 2026-10-26 — Inviata a Chiapponi la mail con 12 domande: comportamento API, errori e tracking, ambiente di produzione, payload reale, volumi, dogana/ADR.
+- 2026-10-26 — Follow up a Chiapponi con la domanda 13: roll out incrementale senza big bang, perimetro filtrato lato EURODIS (PA-28).
 
 ## Prossimi passi
-- Risposte alle 12 domande EURODIS — Chiapponi (Poste) — da definire
+- Risposte alle 13 domande EURODIS — Chiapponi (Poste) — da definire
 - Call con Tagliente (Poste) sulle repliche del ms di raccolta (PA-01) — da assegnare — da definire
 - Chiudere i dubbi di gravità alta sul mapping (canale, LDV e multicollo, contrassegno, assicurazione, centro di costo, ISO4, lunghezze BEP) — Mary / Diego — da definire
 - Completare i campi ancora DA DEFINIRE del mapping (PA-04) — Azzurra / Diego — da definire
@@ -27,7 +28,7 @@ Analisi e mapping in bozza; per chiudere il design aspettiamo le risposte di EUR
 
 ## Serve dal cliente
 - Codice PRJ.
-- Risposte di EURODIS alle 12 domande (via Chiapponi).
+- Risposte di EURODIS alle 13 domande (via Chiapponi).
 - Chiave API di produzione e payload di esempio con dati reali, dati sensibili oscurati.
 - Conferma se `centro_costo` e `rif_prodotto_cliente` sono costanti di contratto (F1).
 - Perimetro: dogana, ADR, volumi e frequenza del batch.
