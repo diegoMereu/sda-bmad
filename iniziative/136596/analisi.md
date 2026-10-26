@@ -178,16 +178,16 @@ Owner RTI = chi lo porta avanti lato fornitore; Rif. Poste = referente lato clie
 | PA-02 | 22-Oct | ms collection — con stato o senza stato | — | — | Deciso: si salva lo storico | chiuso | |
 | PA-03 | 22-Oct | Mapping prodotto / servizi accessori | — | — | Deciso: chiamare ce-rules per derivare prodotto e servizi dalla LDV | chiuso | |
 | PA-04 | 22-Oct | Mapping dati EURODIS → DTO del dichiarato | Azzurra / Diego | — | Mapping fatto con LLM confrontando lo swagger EURODIS con l'ICD | in corso | Prima stesura il 22-Oct nel file ICD, foglio "Mapping EURODIS". Restano 15 campi DA DEFINIRE |
-| PA-05 | 22-Oct | ms collection — come EURODIS gestisce lo stato delle spedizioni inviate | — | Chiapponi | | aperto | Evidenza 1 |
-| PA-06 | 22-Oct | ms collection — come EURODIS gestisce la prima chiamata | — | Chiapponi | | aperto | Evidenza 3 |
-| PA-07 | 22-Oct | ms tracking — quale API chiamare e con quali dati | — | Chiapponi | | aperto | Evidenza 5. Riguarda il task a parte `ce-eurodis-send-tracking` |
-| PA-08 | — | Come si restituisce a EURODIS un errore (validazione o altro) | — | Chiapponi | | aperto | Evidenza 4 |
-| PA-09 | — | Errore tra la chiamata a receive-shipments e la persistenza | — | Chiapponi | | aperto | Evidenza 1 |
+| PA-05 | 22-Oct | ms collection — come EURODIS gestisce lo stato delle spedizioni inviate | — | Chiapponi | | aperto | Evidenza 1. Chiesto a Chiapponi con mail del 26-Oct (dom. 1) |
+| PA-06 | 22-Oct | ms collection — come EURODIS gestisce la prima chiamata | — | Chiapponi | | aperto | Evidenza 3. Chiesto a Chiapponi con mail del 26-Oct (dom. 2) |
+| PA-07 | 22-Oct | ms tracking — quale API chiamare e con quali dati | — | Chiapponi | | aperto | Evidenza 5. Riguarda il task a parte `ce-eurodis-send-tracking`. Chiesto a Chiapponi con mail del 26-Oct (dom. 8) |
+| PA-08 | — | Come si restituisce a EURODIS un errore (validazione o altro) | — | Chiapponi | | aperto | Evidenza 4. Chiesto a Chiapponi con mail del 26-Oct (dom. 7) |
+| PA-09 | — | Errore tra la chiamata a receive-shipments e la persistenza | — | Chiapponi | | aperto | Evidenza 1. Chiesto a Chiapponi con mail del 26-Oct (dom. 1) |
 | PA-10 | — | Reperire contratto / codice cliente / AUC | — | — | Deciso: si reperiscono da F1 | chiuso | |
 | PA-11 | 22-Oct | Quale campo EURODIS diventa la LDV SDA? Una LDV per spedizione o per collo? | da assegnare | — | Deciso: `consignorsColloBarcode` → `collo.id_ldv`; `europlateBarcode` → `internazionale.id_ldv_itz`; `edReference` → `rif_spedizione` | aperto | Restano: (a) `id_ldv_itz` è un campo di spedizione e `europlateBarcode` uno per collo, con più colli quale si usa? (b) da dove arriva `collo.id_collo`; (c) madre/figlio nel multicollo |
-| PA-12 | 22-Oct | Ambiente di produzione EURODIS e chiave API di produzione | da assegnare | — | | aperto | Proposto da Mary; oggi c'è solo TEST |
-| PA-13 | 22-Oct | Spedizioni con dogana e ADR: rientrano nel perimetro? | da assegnare | — | | aperto | Proposto da Mary |
-| PA-14 | 22-Oct | Frequenza del batch e volumi attesi | da assegnare | — | | aperto | Proposto da Mary |
+| PA-12 | 22-Oct | Ambiente di produzione EURODIS e chiave API di produzione | da assegnare | Chiapponi | | aperto | Proposto da Mary; oggi c'è solo TEST. Chiesto a Chiapponi con mail del 26-Oct (dom. 9) |
+| PA-13 | 22-Oct | Spedizioni con dogana e ADR: rientrano nel perimetro? | da assegnare | Chiapponi | | aperto | Proposto da Mary. Chiesto a Chiapponi con mail del 26-Oct (dom. 12) |
+| PA-14 | 22-Oct | Frequenza del batch e volumi attesi | da assegnare | Chiapponi | | aperto | Proposto da Mary. Chiesto a Chiapponi con mail del 26-Oct (dom. 11) |
 | PA-15 | 22-Oct | Identificativi di canale: `id_preadvising` (obbligatorio), `id_canale`, `id_file`, `id_partner` | da assegnare | — | Deciso per `id_preadvising`: `UUID.randomUUID().toString()` | aperto | Restano `id_canale`, `id_file`, `id_partner`. UUID 36 caratteri contro i 15 dell'ICD: vedi Note per lo sviluppo |
 | PA-16 | 22-Oct | Lunghezze incompatibili (email 80→50, SMS 35→30, civico 40→5, nome contatto, note, TARIC) | — | — | Deciso: si passa il valore intero, non si tronca. Se serve si cambia la validazione | chiuso | |
 | PA-17 | 22-Oct | Resi e rettifiche (`shipmentTypeIndicator` R, `referencedEurodis…`, `returnAddress`), `verso`, `consegna.modalita`, `mancata_consegna` | da assegnare | — | | aperto | Dal mapping |
@@ -196,3 +196,7 @@ Owner RTI = chi lo porta avanti lato fornitore; Rif. Poste = referente lato clie
 | PA-20 | 22-Oct | Consegna a punto di ritiro (`pudoID`): nessun campo ICD generico | da assegnare | — | | aperto | Dal mapping |
 | PA-23 | 22-Oct | `rif_prodotto_cliente` (`APT000902`) e `centro_costo` (`CDC-00000014`) nell'esempio EUD_INVIOFILE: sono costanti di contratto (F1) o si derivano? | da assegnare | — | | aperto | Emerso dall'esempio; `rif_prodotto_cliente` potrebbe pesare su ce-rules |
 | PA-22 | 22-Oct | Campi con semantica diversa, non di lunghezza: `region` EURODIS → `provincia` ICD; valore merce in valuta non EUR | da assegnare | — | | aperto | Separati da PA-16 |
+| PA-24 | 22-Oct | Payload di esempio di produzione con dati reali (dati sensibili oscurati) | da assegnare | Chiapponi | | aperto | Serve a verificare DF-01, DF-02, DF-18. Chiesto a Chiapponi con mail del 26-Oct (dom. 10) |
+| PA-25 | 22-Oct | Decidere il nome del canale che guida tutta l'elaborazione | da assegnare | — | | aperto | Vedi DF-04 (`EURODIS` o `EUD_INVIOSYSTEM`) e PA-15 |
+| PA-26 | 26-Oct | ms ingestione: servono due livelli di ms? Uno consuma dall'API, salva in Mongo e produce su coda; l'altro consuma dalla coda e fa il mapping DTO | da assegnare | — | | aperto | Conseguenza di PA-02 (si salva lo storico); tocca PA-01 |
+| PA-27 | 26-Oct | Comportamento API receive-pan: aggiornamenti e annullamenti, limiti di chiamata (paginazione, rate limit, timeout), durata della rilettura puntuale, fuso orario dei timestamp, rotazione della chiave API | da assegnare | Chiapponi | | aperto | Chiesto a Chiapponi con mail del 26-Oct (dom. 3, 4, 5, 6). Dalla mail è stata tolta la domanda sulle restrizioni di rete (whitelist IP) |
