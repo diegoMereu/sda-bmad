@@ -1,0 +1,92 @@
+# Configurazione del mock per prodotto.
+# Per aggiungere un prodotto: copiare un blocco, cambiare il nome e i parametri.
+# Tutti i campi sono opzionali: quelli assenti prendono i valori di "default".
+
+api_keys:            # X-API-Key -> partner (451 se la spedizione e' di un altro partner)
+  test-key-sda: SDA
+  test-key-altro: ALTRO
+
+# Sintassi LDV. PROVVISORIA: da confermare con chi conosce la regola SDA
+# (richiesta inviata a Marzilli). Si cambia qui, senza toccare il codice.
+#   prefisso : stringa fissa iniziale
+#   cifre    : numero di cifre del corpo (progressivo univoco)
+#   check    : none | mod10 | mod11   (cifra di controllo in coda)
+#   alfabeto : digits | alnum
+ldv_default:
+  prefisso: ""
+  cifre: 11
+  check: mod10
+  alfabeto: digits
+
+default:
+  shipmentTypeIndicator: N
+  lineHaulIndicator: L
+  mittente_paese: AT          # chiave in data/indirizzi.yaml
+  destinatari_paesi: [IT]
+  colli: [1, 1]               # min, max colli per spedizione
+  peso_collo_kg: [1, 20]
+  dimensioni_cm: [10, 60]
+  deliveryService: D
+  deliveryType: N
+  contrassegno: null          # null oppure {importo: [min, max], tipo: 3|5}
+  dogana: false
+  adr: false
+  pudo: false
+  preavviso: {sms: true, email: true, telefono: false}
+  # Anomalie da iniettare con probabilita' 0..1 (per test negativi)
+  anomalie:
+    consignorsColloBarcode_vuoto: 0
+    ldv_duplicata: 0
+    ldv_check_errato: 0
+
+prodotti:
+  standard:
+    descrizione: Pacco singolo a firma, consegna in giornata
+    deliveryType: S
+
+  multicollo:
+    descrizione: Spedizione da 2-4 colli
+    colli: [2, 4]
+    peso_collo_kg: [2, 15]
+
+  contrassegno_contanti:
+    descrizione: Contrassegno in contanti
+    contrassegno: {importo: [20, 500], tipo: 3}
+
+  contrassegno_assegno:
+    descrizione: Contrassegno con assegno
+    contrassegno: {importo: [20, 500], tipo: 5}
+
+  pudo:
+    descrizione: Consegna a punto di ritiro
+    deliveryService: Z
+    pudo: true
+
+  sabato:
+    descrizione: Consegna di sabato
+    deliveryService: "6"
+
+  dogana_extra_ue:
+    descrizione: Spedizione con dogana
+    mittente_paese: CH
+    destinatari_paesi: [IT]
+    dogana: true
+    termsOfDeliveryText: DDX
+
+  adr:
+    descrizione: Merce pericolosa ADR
+    adr: true
+
+  reso:
+    descrizione: Reso
+    shipmentTypeIndicator: R
+    mittente_paese: IT
+    destinatari_paesi: [AT]
+
+# Contenuto della coda all'avvio: quante spedizioni per prodotto
+# (si possono sempre generare altre con POST /admin/genera)
+seed:
+  standard: 3
+  multicollo: 2
+  contrassegno_contanti: 1
+  pudo: 1
