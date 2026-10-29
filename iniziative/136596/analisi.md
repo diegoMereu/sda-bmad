@@ -1,6 +1,6 @@
 # 136596 — Eurodis autoproduttore · Analisi
 
-**Aggiornata**: 2026-10-22 · **Analista**: Mary · **Stato**: bozza, in raccolta
+**Aggiornata**: 2026-10-29 · **Analista**: Mary · **Stato**: bozza, in raccolta
 
 ## Esigenza
 
@@ -43,17 +43,30 @@ Fogli aggiunti:
 Per rigenerarlo: `python genera_mapping_eurodis.py`. Le regole sono nel
 dizionario `R`; i default per famiglia di campi sono in `default()`.
 
-Quadro al 2026-10-22 (553 campi foglia):
+Quadro al 2026-10-29 (553 campi foglia; include la proposta sui servizi
+accessori, [accessori-eurodis-pdb-proposta.md](accessori-eurodis-pdb-proposta.md)):
 
 | Categoria | Campi |
 |---|---|
-| DIRETTO / TRASFORMATO | 43 / 24 |
-| COSTANTE / GENERATO | 7 / 6 |
-| F1 (cliente) / CE-RULES | 4 / 10 |
-| A VALLE (normalizzazione e arricchimento) | 232 |
-| N/A (ritiro, pickup, altri vettori) | 95 |
-| NON VALORIZZATO | 115 |
-| **DA DEFINIRE** | **17** |
+| DIRETTO / TRASFORMATO | 40 / 20 |
+| COSTANTE / GENERATO | 6 / 7 |
+| F1 (cliente) / CE-RULES | 4 / 9 |
+| A VALLE (normalizzazione e arricchimento) | 230 |
+| N/A (ritiro, pickup, altri vettori) | 94 |
+| NON VALORIZZATO | 127 |
+| **DA DEFINIRE** | **16** |
+
+### Servizi accessori: dal formato EURODIS al formato PDB (proposta del 29-Oct)
+
+La catena è: API `receive-pan` → **nostro mapping verso l'ICD** → ms esistente
+`ce-dichiarato-ldv-pdb-sync` → PDB `waybillCreate` (sincrono). Il ms sync legge
+i codici APT da `codici_servizi` (separati da pipe) e le sottochiavi dai campi
+ICD (contrassegno, consegna, ecc.), come il ms asincrono della PDB Fase 2. Per
+ogni accessorio EURODIS il nostro mapping scrive quindi gli stessi valori che il
+builder PDB scriverebbe da un JSON con `APTxxxxxx`: specifica in
+`FlussiPreadvisingInfo.csv`, perimetro nel riscontro SDA/Chiapponi del 11-set
+(flusso via file: ipotesi per l'API). Dettaglio, osservazioni sul ms sync e
+nuovi dubbi (DF-21…DF-28) nel file di proposta.
 
 ### Modello di riferimento: il flusso esistente EUD_INVIOFILE
 
@@ -176,7 +189,7 @@ Owner RTI = chi lo porta avanti lato fornitore; Rif. Poste = referente lato clie
 |---|---|---|---|---|---|---|---|
 | PA-01 | 22-Oct | ms collection — gestione repliche | — | Tagliente | Fissare una call per farsi consigliare | aperto | Proposta Mary: una sola istanza attiva (evidenza 2) |
 | PA-02 | 22-Oct | ms collection — con stato o senza stato | — | — | Deciso: si salva lo storico | chiuso | |
-| PA-03 | 22-Oct | Mapping prodotto / servizi accessori | — | — | Deciso: chiamare ce-rules per derivare prodotto e servizi dalla LDV | chiuso | |
+| PA-03 | 22-Oct | Mapping prodotto / servizi accessori | — | — | Deciso il 22-Oct: ce-rules da `id_ldv`. **Rivisto il 29-Oct (proposta)**: i servizi si traducono nel nostro mapping in `codici_servizi` e nei campi delle sottochiavi, formato PDB; il prodotto ha fallback `APT000901` nel ms sync | da validare | Vedi accessori-eurodis-pdb-proposta.md, DF-05, DF-07, DF-21 |
 | PA-04 | 22-Oct | Mapping dati EURODIS → DTO del dichiarato | Azzurra / Diego | — | Mapping fatto con LLM confrontando lo swagger EURODIS con l'ICD | in corso | Prima stesura il 22-Oct nel file ICD, foglio "Mapping EURODIS". Restano 15 campi DA DEFINIRE |
 | PA-05 | 22-Oct | ms collection — come EURODIS gestisce lo stato delle spedizioni inviate | — | Chiapponi | | aperto | Evidenza 1. Chiesto a Chiapponi con mail del 26-Oct (dom. 1) |
 | PA-06 | 22-Oct | ms collection — come EURODIS gestisce la prima chiamata | — | Chiapponi | | aperto | Evidenza 3. Chiesto a Chiapponi con mail del 26-Oct (dom. 2) |
@@ -201,3 +214,5 @@ Owner RTI = chi lo porta avanti lato fornitore; Rif. Poste = referente lato clie
 | PA-26 | 26-Oct | ms ingestione: servono due livelli di ms? Uno consuma dall'API, salva in Mongo e produce su coda; l'altro consuma dalla coda e fa il mapping DTO | da assegnare | — | | aperto | Conseguenza di PA-02 (si salva lo storico); tocca PA-01 |
 | PA-27 | 26-Oct | Comportamento API receive-pan: aggiornamenti e annullamenti, limiti di chiamata (paginazione, rate limit, timeout), durata della rilettura puntuale, fuso orario dei timestamp, rotazione della chiave API | da assegnare | Chiapponi | | aperto | Chiesto a Chiapponi con mail del 26-Oct (dom. 3, 4, 5, 6). Dalla mail è stata tolta la domanda sulle restrizioni di rete (whitelist IP) |
 | PA-28 | 26-Oct | Roll out incrementale, no big bang: il controllo sul dato è lato API EURODIS, quindi si può partire con un sottoinsieme (per mittente/cliente, per ufficio o per volume) e allargare per gradi? Chi decide il perimetro di ogni fase: EURODIS (chiave API, filtro lato loro) o noi (filtro lato ms)? | da assegnare | Chiapponi | Chiesto a Chiapponi con mail di follow up del 26-Oct (dom. 13) | aperto | Lo swagger `receive-pan` non ha parametri di filtro: `GET /shipments/v1` restituisce tutte le nuove spedizioni del partner (chiave API) e le segna come consegnate, senza ack. Un filtro lato nostro scarterebbe spedizioni già "consegnate" da EURODIS: serve il filtro lato EURODIS, oppure si salvano tutte (PA-02) e si elabora solo il perimetro attivo. Tocca PA-05, PA-12, PA-13 |
+| PA-29 | 29-Oct | Test integrati con EURODIS su `receive-pan` (ambiente TEST): scenari, dati di prova, referente, finestre | da assegnare | Chiapponi | Chiedere a EURODIS almeno un esempio per scenario, con le combinazioni; solo ingestione | aperto | Scenari in accessori-eurodis-pdb-proposta.md, sezione 4. Esistono TestList del flusso INVIOFILE (cartella EURODIS su SharePoint) da usare come riferimento |
+| PA-30 | 29-Oct | Osservazioni sul ms `ce-dichiarato-ldv-pdb-sync` (in test): canale `POU`/`WEBSERVICE`, ISO4 non risolto, default peso e dimensioni, troncamento, nome Punto Poste, contrassegno a 0 | da assegnare | — | Segnalare al responsabile del ms | aperto | Elenco S1…S7 nel file di proposta; DF-26, DF-27 |

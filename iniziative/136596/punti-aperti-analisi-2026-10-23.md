@@ -76,3 +76,38 @@ e restano lì a ogni rigenerazione.
 | `commercialValueOfGoods` | C'è anche la sezione assicurata | `assicurata.importo_assicurata` → DF-08 |
 | `smsPreAdvice`, `eMailPreAdvice` | Tracciare come sono stati mappati | DF-09 |
 | `referencedEuroplateBarcode` | Dovrebbe essere `id_ldv_associata` | Mappato → DF-10 |
+
+## Aggiornamento del 29-10: servizi accessori nel formato PDB (proposta)
+
+Fonti: riscontro SDA/Chiapponi del 11-09 (flusso via file: ipotesi per l'API),
+`FlussiPreadvisingInfo.csv` e `ce-dichiarato-ldv-pdb-sync`. Il dettaglio è in
+[accessori-eurodis-pdb-proposta.md](accessori-eurodis-pdb-proposta.md). La
+colonna "Stato" della tabella sopra non è stata toccata: qui sotto cosa cambia.
+
+| DF | Proposta | Esito |
+|---|---|---|
+| DF-01 | Conflitto: il riscontro SDA mappa `clearanceTimestamp` → `shipmentDate`, noi usiamo `entranceTimestamp` | da confermare |
+| DF-05 | Servizi confermati da SDA: `6`, `E`, `F`, `M`, `B`, `Z`; lacune `D`, `W`, `7`, `T` | in parte chiuso → DF-21 |
+| DF-06 | `T` non ha APT: nessun servizio per la data di consegna | aperto → DF-21 |
+| DF-07 | Contrassegno in perimetro: `APT000918`, `amount`, `3`→`CON`, `5`→`ABM`; non ammesso con Punto Poste | da confermare → DF-24 |
+| DF-08 | Assicurazione fuori perimetro: non valorizzare `assicurata` | chiuso (proposta) |
+| DF-09 | Pre-avviso non mappato dal riscontro SDA | da rivedere |
+| DF-10 | Reso = rientro al mittente; tipo P via FTP; C, X, A come normali | in parte chiuso → DF-25 |
+| DF-11 | Fallback in config del ms sync per prodotto (`APT000901`), contratto e centro di costo | ridimensionato |
+| DF-12 | Destinatario `ITA1`; il ms sync non risolve ISO4 | aperto → DF-27 |
+| DF-13, DF-20 | Prodotto unico trattato come nazionale: campi internazionali BEP non richiesti; dogana e ADR da confermare | ridimensionato |
+| DF-14 | PUDO in perimetro, solo Punto Poste | chiuso (proposta) → DF-23 |
+| DF-19 | Il ms sync non tronca | aperto → DF-26 |
+
+### Nuovi dubbi
+
+| ID | Gravità | Dubbio | Chi |
+|---|---|---|---|
+| DF-21 | media | Valori `deliveryService` non coperti (`D`, `W`, `7`, `T`): servizio, scarto o normale? | Chiapponi / EURODIS |
+| DF-22 | media | Valori fuori perimetro che arrivano dall'API (`A`, Locker, assicurazione, tipo P): scarto o ignorati? | Chiapponi / EURODIS |
+| DF-23 | alta | Sorgente del nome del Punto Poste (`name` di `APT000947`, obbligatorio): in EURODIS il nome nel record del punto è quello del destinatario | Chiapponi / EURODIS |
+| DF-24 | media | Contrassegno: formato e valuta dell'importo, `3`→`CON`, `5`→`ABM` | Chiapponi / EURODIS |
+| DF-25 | media | Reso: serve `APT000930`? Valore di `return` e semantica di `R` e `A` | SDA |
+| DF-26 | alta | Peso e dimensioni a 0 (default 1/1/1) e troncamento: chi li applica | Diego / responsabile ms sync |
+| DF-27 | alta | ISO4 non risolto e canale `POU` / `WEBSERVICE` nel ms sync | responsabile ms sync |
+| DF-28 | media | Scarto: l'unica causa confermata è il nome mittente assente. Vale per l'API? Come si traccia? | Diego |

@@ -1,8 +1,9 @@
+import os
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
 
-PATH = r"C:\Users\diego.mereu\sda-iniziative\iniziative\136596\ICD_PREADVISING_LDV_EVENT_SOURCE_v11.xlsx"
+PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ICD_PREADVISING_LDV_EVENT_SOURCE_v11.xlsx")
 
 # Categorie
 D, T, C, G, F1, CE, AV, NA, DD, NV = (
@@ -191,6 +192,39 @@ R.update({
     S + "notifiche_email": (T, "consigneePreAdvice.eMailPreAdvice", f'true -> "S", false -> "N" ({K}: mappato cosi, da confermare)', "DF-09"),
 })
 R["progressivo"] = (G, "", "Progressivo 1..n della spedizione nell'esecuzione batch: obbligatorio per BEP (fileRecordOrder). Da confermare", "")
+
+# Servizi accessori EURODIS -> formato PDB (proposta del 29-Oct, accessori-eurodis-pdb-proposta.md).
+# Fonti: riscontro SDA/Chiapponi 11-set (flusso via file: ipotesi per l'API), FlussiPreadvisingInfo.csv,
+# ce-dichiarato-ldv-pdb-sync. Il ms sync legge i codici APT da codici_servizi e le sottochiavi dai campi ICD.
+P = "proposta 29-Oct"
+R.update({
+    S + "codici_servizi": (T, "deliveryService.deliveryService, cashOnDeliveryService, consigneeAddress.pudoID",
+                           f'Lista APT separata da pipe ({P}): 6 -> APT000910, E -> APT000911, F -> APT000906, M -> APT000907, '
+                           'B -> APT000908, Z + pudoID -> APT000947, cashOnDeliveryService presente -> APT000918. '
+                           'APT000945 (multicollo) NON si scrive: lo aggiunge il ms sync. A = spedizione normale. '
+                           'Valori D, W, 7, T non coperti (DF-21); fuori perimetro: assicurazione, Locker, Uffici Postali', "DF-05, DF-07, DF-21, DF-22"),
+    S + "consegna.codice_frazionario": (T, "consigneeAddress.pudoID",
+                                        f"Solo con deliveryService = Z: PUDO ID, e' il node di APT000947 ({P})", "DF-14, DF-23"),
+    S + "consegna.denominazione_frazionario": (DD, "",
+                                               f"Nome del Punto Poste: e' il name di APT000947, obbligatorio non vuoto. Sorgente da chiarire: nel flusso via file RT_30_080 contiene il destinatario effettivo ({P})", "DF-23"),
+    S + "contrassegno.importo_contrassegno": (D, "cashOnDeliveryService.amount",
+                                              f"2 decimali, maggiore di 0, max 999999.99 (CSV accessori). Se currency <> EUR: scarto? ({P})", "DF-24"),
+    S + "contrassegno.tipo_pagamento_contrassegno": (T, "cashOnDeliveryService.identifierForCODCollection",
+                                                     f"3 -> CON, 5 -> ABM (riscontro SDA, da confermare; mai ACM). Non ammesso con Punto Poste ({P})", "DF-24"),
+    S + "assicurata.spedizione_assicurata": (NV, "", f"Assicurazione fuori perimetro (riscontro SDA): non valorizzare ({P})", "DF-08"),
+    S + "assicurata.importo_assicurata": (NV, "", f"Assicurazione fuori perimetro (riscontro SDA): non usare commercialValueOfGoods ({P})", "DF-08"),
+    S + "assicurata.flag": (NV, "", f"Assicurazione fuori perimetro (riscontro SDA) ({P})", "DF-08"),
+    S + "consegna.mancata_consegna": (DD, "", f"Reso = rientro al mittente. APT000930 non mappato finche' non si decide se serve e che valore ha return (A o R) ({P})", "DF-25"),
+    S + "consegna.data_consegna": (T, "deliveryService.deliveryDateWindowStart", f"yyyy-MM-dd ({K}). Il servizio T non ha APT (DF-21) ({P})", "DF-06, DF-21"),
+    S + "notifiche_sms": (DD, "consigneePreAdvice.smsPreAdvice", f"SDA notifica da sola se ci sono i contatti e non usa RT_65 (riscontro SDA): valutare se non mapparlo ({P})", "DF-09"),
+    S + "notifiche_email": (DD, "consigneePreAdvice.eMailPreAdvice", f"SDA notifica da sola se ci sono i contatti e non usa RT_65 (riscontro SDA): valutare se non mapparlo ({P})", "DF-09"),
+    S + "rif_prodotto_cliente": (DD, "", f'Il ms sync usa questo campo come prodotto e, se vuoto, il valore di config (APT000901, PDB Express) ({P})', "DF-11, PA-23"),
+    S + "centro_costo": (DD, "", f"Il ms sync, se vuoto, usa il centro di costo di config; un solo centro statico fornito da Poste (riscontro SDA) ({P})", "DF-11, PA-23"),
+    S + "data_spedizione": (T, "entranceTimestamp", f"yyyy-MM-dd ({K}: clearanceTimestamp si ignora). Conflitto: il riscontro SDA mappa clearanceTimestamp -> shipmentDate ({P})", "DF-01"),
+})
+# Il ms sync legge il paese BEP da codice_nazione e non risolve l'ISO4 (AnagraficaClient mai chiamato): vedi DF-12 e DF-27
+for p in (M, DE):
+    R[p + "codice_nazione"] = (NV, "", f"countryCode va solo in codice_nazione_iso_2 ({K}). Attenzione: il ms sync legge il paese BEP da qui e non risolve ISO4; destinatario = ITA1 ({P})", "DF-12, DF-27")
 GAP_23 = {
     "shipmentTypeIndicator": ("", "", f"Da ignorare ({K})", ""),
     "lineHaulIndicator": ("", "", f"Da ignorare ({K})", ""),
