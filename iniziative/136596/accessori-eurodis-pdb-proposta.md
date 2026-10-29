@@ -38,7 +38,7 @@ Fonti:
 | Consegna di sera | `deliveryService` = `E` | `APT000911` | nessuno | confermato SDA |
 | Time Definite ore 10 | `deliveryService` = `F` | `APT000906` | nessuno | confermato SDA |
 | Time Definite ore 12 | `deliveryService` = `M` | `APT000907` | nessuno | confermato SDA (per EURODIS `M` è "Morning") |
-| Consegna su appuntamento | `deliveryService` = `B` | `APT000908` | nessuno; serve il telefono del destinatario | confermato SDA |
+| Consegna su appuntamento | `deliveryService` = `B` (e `W`) | `APT000908` | nessuno; serve il telefono del destinatario | `B` confermato SDA; `W` → APP dalla matrice di test (da confermare) |
 | Punto Poste | `deliveryService` = `Z` + `consigneeAddress.pudoID` | `APT000947` | `consegna.codice_frazionario` = PUDO ID (`node`); `consegna.denominazione_frazionario` = nome del punto (`name`, non vuoto) | da confermare (PA-01 del riscontro: sorgente del nome) |
 | Contrassegno | presenza di `cashOnDeliveryService` | `APT000918` | `contrassegno.importo_contrassegno` = `amount` (2 decimali, > 0, max 999999.99); `contrassegno.tipo_pagamento_contrassegno`: `3` → `CON`, `5` → `ABM`; `contrassegno.flag` = `S` | da confermare (3→CON, 5→ABM, formato importo) |
 | Multicollo | più di un elemento in `collis[]` | **non scriverlo** | nessuno | il ms sync aggiunge `APT000945` se i colli sono più di uno |
@@ -55,7 +55,6 @@ e multicollo.
 | `deliveryService` | Significato EURODIS | Domanda |
 |---|---|---|
 | `D` | Day | servizio, scarto o normale? |
-| `W` | finestra di consegna | idem |
 | `7` | domenica | idem |
 | `T` | a orario definito | SDA: "consegna a giorno e orario definito", senza APT (PA-05 del riscontro) |
 
@@ -81,8 +80,8 @@ Il ms è in test. Rilevanti per EURODIS:
 |---|---|---|
 | S1 | Canale: la costante `PDB_CHANNEL_POU = "POU"`, ma README e Javadoc dicono `WEBSERVICE` | da chiarire quale vale |
 | S2 | ISO4: esiste `AnagraficaClient.resolveIso4` ma non è chiamato da nessuno; il paese passa come `codice_nazione` | PDB vuole ISO4: o lo scriviamo noi in `codice_nazione`, o va corretto il ms |
-| S3 | Peso assente → `"0"`; dimensioni assenti → `null`. Nessun default (1/1/1 previsto nel riscontro) | EURODIS può inviare 0: rischio KO |
-| S4 | Nessun troncamento (civico 4, città 30, indirizzo 40, nome 35) | rischio KO su valori lunghi, vedi DF-19 |
+| S3 | Peso assente → `"0"`; dimensioni assenti → `null`. Nessun default (1/1/1 previsto nel riscontro) | EURODIS può inviare 0: rischio KO. Nel flusso file i default li applica il validatore (VR-31): da verificare se la nostra catena passa dal validatore |
+| S4 | Nessun troncamento (civico 4, città 30, indirizzo 40, nome 35) | rischio KO su valori lunghi, vedi DF-19. Nel flusso file tronca il validatore (test EUD_007): da verificare come per S3 |
 | S5 | Punto Poste con nome vuoto: `name` omesso | il controllo CSV lo rifiuta: il nome del punto è obbligatorio |
 | S6 | Contrassegno con importo 0 non scartato in locale | il CSV vuole `amount` > 0 |
 | S7 | `rif_prodotto_cliente` vuoto → prodotto da config (`APT000901`); `contractCode` e `costCenterCode` hanno fallback in config | DF-11 si ridimensiona |
@@ -113,13 +112,14 @@ dei servizi LMD letto da `data_appuntamento` (bug B6 corretto solo nell'async),
 
 | ID | Dubbio | Chi |
 |---|---|---|
-| DF-21 | Valori `deliveryService` non coperti (`D`, `W`, `7`, `T`) | Chiapponi / EURODIS |
+| DF-21 | Valori `deliveryService` non coperti (`D`, `7`, `T`); `W` risulta APP nella matrice di test, da confermare | Chiapponi / EURODIS |
 | DF-22 | Valori fuori perimetro che arrivano dall'API (`A`, Locker, assicurazione, tipo P): scarto o ignorati? | Chiapponi / EURODIS |
-| DF-23 | Sorgente del nome del Punto Poste: `name` è obbligatorio, ma in EURODIS il nome nel record del punto è quello del destinatario | Chiapponi / EURODIS |
+| DF-23 | Nome del Punto Poste: `name` è obbligatorio, ma nel flusso via file è in `RT_30_030`, opzionale e non garantito (`RT_30_080` è il destinatario effettivo). Cosa si fa se manca? | Chiapponi / EURODIS |
 | DF-24 | Formato e valuta del contrassegno: `amount` con 2 decimali, solo EUR? `3`→`CON`, `5`→`ABM` | Chiapponi / EURODIS |
 | DF-25 | Reso (`APT000930`): serve? valore di `return`, semantica di `R` e `A` | SDA |
 | DF-26 | Peso e dimensioni a 0: default 1/1/1 e peso (S3), chi li applica | Diego / responsabile ms sync |
 | DF-27 | ISO4 e canale `POU` / `WEBSERVICE` (S1, S2) | responsabile ms sync |
+| DF-29 | LDV generata da EURODIS: regole di validità secondo SDA, e univocità. Ogni ripetizione dei test richiede LDV nuove; indirizzi, CAP e nazioni devono essere reali. Richiesto a EURODIS nella mail del 29-10 | Chiapponi / EURODIS |
 | DF-28 | Scarto: l'unica causa confermata è il nome del mittente assente. Vale anche per l'API? Come si traccia? | Diego |
 
 ## 4. Scenari da chiedere a EURODIS per i test

@@ -103,11 +103,12 @@ colonna "Stato" della tabella sopra non è stata toccata: qui sotto cosa cambia.
 
 | ID | Gravità | Dubbio | Chi |
 |---|---|---|---|
-| DF-21 | media | Valori `deliveryService` non coperti (`D`, `W`, `7`, `T`): servizio, scarto o normale? | Chiapponi / EURODIS |
+| DF-21 | media | Valori `deliveryService` non coperti (`D`, `7`, `T`): servizio, scarto o normale? `W` risulta APP nella matrice di test, da confermare | Chiapponi / EURODIS |
 | DF-22 | media | Valori fuori perimetro che arrivano dall'API (`A`, Locker, assicurazione, tipo P): scarto o ignorati? | Chiapponi / EURODIS |
-| DF-23 | alta | Sorgente del nome del Punto Poste (`name` di `APT000947`, obbligatorio): in EURODIS il nome nel record del punto è quello del destinatario | Chiapponi / EURODIS |
+| DF-23 | alta | Nome del Punto Poste (`name` di `APT000947`, obbligatorio): nel flusso via file è in `RT_30_030`, opzionale e non garantito. Cosa si fa se manca? | Chiapponi / EURODIS |
 | DF-24 | media | Contrassegno: formato e valuta dell'importo, `3`→`CON`, `5`→`ABM` | Chiapponi / EURODIS |
 | DF-25 | media | Reso: serve `APT000930`? Valore di `return` e semantica di `R` e `A` | SDA |
-| DF-26 | alta | Peso e dimensioni a 0 (default 1/1/1) e troncamento: chi li applica | Diego / responsabile ms sync |
+| DF-26 | alta | Peso e dimensioni a 0 (default 1/1/1) e troncamento: chi li applica. Nel flusso file li fa il validatore (VR-30, VR-31): verificare se la nostra catena ci passa | Diego / responsabile ms sync |
 | DF-27 | alta | ISO4 non risolto e canale `POU` / `WEBSERVICE` nel ms sync | responsabile ms sync |
+| DF-29 | alta | LDV generata da EURODIS: regole di validità secondo SDA e univocità; ogni ripetizione dei test richiede LDV nuove; indirizzi, CAP e nazioni reali. Chiesto con la mail del 29-10 | Chiapponi / EURODIS |
 | DF-28 | media | Scarto: l'unica causa confermata è il nome mittente assente. Vale per l'API? Come si traccia? | Diego |

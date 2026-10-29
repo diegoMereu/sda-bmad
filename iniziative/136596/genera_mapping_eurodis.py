@@ -200,13 +200,13 @@ P = "proposta 29-Oct"
 R.update({
     S + "codici_servizi": (T, "deliveryService.deliveryService, cashOnDeliveryService, consigneeAddress.pudoID",
                            f'Lista APT separata da pipe ({P}): 6 -> APT000910, E -> APT000911, F -> APT000906, M -> APT000907, '
-                           'B -> APT000908, Z + pudoID -> APT000947, cashOnDeliveryService presente -> APT000918. '
+                           'B -> APT000908, W -> APT000908 (matrice di test SDA, da confermare), Z + pudoID -> APT000947, cashOnDeliveryService presente -> APT000918. '
                            'APT000945 (multicollo) NON si scrive: lo aggiunge il ms sync. A = spedizione normale. '
-                           'Valori D, W, 7, T non coperti (DF-21); fuori perimetro: assicurazione, Locker, Uffici Postali', "DF-05, DF-07, DF-21, DF-22"),
+                           'Valori D, 7, T non coperti (DF-21); fuori perimetro: assicurazione, Locker, Uffici Postali', "DF-05, DF-07, DF-21, DF-22"),
     S + "consegna.codice_frazionario": (T, "consigneeAddress.pudoID",
                                         f"Solo con deliveryService = Z: PUDO ID, e' il node di APT000947 ({P})", "DF-14, DF-23"),
     S + "consegna.denominazione_frazionario": (DD, "",
-                                               f"Nome del Punto Poste: e' il name di APT000947, obbligatorio non vuoto. Sorgente da chiarire: nel flusso via file RT_30_080 contiene il destinatario effettivo ({P})", "DF-23"),
+                                               f"Nome del Punto Poste: e' il name di APT000947, obbligatorio non vuoto. Nel flusso via file il nome e' in RT_30_030, opzionale e non garantito (RT_30_080 e' il destinatario effettivo): cosa fare se manca ({P})", "DF-23"),
     S + "contrassegno.importo_contrassegno": (D, "cashOnDeliveryService.amount",
                                               f"2 decimali, maggiore di 0, max 999999.99 (CSV accessori). Se currency <> EUR: scarto? ({P})", "DF-24"),
     S + "contrassegno.tipo_pagamento_contrassegno": (T, "cashOnDeliveryService.identifierForCODCollection",
