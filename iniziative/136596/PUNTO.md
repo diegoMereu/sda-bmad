@@ -1,12 +1,14 @@
 # 136596 — Eurodis autoproduttore
 
-**Data**: 2026-10-30 · **Stato**: in_analisi · **Semaforo**: 🟡
+**Data**: 2026-11-02 · **Stato**: in_analisi · **Semaforo**: 🟡
 **Owner cliente**: Piergentili · **PRJ**: non ancora assegnato
 
 ## In una riga
 Analisi e mapping in bozza, con i servizi accessori tradotti nel formato PDB; pronto un mock dell'API `receive-pan` per i test, ma la sintassi delle LDV è provvisoria in attesa di Marzilli, e restiamo in attesa delle risposte di EURODIS alle 13 domande e sui test integrati.
 
 ## Fatto dall'ultimo punto
+- 2026-11-02 — Bozza 0.2 del documento funzionale di `ce-dichiarato-eurodis-in` (`sviluppo/`), da passare ad Amelia: 17 regole, 14 scenari di errore, 16 criteri di accettazione sul mock. Allineata al topic `preadvising.eud.pre.build` e al blueprint tecnico dei ms `ce-`.
+- 2026-11-02 — Regola di progetto: un documento funzionale per microservizio, con il suo prompt, in `iniziative/<id>/sviluppo/`.
 - 2026-10-30 — Architettura aggiornata: nuovo ms `ce-dichiarato-eurodis-mapper` (repo creato, solo scheletro). `eurodis-in` legge `receive-pan`, salva lo storico (probabilmente Mongo), scompone e pubblica su `preadvising.eud.pre.build`; il mapper consuma, converte nell'ICD e pubblica su `preadvising.pre-enrichment`. Analisi aggiornata: ripartizione delle responsabilità, PA-26 chiuso, nuovi PA-31…PA-33.
 - 2026-10-29 — Realizzato in Python un mock dell'API `receive-pan` (`mock-eurodis/`, 9 test verdi): configurabile per prodotto, con indirizzi e nazioni reali e dati generati, coda "consuma senza ack" come EURODIS, anomalie iniettabili per i test negativi.
 - 2026-10-29 — Chiesta a Marzilli (team) la sintassi delle LDV autoproduttore EURODIS: nel mock è provvisoria (11 cifre + check Luhn, inventata) e si cambia da configurazione.
@@ -16,7 +18,9 @@ Analisi e mapping in bozza, con i servizi accessori tradotti nel formato PDB; pr
 - 2026-10-29 — Inviata a Gianluca Chiapponi la mail per organizzare i test integrati su `receive-pan` (PA-29): scenari proposti da EURODIS, LDV valide e univoche, indirizzi e nazioni reali, modalità operative.
 
 ## Prossimi passi
-- Definire il contratto del messaggio su `preadvising.eud.pre.build` (PA-31): proposta di Mary, un elemento di `GetShipmentResponse2` com'è, chiave `edReference` — Mary / team sviluppo — da definire
+- Confermare il contratto su `preadvising.eud.pre.build` (PA-31): corpo = spedizione così com'è, chiave `edReference`, metadati negli header Kafka — Diego — da definire
+- Rispondere alle 4 domande del documento di `-in` (Mongo, messaggio, duplicati, recupero) e passarlo ad Amelia — Diego / Mary — da definire
+- Documenti funzionali di `ce-dichiarato-eurodis-mapper` e `ce-eurodis-send-tracking` — Mary — da definire
 - Decidere come il mapper gestisce i messaggi non mappabili (PA-32) e dove avviene l'enrichment F1 / ce-rules (PA-33) — Mary / Diego — da definire
 - Risposta di Marzilli sulla sintassi LDV, poi inserirla in `ldv_default` del mock — Marzilli / Paolo — da definire
 - Risposte alle 13 domande EURODIS — Chiapponi (Poste) — da definire
@@ -45,12 +49,13 @@ Analisi e mapping in bozza, con i servizi accessori tradotti nel formato PDB; pr
 - Perimetro: dogana, ADR, volumi e frequenza del batch.
 
 ## Decisioni prese
+- 2026-11-02 — Il tracking (`ce-eurodis-send-tracking`) rientra nel perimetro della 136596 (supera la decisione del 22-10). Tre microservizi, un documento funzionale ciascuno.
 - 2026-10-30 — Due livelli di ingestione (chiude PA-26): `ce-dichiarato-eurodis-in` legge, salva e scompone su `preadvising.eud.pre.build`; `ce-dichiarato-eurodis-mapper` converte nell'ICD e pubblica su `preadvising.pre-enrichment`. Il mapping vive solo nel mapper.
 - 2026-10-29 — Mock dell'API in Python con FastAPI, configurazione per prodotto in YAML; la sintassi LDV è un parametro, non codice.
 - 2026-10-29 — Test integrati: solo ingestione `receive-pan`, in parallelo alle risposte, con scenari proposti da EURODIS.
 - 2026-10-29 — Catena: lettura API → nostro mapping verso l'ICD → ms sync `ce-dichiarato-ldv-pdb-sync` → PDB `waybillCreate` sincrono.
 - 2026-10-22 — Si parte con l'analisi (Mary) prima di qualsiasi PRD o stima.
-- 2026-10-22 — Il ms tracking (`ce-eurodis-send-tracking`) è un task a parte, fuori da questa analisi.
+- 2026-10-22 — Il ms tracking (`ce-eurodis-send-tracking`) è un task a parte, fuori da questa analisi (superata il 02-11).
 - 2026-10-22 — Il ms di raccolta salva lo storico (con stato).
 - 2026-10-22 — Prodotto e servizi accessori si derivano dalla LDV con ce-rules (rivista il 29-10: proposta di tradurli nel nostro mapping, da validare).
 - 2026-10-22 — Contratto, codice cliente e AUC si reperiscono da F1.

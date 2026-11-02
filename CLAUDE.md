@@ -13,6 +13,9 @@ template solo quando nascono dal lavoro reale, non in anticipo.
 - `iniziative.yaml` è l'unica anagrafica: id, titolo, PRJ, stato, referenti, perimetro.
 - Ogni artefatto sta in `iniziative/<id>/` dell'iniziativa a cui appartiene.
 - Dati di produzione (nomi, indirizzi, CF, P.IVA) **mai** versionati.
+- Verso lo sviluppo: **un documento funzionale per microservizio**, in
+  `iniziative/<id>/sviluppo/<microservizio>.md`. Il prompt che lo genera sta
+  accanto, in `iniziative/<id>/sviluppo/prompt-<microservizio>.md`.
 - Ogni iniziativa attiva ha un `iniziative/<id>/PUNTO.md` per il PM. Lo tiene
   l'agente PM (John, `bmad-agent-pm`, voce di menu `PT`), oppure `/punto <id>`.
   È il primo file da leggere per sapere dove siamo.
