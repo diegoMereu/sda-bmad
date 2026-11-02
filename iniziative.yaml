@@ -16,8 +16,10 @@ iniziative:
     owner_cliente: "Piergentili"
     perimetro: >-
       Presa in carico delle spedizioni del consorzio EURODIS: batch schedulato
-      (ms collection) che scarica i PAN dall'API EURODIS receive-pan, li
-      converte nel tracciato unico e li pubblica su Kafka
+      (ms collection, ce-dichiarato-eurodis-in) che scarica i PAN dall'API
+      EURODIS receive-pan, li salva in storico, li scompone e li pubblica su
+      Kafka preadvising.eud.pre.build; il ms ce-dichiarato-eurodis-mapper li
+      consuma, li converte nel tracciato unico e li pubblica su Kafka
       preadvising.pre-enrichment. Da chiarire il ritorno tracking/esiti verso
       EURODIS. Analisi in iniziative/136596/analisi.md.
 

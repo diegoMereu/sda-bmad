@@ -1,6 +1,6 @@
 # 136596 — Eurodis autoproduttore · Analisi
 
-**Aggiornata**: 2026-10-29 · **Analista**: Mary · **Stato**: bozza, in raccolta
+**Aggiornata**: 2026-10-30 · **Analista**: Mary · **Stato**: bozza, in raccolta
 
 ## Esigenza
 
@@ -9,23 +9,53 @@ spedizioni che EURODIS le affida, ricevendone i dati (PAN) dalla piattaforma
 EURODIS invece che dal dichiarato tradizionale: EURODIS è l'"autoproduttore"
 del dato di spedizione.
 
-## Flusso atteso: due microservizi
+## Flusso atteso: tre microservizi
+
+Architettura aggiornata il 2026-10-30: l'ingestione è divisa in due livelli
+(decisione su PA-26). `ce-dichiarato-eurodis-in` legge e scompone,
+`ce-dichiarato-eurodis-mapper` converte nell'ICD.
 
 **1. `ce-dichiarato-eurodis-in`**: presa in carico delle spedizioni (nei punti
-aperti si chiama "ms collection").
+aperti si chiama "ms collection"). Non fa mapping.
 
 ```
 batch schedulato
-  -> GET testapi.eurodis.com/receive-pan/shipments/v1   (X-API-Key)
-  -> persistenza storico (decisione PA-02)
+  -> GET testapi.eurodis.com/receive-pan/shipments/v1   (X-API-Key; dettagli da capire)
+  -> persistenza storico, probabilmente su Mongo (decisione PA-02)
+  -> scomposizione della risposta in massa in singole spedizioni
+  -> pubblicazione di una spedizione per messaggio su Kafka preadvising.eud.pre.build
+```
+
+**2. `ce-dichiarato-eurodis-mapper`** (nuovo): mapping nel tracciato unico.
+
+```
+consumo da Kafka preadvising.eud.pre.build  (una spedizione per messaggio)
   -> conversione nel tracciato unico ICD v11 (+ ce-rules per prodotto/servizi, PA-03)
   -> pubblicazione su Kafka preadvising.pre-enrichment
 ```
 
-**2. `ce-eurodis-send-tracking`**: recupera le tracce SDA delle spedizioni
+Il repo esiste come scheletro (`CORRIERE-ESPRESSO_PREADVISING_ce-dichiarato-eurodis-mapper`,
+Spring Boot 3.2.2 con snowcore, nessun codice). Non dipende dall'API EURODIS:
+gli serve solo il formato del messaggio sul topic (PA-31).
+
+**3. `ce-eurodis-send-tracking`**: recupera le tracce SDA delle spedizioni
 EURODIS e le invia a EURODIS (nei punti aperti si chiama "ms tracking", PA-07).
 **È un task a parte** (decisione del 22-Oct) e non rientra in questa analisi,
-che copre solo `ce-dichiarato-eurodis-in`.
+che copre solo `ce-dichiarato-eurodis-in` e `ce-dichiarato-eurodis-mapper`.
+
+Ripartizione delle responsabilità:
+
+| Tema | `eurodis-in` | `eurodis-mapper` |
+|---|---|---|
+| Chiamata API, chiave, 404, errori HTTP | sì | — |
+| Salvataggio grezzo prima di trasformare (PA-05, PA-09) | sì | — |
+| Repliche e istanza unica del batch (PA-01) | sì | — |
+| Ripubblicazione dallo storico se Kafka fallisce | sì | — |
+| Scomposizione in singole spedizioni | sì | — |
+| Mapping ICD, convenzioni EUD_INVIOFILE, servizi accessori | — | sì |
+| LDV, multicollo (PA-11), `id_preadvising` UUID | — | sì |
+| Messaggi non mappabili (PA-32) | — | sì |
+| Enrichment F1 / ce-rules (PA-33) | da decidere | da decidere |
 
 ## Mapping verso l'ICD (PA-04)
 
@@ -96,7 +126,8 @@ Eurodis". È il candidato naturale per la LDV (PA-11).
 
 ## Note per lo sviluppo
 
-Decisioni da girare agli sviluppatori di `ce-dichiarato-eurodis-in`:
+Decisioni da girare agli sviluppatori di `ce-dichiarato-eurodis-mapper`
+(dal 30-Oct il mapping non è più in `eurodis-in`):
 
 1. **`id_preadvising`** si valorizza con `UUID.randomUUID().toString()`.
    L'ICD v11 dichiara per questo campo una dimensione di 15 caratteri, mentre
@@ -211,8 +242,11 @@ Owner RTI = chi lo porta avanti lato fornitore; Rif. Poste = referente lato clie
 | PA-22 | 22-Oct | Campi con semantica diversa, non di lunghezza: `region` EURODIS → `provincia` ICD; valore merce in valuta non EUR | da assegnare | — | | aperto | Separati da PA-16 |
 | PA-24 | 22-Oct | Payload di esempio di produzione con dati reali (dati sensibili oscurati) | da assegnare | Chiapponi | | aperto | Serve a verificare DF-01, DF-02, DF-18. Chiesto a Chiapponi con mail del 26-Oct (dom. 10) |
 | PA-25 | 22-Oct | Decidere il nome del canale che guida tutta l'elaborazione | da assegnare | — | | aperto | Vedi DF-04 (`EURODIS` o `EUD_INVIOSYSTEM`) e PA-15 |
-| PA-26 | 26-Oct | ms ingestione: servono due livelli di ms? Uno consuma dall'API, salva in Mongo e produce su coda; l'altro consuma dalla coda e fa il mapping DTO | da assegnare | — | | aperto | Conseguenza di PA-02 (si salva lo storico); tocca PA-01 |
+| PA-26 | 26-Oct | ms ingestione: servono due livelli di ms? Uno consuma dall'API, salva in Mongo e produce su coda; l'altro consuma dalla coda e fa il mapping DTO | da assegnare | — | Deciso il 30-Oct: sì. `eurodis-in` legge, salva e scompone su `preadvising.eud.pre.build`; `eurodis-mapper` converte e pubblica su `preadvising.pre-enrichment` | chiuso | Conseguenza di PA-02 (si salva lo storico); tocca PA-01 |
 | PA-27 | 26-Oct | Comportamento API receive-pan: aggiornamenti e annullamenti, limiti di chiamata (paginazione, rate limit, timeout), durata della rilettura puntuale, fuso orario dei timestamp, rotazione della chiave API | da assegnare | Chiapponi | | aperto | Chiesto a Chiapponi con mail del 26-Oct (dom. 3, 4, 5, 6). Dalla mail è stata tolta la domanda sulle restrizioni di rete (whitelist IP) |
 | PA-28 | 26-Oct | Roll out incrementale, no big bang: il controllo sul dato è lato API EURODIS, quindi si può partire con un sottoinsieme (per mittente/cliente, per ufficio o per volume) e allargare per gradi? Chi decide il perimetro di ogni fase: EURODIS (chiave API, filtro lato loro) o noi (filtro lato ms)? | da assegnare | Chiapponi | Chiesto a Chiapponi con mail di follow up del 26-Oct (dom. 13) | aperto | Lo swagger `receive-pan` non ha parametri di filtro: `GET /shipments/v1` restituisce tutte le nuove spedizioni del partner (chiave API) e le segna come consegnate, senza ack. Un filtro lato nostro scarterebbe spedizioni già "consegnate" da EURODIS: serve il filtro lato EURODIS, oppure si salvano tutte (PA-02) e si elabora solo il perimetro attivo. Tocca PA-05, PA-12, PA-13 |
 | PA-29 | 29-Oct | Test integrati con EURODIS su `receive-pan` (ambiente TEST): scenari, dati di prova, referente, finestre | da assegnare | Chiapponi | Chiedere a EURODIS di proporre i propri scenari, con almeno un esempio ciascuno e le combinazioni; solo ingestione | in corso | Mail a Gianluca Chiapponi inviata il 29-Oct (scenari, LDV valide e univoche, dati reali, modalità operative). Referente e accessi: coordina Chiapponi, i dati di accesso li abbiamo già. Riferimento interno: test list INVIOFILE (52 scenari) e matrice di compatibilità nella cartella TEST LIST su SharePoint |
 | PA-30 | 29-Oct | Osservazioni sul ms `ce-dichiarato-ldv-pdb-sync` (in test): canale `POU`/`WEBSERVICE`, ISO4 non risolto, default peso e dimensioni, troncamento, nome Punto Poste, contrassegno a 0 | da assegnare | — | Segnalare al responsabile del ms | aperto | Elenco S1…S7 nel file di proposta; DF-26, DF-27 |
+| PA-31 | 30-Oct | Contratto del messaggio su `preadvising.eud.pre.build`: payload, chiave Kafka, header | da assegnare | — | Proposta Mary: un elemento di `GetShipmentResponse2` così com'è, senza trasformazioni; chiave = `edReference` | aperto | Serve a far partire il mapper senza aspettare l'API. Il mock può emettere spedizioni singole |
+| PA-32 | 30-Oct | Messaggio non mappabile o non valido nel mapper: scarto, DLT o altro; chi ne vede l'esito | da assegnare | — | | aperto | Lega PA-08 (nessun canale di rifiuto verso EURODIS) |
+| PA-33 | 30-Oct | Dove avviene l'enrichment: F1 (contratto, codice cliente, AUC) e ce-rules (prodotto, servizi) nel mapper o a valle? | da assegnare | — | | aperto | Le decisioni PA-03 e PA-10 non dicono in quale servizio |
