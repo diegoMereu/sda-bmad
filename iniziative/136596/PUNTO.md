@@ -4,9 +4,10 @@
 **Owner cliente**: Piergentili · **PRJ**: non ancora assegnato
 
 ## In una riga
-Analisi e mapping in bozza, con i servizi accessori tradotti nel formato PDB; pronto un mock dell'API `receive-pan` per i test, ma la sintassi delle LDV è provvisoria in attesa di Marzilli, e restiamo in attesa delle risposte di EURODIS alle 13 domande e sui test integrati.
+`ce-dichiarato-eurodis-in` implementato e pronto per il deploy in svil (da lanciare su Jenkins); mapper ancora parziale (~10 campi su 73), send-tracking da specificare. Restiamo in attesa della sintassi LDV (Marzilli) e delle risposte di EURODIS alle 13 domande e sui test integrati.
 
 ## Fatto dall'ultimo punto
+- 2026-11-04 — Dockerfile di `-in` allineato a quello di `ce-dichiarato-adapter` (`db9a56a`): senza `ENV password` la build in pipeline non si sarebbe autenticata su Nexus. Quelli di mapper e send-tracking vanno sistemati (AS-24).
 - 2026-11-04 — **`ce-dichiarato-eurodis-in` implementato** (Amelia, `a53398c` su `feature/eurodis-base-implementation`, 53 test verdi): scarico in due fasi (run + esito HTTP + JSON grezzo su `eurodis_scarichi`; record per spedizione su `eurodis_spedizioni` con ora di invio ed esito), nessuna deserializzazione, nessun filtro duplicati, metriche e span sul modello di `ce-dichiarato-adapter`, job ogni 2 minuti. Specifica portata alla 0.4, assessment rifatto.
 - 2026-11-04 — Mapper: MAP-1 risolto (`flag_autoproduttore`, `versione_tracciato`, `progressivo`); verifica completa rispetto alle decisioni in `sviluppo/verifica-mapper-2026-11-04.md` (copre ~10 campi su 73, un bug su `collis` null).
 - 2026-11-02 — Ricognizione dei tre repository e `CLAUDE.md` in ciascuno (Amelia).
@@ -21,11 +22,11 @@ Analisi e mapping in bozza, con i servizi accessori tradotti nel formato PDB; pr
 - 2026-10-29 — Inviata a Gianluca Chiapponi la mail per organizzare i test integrati su `receive-pan` (PA-29): scenari proposti da EURODIS, LDV valide e univoche, indirizzi e nazioni reali, modalità operative.
 
 ## Prossimi passi
-- Deploy di `-in` in svil con scarico disabilitato, verifica di avvio, poi prova con EURODIS TEST — Amelia — da definire
+- Lanciare su Jenkins `ce-dichiarato-eurodis-in-build` e poi `-deploy` (branch `feature/eurodis-base-implementation`, svil, scarico disabilitato) — Diego — da definire
+- Dopo il deploy: verifica di avvio con Mongo e Kafka veri, poi abilitare lo scarico e provare con EURODIS TEST — Amelia — subito dopo il deploy
 - Comunicare ad azzurrazezza la scelta di Spring Boot 3.5.14 — Diego — da definire
-- Alert Datadog di `-in` (specifica, sezione 9) — da assegnare — più avanti
-- Confermare il contratto su `preadvising.eud.pre.build` (PA-31): corpo = spedizione così com'è, chiave `edReference`, metadati negli header Kafka — Diego — da definire
-- Rispondere alle 4 domande del documento di `-in` (Mongo, messaggio, duplicati, recupero) e passarlo ad Amelia — Diego / Mary — da definire
+- Sistemare i Dockerfile di mapper e send-tracking (AS-24) — Amelia — quando si lavora su di loro
+- Alert Datadog di `-in` (specifica, sezione 9) e conservazione delle collezioni (AS-21) — da assegnare — più avanti
 - Documenti funzionali di `ce-dichiarato-eurodis-mapper` e `ce-eurodis-send-tracking` — Mary — da definire
 - Decidere come il mapper gestisce i messaggi non mappabili (PA-32) e dove avviene l'enrichment F1 / ce-rules (PA-33) — Mary / Diego — da definire
 - Risposta di Marzilli sulla sintassi LDV, poi inserirla in `ldv_default` del mock — Marzilli / Paolo — da definire
