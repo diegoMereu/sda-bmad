@@ -56,8 +56,17 @@ la configurazione EURODIS.
 **Lavoro di impostazione (storia S1)**: AS-2, AS-3, AS-4, AS-5, AS-6, AS-7, AS-8, AS-11,
 `CLAUDE.md`. Allineamento sul modello del mapper, senza logica applicativa.
 
-**Richieste esterne (tempi lunghi)**: topic e ACL in svil; `EURODIS_API_KEY` e
-`MONGO_STRING_CONNECTION` nel secret; uscita di rete da svil verso `testapi.eurodis.com`;
+**Secret** `ce-dichiarato-eurodis-in-secret` (svil, verificato il 04-11 sulla struttura, non sui valori):
+chiavi `kafka-scram-username`, `kafka-scram-password`, `mongo-string-connection`, `api-key`.
+Nell'Helm vanno mappate su `KAFKA_SCRAM_*` (già fatto), `MONGO_STRING_CONNECTION` e
+`EURODIS_API_KEY` (da aggiungere). Due verifiche:
+- **AS-15**: l'utente SCRAM è quello di `ce-dichiarato-smistatore`, e il secret risulta creato
+  il 28-07-2025, prima del progetto: sembra copiato da quello dello smistatore. Serve un utente
+  Kafka dedicato, con ACL di scrittura su `preadvising.eud.pre.build`, oppure è voluto?
+- **AS-16**: la stringa Mongo punta al database `ce_preadvising` su un cluster che dal nome
+  sembra di collaudo, anche se il secret è in svil. Confermare database e cluster per il grezzo (D1).
+
+**Richieste esterne (tempi lunghi)**: topic e ACL in svil; uscita di rete da svil verso `testapi.eurodis.com`;
 verifica dei retry del service mesh (AS-14).
 
 **Mock**: estensioni per AC-04, 05, 10, 11, 12 (storia S0).
