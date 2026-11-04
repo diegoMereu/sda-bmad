@@ -1,12 +1,15 @@
 # 136596 — Eurodis autoproduttore
 
-**Data**: 2026-11-02 · **Stato**: in_analisi · **Semaforo**: 🟡
+**Data**: 2026-11-04 · **Stato**: in_analisi · **Semaforo**: 🟡
 **Owner cliente**: Piergentili · **PRJ**: non ancora assegnato
 
 ## In una riga
 Analisi e mapping in bozza, con i servizi accessori tradotti nel formato PDB; pronto un mock dell'API `receive-pan` per i test, ma la sintassi delle LDV è provvisoria in attesa di Marzilli, e restiamo in attesa delle risposte di EURODIS alle 13 domande e sui test integrati.
 
 ## Fatto dall'ultimo punto
+- 2026-11-04 — **`ce-dichiarato-eurodis-in` implementato** (Amelia, `a53398c` su `feature/eurodis-base-implementation`, 53 test verdi): scarico in due fasi (run + esito HTTP + JSON grezzo su `eurodis_scarichi`; record per spedizione su `eurodis_spedizioni` con ora di invio ed esito), nessuna deserializzazione, nessun filtro duplicati, metriche e span sul modello di `ce-dichiarato-adapter`, job ogni 2 minuti. Specifica portata alla 0.4, assessment rifatto.
+- 2026-11-04 — Mapper: MAP-1 risolto (`flag_autoproduttore`, `versione_tracciato`, `progressivo`); verifica completa rispetto alle decisioni in `sviluppo/verifica-mapper-2026-11-04.md` (copre ~10 campi su 73, un bug su `collis` null).
+- 2026-11-02 — Ricognizione dei tre repository e `CLAUDE.md` in ciascuno (Amelia).
 - 2026-11-02 — Bozza 0.2 del documento funzionale di `ce-dichiarato-eurodis-in` (`sviluppo/`), da passare ad Amelia: 17 regole, 14 scenari di errore, 16 criteri di accettazione sul mock. Allineata al topic `preadvising.eud.pre.build` e al blueprint tecnico dei ms `ce-`.
 - 2026-11-02 — Regola di progetto: un documento funzionale per microservizio, con il suo prompt, in `iniziative/<id>/sviluppo/`.
 - 2026-10-30 — Architettura aggiornata: nuovo ms `ce-dichiarato-eurodis-mapper` (repo creato, solo scheletro). `eurodis-in` legge `receive-pan`, salva lo storico (probabilmente Mongo), scompone e pubblica su `preadvising.eud.pre.build`; il mapper consuma, converte nell'ICD e pubblica su `preadvising.pre-enrichment`. Analisi aggiornata: ripartizione delle responsabilità, PA-26 chiuso, nuovi PA-31…PA-33.
@@ -31,6 +34,8 @@ Analisi e mapping in bozza, con i servizi accessori tradotti nel formato PDB; pr
 - Chiudere i dubbi di gravità alta sul mapping — Mary / Diego — da definire
 
 ## Blocchi e rischi
+- 🟡 Versione di Spring Boot da decidere per tutta la catena: `-in` e mapper su 3.5.14, un commit di azzurrazezza portava `-in` a 4.1.2 (AS-17).
+- 🟡 Per il deploy di `-in` in svil servono: permessi Kafka sull'utente del secret (oggi è quello dello smistatore), conferma del database Mongo, uscita di rete verso EURODIS TEST, retry del service mesh disattivati.
 - 🟡 La sintassi delle LDV non è nota: finché non arriva, il mock genera LDV inventate e non prova che SDA le accetti.
 - 🟡 Perimetro e PRJ non definiti: non si può stimare né pianificare.
 - 🟡 `receive-pan` non ha ack: se EURODIS considera consegnata una spedizione quando la restituisce, un errore prima del salvataggio la fa perdere. Da confermare con EURODIS (domanda 1).
@@ -49,6 +54,8 @@ Analisi e mapping in bozza, con i servizi accessori tradotti nel formato PDB; pr
 - Perimetro: dogana, ADR, volumi e frequenza del batch.
 
 ## Decisioni prese
+- 2026-11-04 — `-in` in due fasi: scarico (run, esito HTTP, grezzo) ed elaborazione (record per spedizione, esito dello scarico: tutto inviato / parziale / nessun invio). Grezzo su Mongo. Nessuna deserializzazione, nessun filtro duplicati (si filtra a valle). Niente endpoint applicativi: recupero da configurazione. Scarico e invio ogni 2 minuti. Metriche e span su tutto.
+- 2026-11-04 — Contratto su `preadvising.eud.pre.build` (PA-31): corpo = spedizione così com'è, chiave `edReference`, metadati negli header.
 - 2026-11-02 — Il tracking (`ce-eurodis-send-tracking`) rientra nel perimetro della 136596 (supera la decisione del 22-10). Tre microservizi, un documento funzionale ciascuno.
 - 2026-10-30 — Due livelli di ingestione (chiude PA-26): `ce-dichiarato-eurodis-in` legge, salva e scompone su `preadvising.eud.pre.build`; `ce-dichiarato-eurodis-mapper` converte nell'ICD e pubblica su `preadvising.pre-enrichment`. Il mapping vive solo nel mapper.
 - 2026-10-29 — Mock dell'API in Python con FastAPI, configurazione per prodotto in YAML; la sintassi LDV è un parametro, non codice.

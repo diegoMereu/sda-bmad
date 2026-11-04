@@ -211,6 +211,8 @@ receive-tracking, send-pod, receive-pod, get-label, pickup, receive-clearing.
 
 ## Registro punti aperti
 
+Stato dello sviluppo di `ce-dichiarato-eurodis-in`: specifica 0.4 e assessment in `sviluppo/`.
+
 I **dubbi funzionali** sul mapping (DF-nn) sono raccolti a parte in
 [punti-aperti-analisi-2026-10-23.md](punti-aperti-analisi-2026-10-23.md).
 
@@ -218,7 +220,7 @@ Owner RTI = chi lo porta avanti lato fornitore; Rif. Poste = referente lato clie
 
 | ID | Data | Tema | Owner RTI | Rif. Poste | Azione / decisione | Stato | Note |
 |---|---|---|---|---|---|---|---|
-| PA-01 | 22-Oct | ms collection — gestione repliche | — | Tagliente | Fissare una call per farsi consigliare | aperto | Proposta Mary: una sola istanza attiva (evidenza 2) |
+| PA-01 | 22-Oct | ms collection — gestione repliche | — | Tagliente | Fissare una call per farsi consigliare | aperto | Proposta Mary: una sola istanza attiva (evidenza 2). 04-11: implementato con ShedLock su Mongo (un lock per job); la call resta per conferma |
 | PA-02 | 22-Oct | ms collection — con stato o senza stato | — | — | Deciso: si salva lo storico | chiuso | |
 | PA-03 | 22-Oct | Mapping prodotto / servizi accessori | — | — | Deciso il 22-Oct: ce-rules da `id_ldv`. **Rivisto il 29-Oct (proposta)**: i servizi si traducono nel nostro mapping in `codici_servizi` e nei campi delle sottochiavi, formato PDB; il prodotto ha fallback `APT000901` nel ms sync | da validare | Vedi accessori-eurodis-pdb-proposta.md, DF-05, DF-07, DF-21 |
 | PA-04 | 22-Oct | Mapping dati EURODIS → DTO del dichiarato | Azzurra / Diego | — | Mapping fatto con LLM confrontando lo swagger EURODIS con l'ICD | in corso | Prima stesura il 22-Oct nel file ICD, foglio "Mapping EURODIS". Restano 15 campi DA DEFINIRE |
@@ -231,7 +233,7 @@ Owner RTI = chi lo porta avanti lato fornitore; Rif. Poste = referente lato clie
 | PA-11 | 22-Oct | Quale campo EURODIS diventa la LDV SDA? Una LDV per spedizione o per collo? | da assegnare | — | Deciso: `consignorsColloBarcode` → `collo.id_ldv`; `europlateBarcode` → `internazionale.id_ldv_itz`; `edReference` → `rif_spedizione` | aperto | Restano: (a) `id_ldv_itz` è un campo di spedizione e `europlateBarcode` uno per collo, con più colli quale si usa? (b) da dove arriva `collo.id_collo`; (c) madre/figlio nel multicollo |
 | PA-12 | 22-Oct | Ambiente di produzione EURODIS e chiave API di produzione | da assegnare | Chiapponi | | aperto | Proposto da Mary; oggi c'è solo TEST. Chiesto a Chiapponi con mail del 26-Oct (dom. 9) |
 | PA-13 | 22-Oct | Spedizioni con dogana e ADR: rientrano nel perimetro? | da assegnare | Chiapponi | | aperto | Proposto da Mary. Chiesto a Chiapponi con mail del 26-Oct (dom. 12) |
-| PA-14 | 22-Oct | Frequenza del batch e volumi attesi | da assegnare | Chiapponi | | aperto | Proposto da Mary. Chiesto a Chiapponi con mail del 26-Oct (dom. 11) |
+| PA-14 | 22-Oct | Frequenza del batch e volumi attesi | da assegnare | Chiapponi |  | in parte | Proposto da Mary. Chiesto a Chiapponi con mail del 26-Oct (dom. 11). 04-11: scarico e invio ogni 2 minuti; volumi ancora da chiedere |
 | PA-15 | 22-Oct | Identificativi di canale: `id_preadvising` (obbligatorio), `id_canale`, `id_file`, `id_partner` | da assegnare | — | Deciso per `id_preadvising`: `UUID.randomUUID().toString()` | aperto | Restano `id_canale`, `id_file`, `id_partner`. UUID 36 caratteri contro i 15 dell'ICD: vedi Note per lo sviluppo |
 | PA-16 | 22-Oct | Lunghezze incompatibili (email 80→50, SMS 35→30, civico 40→5, nome contatto, note, TARIC) | — | — | Deciso: si passa il valore intero, non si tronca. Se serve si cambia la validazione | chiuso | |
 | PA-17 | 22-Oct | Resi e rettifiche (`shipmentTypeIndicator` R, `referencedEurodis…`, `returnAddress`), `verso`, `consegna.modalita`, `mancata_consegna` | da assegnare | — | | aperto | Dal mapping |
@@ -247,6 +249,6 @@ Owner RTI = chi lo porta avanti lato fornitore; Rif. Poste = referente lato clie
 | PA-28 | 26-Oct | Roll out incrementale, no big bang: il controllo sul dato è lato API EURODIS, quindi si può partire con un sottoinsieme (per mittente/cliente, per ufficio o per volume) e allargare per gradi? Chi decide il perimetro di ogni fase: EURODIS (chiave API, filtro lato loro) o noi (filtro lato ms)? | da assegnare | Chiapponi | Chiesto a Chiapponi con mail di follow up del 26-Oct (dom. 13) | aperto | Lo swagger `receive-pan` non ha parametri di filtro: `GET /shipments/v1` restituisce tutte le nuove spedizioni del partner (chiave API) e le segna come consegnate, senza ack. Un filtro lato nostro scarterebbe spedizioni già "consegnate" da EURODIS: serve il filtro lato EURODIS, oppure si salvano tutte (PA-02) e si elabora solo il perimetro attivo. Tocca PA-05, PA-12, PA-13 |
 | PA-29 | 29-Oct | Test integrati con EURODIS su `receive-pan` (ambiente TEST): scenari, dati di prova, referente, finestre | da assegnare | Chiapponi | Chiedere a EURODIS di proporre i propri scenari, con almeno un esempio ciascuno e le combinazioni; solo ingestione | in corso | Mail a Gianluca Chiapponi inviata il 29-Oct (scenari, LDV valide e univoche, dati reali, modalità operative). Referente e accessi: coordina Chiapponi, i dati di accesso li abbiamo già. Riferimento interno: test list INVIOFILE (52 scenari) e matrice di compatibilità nella cartella TEST LIST su SharePoint |
 | PA-30 | 29-Oct | Osservazioni sul ms `ce-dichiarato-ldv-pdb-sync` (in test): canale `POU`/`WEBSERVICE`, ISO4 non risolto, default peso e dimensioni, troncamento, nome Punto Poste, contrassegno a 0 | da assegnare | — | Segnalare al responsabile del ms | aperto | Elenco S1…S7 nel file di proposta; DF-26, DF-27 |
-| PA-31 | 30-Oct | Contratto del messaggio su `preadvising.eud.pre.build`: payload, chiave Kafka, header | da assegnare | — | Proposta Mary: un elemento di `GetShipmentResponse2` così com'è, senza trasformazioni; chiave = `edReference` | aperto | Serve a far partire il mapper senza aspettare l'API. Il mock può emettere spedizioni singole |
+| PA-31 | 30-Oct | Contratto del messaggio su `preadvising.eud.pre.build`: payload, chiave Kafka, header | da assegnare | — | Proposta Mary: un elemento di `GetShipmentResponse2` così com'è, senza trasformazioni; chiave = `edReference` | chiuso | Serve a far partire il mapper senza aspettare l'API. Il mock può emettere spedizioni singole. Deciso il 04-11 (D2): corpo = spedizione così com'è, chiave `edReference`, metadati e `traceparent` negli header. Implementato in `-in` (`a53398c`) |
 | PA-32 | 30-Oct | Messaggio non mappabile o non valido nel mapper: scarto, DLT o altro; chi ne vede l'esito | da assegnare | — | | aperto | Lega PA-08 (nessun canale di rifiuto verso EURODIS) |
 | PA-33 | 30-Oct | Dove avviene l'enrichment: F1 (contratto, codice cliente, AUC) e ce-rules (prodotto, servizi) nel mapper o a valle? | da assegnare | — | | aperto | Le decisioni PA-03 e PA-10 non dicono in quale servizio |
