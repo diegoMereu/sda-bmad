@@ -51,24 +51,23 @@ estensione del mock.
 
 | # | Rilievo | Gravità | Chi |
 |---|---|---|---|
-| AS-17 | **Versione di Spring Boot.** Il commit `5da28fc` di azzurrazezza portava il parent a **4.1.2** con Jackson 3. Nel merge ho tenuto **3.5.14** (blueprint e mapper); di quel commit è rimasta la dipendenza `jackson-datatype-jsr310`. Passare a Boot 4 vuol dire ShedLock 7.x, adattare la lettura JSON a Jackson 3 e portare anche il mapper: è una scelta da fare per tutta la catena | **alta (da decidere)** | Diego / azzurrazezza |
+| AS-17 | Versione di Spring Boot | ✅ **deciso 04-11 (Diego)**: si resta su **3.5.14**, come blueprint e mapper. Da comunicare ad azzurrazezza (il suo `5da28fc` portava a 4.1.2) | — |
 | AS-7 | `application-prod.yaml`: `ssl.endpoint.identification.algorithm: ""` disattiva la verifica dell'hostname di Kafka. Non l'ho toccato: con gli `hostAliases` di svil potrebbe servire. Da verificare | media (sicurezza) | team piattaforma |
 | AS-9 | Profilo `svil`: log in console non JSON (`logback-svil.xml`), quindi in svil Datadog non vede l'MDC | bassa | — |
 | AS-10 | `codice_iniziativa_goto: "138972"` in `deploy-svil` e `deploy-coll` | da verificare | Diego |
 | AS-11 | Helm `application.properties` ancora il placeholder del template | bassa | — |
-| AS-14 | Retry del service mesh verso EURODIS (RNF-03) | alta, da verificare in ambiente | piattaforma |
-| AS-15 | Utente SCRAM del secret = quello di `ce-dichiarato-smistatore`: serve permesso di scrittura su `preadvising.eud.pre.build` | alta per il deploy | piattaforma |
-| AS-16 | Stringa Mongo verso `ce_preadvising` su un cluster che dal nome sembra di collaudo | media | piattaforma |
-| AS-18 | Uscita di rete da OpenShift svil verso `testapi.eurodis.com` | alta per il deploy | Poste / rete |
-| AS-19 | **Alert Datadog** da configurare (sezione 9 della specifica): non sono nel codice | media | team / Datadog |
-| AS-20 | **Mock da estendere** (`500`, timeout, `.0`, `edReference` assente, campi extra, `401` testuale) per gli end-to-end | media | Amelia |
+| AS-14 | **Retry del service mesh** verso EURODIS (RNF-03). Se il pod ha il sidecar Istio (`istio-proxy`), il proxy può ripetere da solo una chiamata fallita: per `GET /shipments/v1` vorrebbe dire spedizioni consegnate da EURODIS e mai ricevute da noi. Il chart ha le label Istio ma non abilita il sidecar: l'iniezione dipende dal namespace. Verifica: `oc get pod -l app=ce-dichiarato-eurodis-in -o jsonpath='{.items[0].spec.containers[*].name}'`. Senza `istio-proxy` il punto si chiude; con il sidecar serve una route verso l'host EURODIS con `retries.attempts: 0` | alta, da verificare al primo deploy | Amelia / piattaforma |
+| AS-15 | Utente SCRAM del secret e scrittura su `preadvising.eud.pre.build` | ✅ confermato che funziona (Diego, 04-11) | — |
+| AS-16 | Stringa Mongo | ✅ il servizio la legge dal secret (`mongo-string-connection`); il valore giusto è impostato per ambiente (Diego, 04-11) | — |
+| AS-18 | Uscita di rete verso `testapi.eurodis.com` | ✅ aperta (Diego, 04-11) | — |
+| AS-19 | **Alert Datadog** (sezione 9 della specifica) | **da fare più avanti** (Diego, 04-11): resta come punto aperto | team / Datadog |
+| AS-20 | Estensione del mock per gli end-to-end | va bene così per ora (Diego, 04-11): i casi sono coperti dai test unitari | — |
 | AS-21 | Conservazione (TTL) delle collezioni: ogni run viene salvato, anche i `404` (720 al giorno) | bassa | Diego |
 | AS-22 | Non verificato: avvio dell'applicazione con Mongo e Kafka veri (i test sono unitari) e test con 2 repliche (AC-13) | media | in svil |
 
-## Per andare in svil
+## Per andare in svil (aggiornato 04-11 con le risposte di Diego)
 
-1. Decidere AS-17 (versione di Spring Boot).
-2. AS-15, AS-16, AS-18: permessi Kafka, database Mongo, rete verso EURODIS TEST.
-3. AS-14: retry del service mesh disattivati per l'host EURODIS.
-4. Deploy con `EURODIS_IN_ABILITATO=false`, verifica di avvio, poi abilitazione.
-5. Test end-to-end contro il mock esteso (AS-20), poi con EURODIS TEST (PA-29).
+1. Deploy con `EURODIS_IN_ABILITATO=false` e verifica di avvio con Mongo e Kafka veri (AS-22).
+2. Al primo pod: verificare il sidecar Istio (AS-14).
+3. Abilitare lo scarico e provare con EURODIS TEST (PA-29).
+4. Più avanti: alert Datadog (AS-19), conservazione delle collezioni (AS-21).

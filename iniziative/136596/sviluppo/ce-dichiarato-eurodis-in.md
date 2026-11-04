@@ -453,8 +453,9 @@ Criteri da verificare anche end-to-end contro `mock-eurodis` (`../mock-eurodis/`
 | D6. Recupero | **DECISO 04-11**: niente endpoint applicativi (cioè niente API REST esposte dal servizio per comandi dell'operatore); elenchi di `edReference` in configurazione | PA-09 |
 | Disegno in due fasi | **DECISO 04-11**: scarico (run + esito + grezzo) ed elaborazione (record per spedizione + esito dello scarico) | — |
 | Metriche e span | **DECISO 04-11**, implementati sul modello di `ce-dichiarato-adapter` | — |
-| Versione Spring Boot | **APERTO**: il codice è su 3.5.14 come blueprint e mapper; il commit `5da28fc` portava a 4.1.2 (servirebbero ShedLock 7 e Jackson 3 su tutta la catena) | assessment AS-17 |
+| Versione Spring Boot | **DECISO 04-11**: 3.5.14, come blueprint e mapper | assessment AS-17 |
 | Conservazione (TTL) delle collezioni | APERTO | — |
+| Alert Datadog | APERTO, da fare più avanti (sezione 9) | assessment AS-19 |
 | Ack o riconsegna EURODIS | APERTO: si assume che non esistano (I1) | PA-05, PA-09 |
 | Massimo di spedizioni per chiamata, fuso orario, `consigneeAddress` null | APERTO: nessun impatto su `-in` (non interpreta i dati) | PA-27 |
 | Prima chiamata e arretrato | APERTO: gestita come una chiamata grande | PA-06 |

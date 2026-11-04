@@ -21,6 +21,9 @@ Analisi e mapping in bozza, con i servizi accessori tradotti nel formato PDB; pr
 - 2026-10-29 — Inviata a Gianluca Chiapponi la mail per organizzare i test integrati su `receive-pan` (PA-29): scenari proposti da EURODIS, LDV valide e univoche, indirizzi e nazioni reali, modalità operative.
 
 ## Prossimi passi
+- Deploy di `-in` in svil con scarico disabilitato, verifica di avvio, poi prova con EURODIS TEST — Amelia — da definire
+- Comunicare ad azzurrazezza la scelta di Spring Boot 3.5.14 — Diego — da definire
+- Alert Datadog di `-in` (specifica, sezione 9) — da assegnare — più avanti
 - Confermare il contratto su `preadvising.eud.pre.build` (PA-31): corpo = spedizione così com'è, chiave `edReference`, metadati negli header Kafka — Diego — da definire
 - Rispondere alle 4 domande del documento di `-in` (Mongo, messaggio, duplicati, recupero) e passarlo ad Amelia — Diego / Mary — da definire
 - Documenti funzionali di `ce-dichiarato-eurodis-mapper` e `ce-eurodis-send-tracking` — Mary — da definire
@@ -34,8 +37,7 @@ Analisi e mapping in bozza, con i servizi accessori tradotti nel formato PDB; pr
 - Chiudere i dubbi di gravità alta sul mapping — Mary / Diego — da definire
 
 ## Blocchi e rischi
-- 🟡 Versione di Spring Boot da decidere per tutta la catena: `-in` e mapper su 3.5.14, un commit di azzurrazezza portava `-in` a 4.1.2 (AS-17).
-- 🟡 Per il deploy di `-in` in svil servono: permessi Kafka sull'utente del secret (oggi è quello dello smistatore), conferma del database Mongo, uscita di rete verso EURODIS TEST, retry del service mesh disattivati.
+- 🟡 `-in` mai avviato con Mongo e Kafka veri: la prima verifica reale è il deploy in svil (al primo pod va controllato il sidecar Istio, AS-14).
 - 🟡 La sintassi delle LDV non è nota: finché non arriva, il mock genera LDV inventate e non prova che SDA le accetti.
 - 🟡 Perimetro e PRJ non definiti: non si può stimare né pianificare.
 - 🟡 `receive-pan` non ha ack: se EURODIS considera consegnata una spedizione quando la restituisce, un errore prima del salvataggio la fa perdere. Da confermare con EURODIS (domanda 1).
@@ -54,6 +56,7 @@ Analisi e mapping in bozza, con i servizi accessori tradotti nel formato PDB; pr
 - Perimetro: dogana, ADR, volumi e frequenza del batch.
 
 ## Decisioni prese
+- 2026-11-04 — Spring Boot 3.5.14 per tutta la catena (non 4.1.2). Kafka, Mongo e rete verso EURODIS TEST pronti in svil; alert Datadog rimandati.
 - 2026-11-04 — `-in` in due fasi: scarico (run, esito HTTP, grezzo) ed elaborazione (record per spedizione, esito dello scarico: tutto inviato / parziale / nessun invio). Grezzo su Mongo. Nessuna deserializzazione, nessun filtro duplicati (si filtra a valle). Niente endpoint applicativi: recupero da configurazione. Scarico e invio ogni 2 minuti. Metriche e span su tutto.
 - 2026-11-04 — Contratto su `preadvising.eud.pre.build` (PA-31): corpo = spedizione così com'è, chiave `edReference`, metadati negli header.
 - 2026-11-02 — Il tracking (`ce-eurodis-send-tracking`) rientra nel perimetro della 136596 (supera la decisione del 22-10). Tre microservizi, un documento funzionale ciascuno.
