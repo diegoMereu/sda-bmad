@@ -1,11 +1,9 @@
 # `ce-dichiarato-eurodis-in` — Documento funzionale per lo sviluppo
 
-**Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.4 (allineata all'implementazione) · **Data**: 2026-11-04
+**Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.2 (bozza) · **Data**: 2026-11-02
 **Autore**: Mary (analyst) · **Destinatario**: Amelia (dev) e team di sviluppo
 **Repository**: https://posteitaliane.ghe.com/SVILUPPO/CORRIERE-ESPRESSO_PREADVISING_ce-dichiarato-eurodis-in
 **Generato da**: [prompt-ce-dichiarato-eurodis-in.md](prompt-ce-dichiarato-eurodis-in.md)
-**Implementazione**: branch `feature/eurodis-base-implementation`, commit `a53398c` (04-11, 53 test verdi).
-Assessment: [assessment-ce-dichiarato-eurodis-in-2026-11-04.md](assessment-ce-dichiarato-eurodis-in-2026-11-04.md)
 
 Etichette usate nel documento:
 - **[FATTO]**: scritto nella specifica EURODIS o verificato con una prova; la fonte è indicata.
@@ -92,7 +90,7 @@ Significato dei codici [FATTO, swagger]:
 
 - [FATTO] La descrizione dello swagger dice: *"Deploys all new shipments, that have not already been deployed to the partner"*.
 - [FATTO] Non esiste un endpoint di conferma (acknowledge o commit).
-- [IPOTESI I1, forte] EURODIS segna una spedizione come consegnata nel momento in cui la restituisce. La consegna è quindi **at-most-once**: una risposta persa per timeout, crash o retry del client fa perdere le spedizioni. Le si può recuperare solo con la GET puntuale, e solo se si conosce l'`edReference` (PA-05, PA-09).
+- [IPOTESI I1, forte] EURODIS segna una spedizione come consegnata nel momento in cui la restituisce. La consegna è quindi **at-most-once**: una risposta persa per timeout, crash o retry di client, proxy o sidecar fa perdere le spedizioni. Le si può recuperare solo con la GET puntuale, e solo se si conosce l'`edReference` (PA-05, PA-09).
 - [IPOTESI I2] La GET puntuale non ha effetti collaterali e funziona anche su spedizioni già scaricate.
 - [IPOTESI I3] La risposta può essere molto grande: lo swagger non dichiara limiti (PA-27).
 
@@ -121,7 +119,8 @@ Leggere un JSON generico ed estrarre solo `edReference` rende il microservizio i
 
 **[DECISO 30-10]** Topic: **`preadvising.eud.pre.build`**.
 
-**[DECISO 04-11, D2, PA-31]** Il contratto del messaggio:
+**[DA DECIDERE D2, PA-31]** Il contratto del messaggio. Proposta, che unisce
+quella di PA-31 con i metadati necessari al recupero:
 
 - **Chiave**: `edReference` normalizzato a stringa senza decimali (RF-07). Così
   tutte le versioni della stessa spedizione finiscono nella stessa partizione,
@@ -134,257 +133,238 @@ Leggere un JSON generico ed estrarre solo `edReference` rende il microservizio i
 | Header | Esempio | Uso |
 |---|---|---|
 | `edReference` | `7319003746401` | ridondante con la chiave, comodo per i filtri |
-| `idEsecuzione` | `6720f1a2b3c4d5e6f7a8b9c0` | id dello scarico in `eurodis_scarichi` |
+| `idEsecuzione` | `3f2b8c1e-5a7d-4c1b-9e2f-0a1b2c3d4e5f` | tracciabilità verso l'esecuzione e il grezzo |
 | `ricevutoIl` | `2026-10-30T09:15:02.123Z` | istante di ricezione da EURODIS |
-| `fonte` | `receive-pan/shipments/v1` oppure `receive-pan/shipment/v1` | distingue lo scarico normale dalla rilettura (RF-16) |
-| `rifGrezzo` | `eurodis_scarichi/6720f1a2b3c4d5e6f7a8b9c0` | serve al mapper per `link_file_fisico_inviato` |
+| `fonte` | `receive-pan/shipments/v1` oppure `receive-pan/shipment/v1` | distingue lo scarico normale dal recupero (sezione 7) |
+| `rifGrezzo` | `eurodis_risposte_grezze/6720f1a2b3c4d5e6f7a8b9c0` | serve al mapper per `link_file_fisico_inviato`; formato secondo D1 |
 | `ambiente` | `TEST` / `PROD` | |
 | `schemaVersion` | `1` | versione del contratto |
-| `traceparent` | W3C | contesto di tracing (span PRODUCER), per continuare la traccia nel mapper |
 
 Tenere i metadati negli header lascia il corpo identico al dato EURODIS (RF-14)
 e non obbliga il mapper a conoscere una busta.
 
 ### 3.3 Persistenza
 
-**[DECISO 04-11]** MongoDB (D1). Tre collezioni.
+**[DECISO, PA-02]** Si salva lo storico.
 
-**`eurodis_scarichi`**: un documento per ogni run verso EURODIS (scarico o rilettura). Contiene
-il run, l'esito HTTP e il JSON grezzo, e dopo la fase 2 l'esito dell'invio.
+**[DA DECIDERE D1]** Dove si salva il grezzo. Ci sono tre opzioni:
+
+| Opzione | Pro | Contro |
+|---|---|---|
+| **a. MongoDB** (proposta del 26-10; "probabilmente Mongo" nel punto del 30-10) | Già nello stack; interrogabile; un solo sistema per grezzo e stato | Limite di 16 MB per documento: oltre serve GridFS |
+| b. Topic Kafka dedicato con `acks=all` | Durevole, ripetibile | Limite di dimensione del messaggio; il grezzo intero può superarlo; meno comodo da interrogare |
+| c. Blob storage | Coerente con `link_file_fisico_inviato` degli altri canali (gli esempi puntano a un blob Azure) | Un sistema in più da integrare |
+
+**Default provvisorio: opzione a**, cioè MongoDB, con GridFS automatico sopra una soglia configurabile. Collezioni proposte:
+
+**`eurodis_esecuzioni`**: una riga per ogni esecuzione del batch.
 
 | Campo | Note |
 |---|---|
-| `_id` | generato da Mongo; è l'`idEsecuzione` negli header |
-| `tipo` | `SCARICO` (`/shipments/v1`) o `RILETTURA` (`/shipment/{edReference}/v1`) |
-| `edReferenceRichiesto` | solo per le riletture |
-| `istanza` | pod che ha eseguito |
-| `avviatoIl`, `ricevutoIl` | inizio del run, istante della risposta |
-| `httpStatus`, `durataMs`, `errore` | esito della chiamata; `errore` senza dati personali, max 300 caratteri |
-| `corpo` | JSON grezzo esattamente come ricevuto |
-| `gridFsId` | al posto di `corpo` se il grezzo supera la soglia (limite Mongo di 16 MB) |
-| `dimensioneByte`, `sha256` | verifica del grezzo |
+| `_id` | `idEsecuzione` (UUID) |
+| `istanza` | nome del pod che ha eseguito |
+| `avviataIl`, `conclusaIl` | istanti UTC |
 | `stato` | vedi sezione 6 |
-| `numeroSpedizioni`, `numeroInviate`, `numeroNonInviate` | esito della fase 2 |
-| `elaborazioneIniziataIl`, `elaborazioneConclusaIl` | fase 2 |
+| `httpStatus`, `durataMs` | esito della chiamata |
+| `numeroSpedizioni` | elementi dell'array |
+| `edReferences` | elenco degli `edReference` ricevuti |
+| `rifGrezzo` | riferimento al grezzo |
+| `errore` | classe e messaggio, senza dati personali |
 
-**`eurodis_spedizioni`**: un record per spedizione, con il JSON separato.
+**`eurodis_risposte_grezze`**: il corpo della risposta, intatto.
 
 | Campo | Note |
 |---|---|
-| `_id` | `edReference` normalizzato; per le spedizioni non identificabili `<idScarico>#<posizione>` |
-| `edReference` | |
-| `json` | JSON della singola spedizione, identico al testo ricevuto |
-| `idScarico`, `posizione`, `fonte`, `rifGrezzo`, `ricevutoIl` | provenienza |
-| `statoInvio` | `DA_INVIARE`, `INVIATA`, `ERRORE_INVIO`, `NON_IDENTIFICABILE` |
-| `inviataIl` | ora dell'invio confermato dal broker |
-| `tentativiInvio`, `ultimoErrore` | perché non è partita |
-| `numeroRicezioni`, `primaRicezioneIl`, `ultimaRicezioneIl` | quante volte è arrivata |
+| `_id` | |
+| `idEsecuzione` | |
+| `ricevutaIl` | |
+| `httpStatus` | |
+| `corpo` | stringa con il corpo esattamente come ricevuto (oppure riferimento GridFS) |
+| `dimensioneByte`, `sha256` | per verifica e deduplica |
 
-**`eurodis_richieste_manuali`**: traccia dei recuperi e reinvii già eseguiti (RF-16, RF-17).
+**`eurodis_spedizioni`**: stato per spedizione.
 
-Indici su `stato`, `statoInvio`, `avviatoIl`, `ultimaRicezioneIl` (creati automaticamente).
-Il lock dei job sta nella collezione `shedLock`. **[DA DECIDERE]** La conservazione (TTL): ogni run
-viene salvato, anche i `404` (720 documenti al giorno con il cron a 2 minuti).
+| Campo | Note |
+|---|---|
+| `_id` | `edReference` normalizzato (indice univoco) |
+| `stato` | vedi sezione 6 |
+| `primaRicezioneIl`, `ultimaRicezioneIl` | |
+| `numeroRicezioni` | quante volte è arrivata |
+| `idEsecuzione` | dell'ultima ricezione |
+| `hashContenuto` | SHA-256 del JSON della spedizione |
+| `spedizione` | JSON grezzo dell'ultima versione |
+| `pubblicataIl`, `tentativiPubblicazione`, `ultimoErrore` | |
+
+Indici: `eurodis_spedizioni.stato` (per il job di ripubblicazione) ed `eurodis_esecuzioni.avviataIl`. **[DA DECIDERE]** La conservazione (TTL): la proposta è di allinearla agli altri canali del preadvising.
 
 ## 4. Flusso di elaborazione
 
-Due job distinti, ognuno con il suo lock: girano su un solo pod alla volta.
-
 ```mermaid
 sequenceDiagram
-    participant S1 as Job scarico (ogni 2 min)
-    participant S2 as Job elaborazione (ogni 2 min, +30 s)
+    participant S as Scheduler
+    participant L as Lock (D3)
+    participant IN as ce-dichiarato-eurodis-in
     participant E as EURODIS receive-pan
-    participant SC as eurodis_scarichi
-    participant SP as eurodis_spedizioni
-    participant K as preadvising.eud.pre.build
+    participant DB as MongoDB (D1)
+    participant K as Kafka (D2)
 
-    S1->>SC: run CHIAMATA_IN_CORSO
-    S1->>E: GET /shipments/v1 (X-API-Key, nessun retry)
+    S->>IN: trigger (cron)
+    IN->>L: acquisisci lock
+    alt lock non ottenuto
+        IN-->>S: esci (un'altra istanza sta lavorando)
+    end
+    IN->>DB: crea esecuzione (AVVIATA)
+    IN->>E: GET /shipments/v1 (X-API-Key, nessun retry)
     alt 404
-        S1->>SC: NESSUNA_SPEDIZIONE
+        IN->>DB: esecuzione NESSUNA_SPEDIZIONE
     else 200
-        S1->>SC: corpo grezzo + DA_ELABORARE
+        IN->>DB: salva corpo grezzo (PRIMA di tutto)
+        IN->>DB: esecuzione SALVATA + edReferences
+        loop per ogni spedizione dell'array
+            IN->>DB: upsert eurodis_spedizioni (RICEVUTA)
+            IN->>K: pubblica messaggio (acks=all, attesa conferma)
+            IN->>DB: spedizione PUBBLICATA
+        end
+        IN->>DB: esecuzione PUBBLICATA
     else 401/424/451/500/timeout
-        S1->>SC: ERRORE_CHIAMATA + errore
+        IN->>DB: esecuzione IN_ERRORE
+        IN-->>IN: alert
     end
-
-    S2->>SC: legge gli scarichi DA_ELABORARE
-    S2->>SC: IN_ELABORAZIONE
-    loop per ogni spedizione del grezzo
-        S2->>SP: record DA_INVIARE (JSON separato, edReference)
-        S2->>K: invio sincrono (acks=all)
-        S2->>SP: INVIATA + inviataIl  /  DA_INVIARE + motivo
-    end
-    S2->>SC: INVIATO_TUTTO / INVIO_PARZIALE / NESSUN_INVIO
+    IN->>L: rilascia lock
 ```
 
-**Fase 1, scarico** (`ScaricoService`):
-1. se `eurodis.in.abilitato=false` non fa nulla;
-2. salva il run con stato `CHIAMATA_IN_CORSO`;
-3. chiama `GET /shipments/v1` una volta sola;
-4. `404` → `NESSUNA_SPEDIZIONE`; non-200 → `ERRORE_CHIAMATA` con esito ed errore; eccezione di
-   rete → `ERRORE_CHIAMATA` senza esito HTTP;
-5. `200` → salva il corpo grezzo (GridFS sopra soglia) e porta lo scarico a `DA_ELABORARE`.
+Passo per passo:
 
-**Fase 2, elaborazione** (`ElaborazioneService`):
-1. prende gli scarichi `DA_ELABORARE` in ordine di arrivo, più quelli rimasti `IN_ELABORAZIONE`
-   oltre la durata massima del lock (riavvio a metà);
-2. porta lo scarico a `IN_ELABORAZIONE`;
-3. divide il grezzo: un array (`/shipments/v1`) diventa N testi, uno per spedizione, identici a
-   come sono arrivati; un oggetto (rilettura) è una spedizione sola; altro → `NON_ELABORABILE`;
-4. per ogni spedizione estrae `edReference`:
-   - assente o non valido → record `NON_IDENTIFICABILE` con il motivo, nessun invio;
-   - valido → record `DA_INVIARE`, invio sincrono, poi `INVIATA` con `inviataIl`, oppure resta
-     `DA_INVIARE` con tentativi e motivo;
-5. chiude lo scarico: nessuna spedizione → `NESSUNA_SPEDIZIONE`; tutte inviate → `INVIATO_TUTTO`;
-   nessuna inviata → `NESSUN_INVIO`; altrimenti `INVIO_PARZIALE`.
+1. **Trigger.** Lo scheduler parte secondo il cron configurato. Il batch non parte se `eurodis.in.abilitato=false` (RF-01).
+2. **Lock.** Ottiene il lock distribuito; se non ci riesce esce senza fare nulla (RF-02).
+3. **Esecuzione.** Crea il record con stato `AVVIATA` e un nuovo `idEsecuzione`.
+4. **Chiamata.** Chiama `GET /shipments/v1` una sola volta, senza retry (RF-04).
+5. **Esito `404`.** Chiude l'esecuzione con stato `NESSUNA_SPEDIZIONE` (RF-05).
+6. **Esito `200`.** Salva il corpo grezzo **prima** di analizzarlo (RF-06), poi:
+   - analizza il JSON come array generico;
+   - estrae e normalizza gli `edReference` (RF-07);
+   - li registra nell'esecuzione e nel log (RF-12).
+7. **Per ogni spedizione**, in ordine:
+   - upsert in `eurodis_spedizioni` (RF-08, RF-09);
+   - pubblicazione sincrona su Kafka (RF-10);
+   - aggiornamento a `PUBBLICATA`.
+8. **Chiusura.** Chiude l'esecuzione (`PUBBLICATA`, oppure `PARZIALE` se qualche pubblicazione è fallita) e rilascia il lock.
+9. **Ripubblicazione.** Un job separato ripubblica le spedizioni rimaste `RICEVUTA` o `ERRORE_PUBBLICAZIONE` (RF-11). In pratica è il pattern outbox: copre il crash tra salvataggio e pubblicazione.
 
 ## 5. Regole funzionali
 
-| ID | Regola | Implementazione |
-|---|---|---|
-| RF-01 | Lo scarico gira solo se `eurodis.in.abilitato=true` (default `false`, rilascio incrementale) [DECISO, PA-28]. La rilettura puntuale funziona anche con lo scarico disabilitato. | `ScaricoService.scarica` |
-| RF-02 | Ogni job gira su **un solo pod** anche con più repliche (ShedLock su Mongo, `lockAtMostFor` 15 min). | `EurodisScheduler`, `SchedulingConfig` |
-| RF-03 | Ogni chiamata invia `X-API-Key` letto dal secret (`api-key`). La chiave non compare mai nei log. | `ReceivePanClient` |
-| RF-04 | `GET /shipments/v1` si chiama **una volta per run e senza retry**: client Apache con `disableAutomaticRetries`, nessun Spring Retry. Il progetto non usa service mesh: nessun retry fuori dal codice. | `AppConfig` |
-| RF-05 | `404` = nessuna spedizione: run regolare, nessun alert. | `ScaricoService` |
-| RF-06 | Con `200` il corpo si salva **integro e per primo**. Se il salvataggio fallisce: log CRITICO con gli `edReference` estratti dal testo, per il recupero con RF-16. | `ScaricoService`, `GrezzoStore` |
-| RF-07 | `edReference` si normalizza a stringa intera senza decimali (`7319003746401.0` → `7319003746401`), con `BigDecimal`. Parte decimale ≠ 0, fuori intervallo o assente → non identificabile. Accettato anche come testo numerico. | `EdReference` |
-| RF-08 | Un record per `edReference` in `eurodis_spedizioni`, aggiornato a ogni ricezione (`numeroRicezioni`, `ultimaRicezioneIl`). | `SpedizioneService` |
-| RF-09 | **Nessun filtro dei duplicati** [DECISO 04-11]: una spedizione ricevuta di nuovo si salva e si reinvia sempre. La deduplica è a valle. | `SpedizioneService` |
-| RF-10 | Invio Kafka sincrono, `acks=all`, producer idempotente; l'esito si scrive sul record solo dopo la conferma del broker. | `SpedizioneProducer` |
-| RF-11 | Il job di ripubblicazione reinvia i record `DA_INVIARE` fermi da più di 5 minuti. Dopo 10 tentativi il record va in `ERRORE_INVIO` (si sblocca con RF-17). | `RipubblicazioneService` |
-| RF-12 | Ogni run lascia nel log `id_scarico`, esito HTTP, numero di spedizioni inviate e non inviate. Mai dati personali nei log. | servizi |
-| RF-13 | Una spedizione non identificabile non si scarta in silenzio: record `NON_IDENTIFICABILE` con JSON e motivo, scarico `INVIO_PARZIALE`. | `SpedizioneService.registraNonIdentificabile` |
-| RF-14 | Il corpo del messaggio è il testo della spedizione **identico** a quello ricevuto (non riserializzato). | `AnalizzatoreSpedizioni.elementi` |
-| RF-15 | I corpi di errore in testo semplice (`401 Invalid API Key`) si registrano come testo nell'`errore` del run. | `ScaricoService` |
-| RF-16 | Recupero puntuale: gli `edReference` in `eurodis.in.recupero.ed-references` si rileggono con `GET /shipment/{edReference}/v1` (run `RILETTURA`), una volta per valore; i fallimenti 5xx o di rete si ritentano al giro dopo. **Nessun endpoint applicativo** [DECISO 04-11]. | `RichiesteManualiService` |
-| RF-17 | Reinvio manuale: gli `edReference` in `eurodis.in.ripubblica.ed-references` si reinviano dal record salvato, senza chiamare EURODIS, una volta per valore. | `RichiesteManualiService` |
-| RF-18 | **Metriche e span su tutto** [DECISO 04-11]: ogni job, la chiamata EURODIS e l'invio Kafka hanno uno span OpenTelemetry e metriche Micrometer (sezione 9). Il contesto W3C va negli header Kafka. Il tracing non deve mai mandare in errore la lavorazione. | `TraceUtil`, `MetricheEurodisIn` |
+| ID | Regola |
+|---|---|
+| RF-01 | Il batch gira solo se `eurodis.in.abilitato=true`. Questo flag serve al rilascio incrementale [DECISO, PA-28]. |
+| RF-02 | In ogni istante esegue il batch **una sola istanza**, anche con più repliche [DA DECIDERE D3]. Il lock ha una durata massima, così un pod morto non lo blocca per sempre. |
+| RF-03 | Ogni chiamata invia l'header `X-API-Key`, letto da un secret. La chiave non compare mai nei log. |
+| RF-04 | `GET /shipments/v1` si chiama **una volta per esecuzione e senza retry**, a nessun livello: client HTTP, Spring Retry, Resilience4j, proxy, service mesh. Un fallimento è un incidente da segnalare, non da ripetere. |
+| RF-05 | `404` su `/shipments/v1` vuol dire "nessuna spedizione": l'esecuzione è regolare, senza eccezioni, senza alert e senza contare come errore per un eventuale circuit breaker. |
+| RF-06 | Con `200`, il corpo si salva **integro e per primo**, prima del parsing di business e della pubblicazione. Se il salvataggio fallisce, l'esecuzione va `IN_ERRORE` con alert critico, e gli `edReference` estraibili vanno scritti nel log, così il recupero resta possibile con la GET puntuale. |
+| RF-07 | `edReference` si legge come numero decimale e si normalizza a **stringa intera senza decimali**: `7319003746401.0` e `7319003746401` diventano `7319003746401`. Si usa `BigDecimal` (`stripTrailingZeros().toPlainString()`), mai `double`. Una parte decimale diversa da zero, un valore fuori intervallo o un valore assente rendono la spedizione **non identificabile** (RF-13). |
+| RF-08 | L'elaborazione è **idempotente su `edReference`**: c'è un solo documento per spedizione, aggiornato a ogni ricezione (`numeroRicezioni`, `ultimaRicezioneIl`). |
+| RF-09 | Se arriva un `edReference` già visto [DA DECIDERE D5]: se l'hash del contenuto è uguale, la ricezione si registra ma il messaggio **non** si ripubblica (stato invariato, contatore `duplicati`); se l'hash è diverso, si salva la nuova versione e si ripubblica. |
+| RF-10 | La pubblicazione su Kafka usa `acks=all` e attende la conferma del broker prima di segnare la spedizione `PUBBLICATA`. Il producer è idempotente (`enable.idempotence=true`). |
+| RF-11 | Un job di ripubblicazione rimanda le spedizioni in stato `RICEVUTA` da più di N minuti o in `ERRORE_PUBBLICAZIONE`, con un numero massimo di tentativi. Oltre il massimo la spedizione resta in errore e scatta un alert. |
+| RF-12 | Ogni esecuzione registra numero e elenco degli `edReference` ricevuti, sia nel record dell'esecuzione sia nei log. Nei log non compaiono mai dati personali (nomi, indirizzi, telefoni, email). |
+| RF-13 | Una spedizione non identificabile (senza `edReference` valido) non si scarta in silenzio. Resta nel grezzo, si registra nell'esecuzione con la sua posizione nell'array e fa scattare un alert. Non si pubblica, perché non ha una chiave. |
+| RF-14 | Il microservizio non modifica il contenuto della spedizione: il campo `spedizione` del messaggio è identico all'elemento ricevuto. |
+| RF-15 | I corpi di errore in testo semplice (per esempio `401 Invalid API Key`) si registrano come testo, senza tentare il parsing JSON. |
+| RF-16 | Recupero puntuale: dato un `edReference`, si chiama `GET /shipment/{edReference}/v1`, si salva la risposta e si pubblica con `fonte` = rilettura. Qui il retry è ammesso, se vale I2 [DA DECIDERE D6]. |
+| RF-17 | Ripubblicazione manuale: dato un `edReference`, si ripubblica l'ultima versione salvata, senza chiamare EURODIS [DA DECIDERE D6]. |
 
 ## 6. Stati
 
-**Scarico** (`eurodis_scarichi.stato`)
+**Esecuzione**
 
 ```mermaid
 stateDiagram-v2
-    [*] --> CHIAMATA_IN_CORSO
-    CHIAMATA_IN_CORSO --> NESSUNA_SPEDIZIONE: 404
-    CHIAMATA_IN_CORSO --> ERRORE_CHIAMATA: 401/424/451/500/timeout
-    CHIAMATA_IN_CORSO --> DA_ELABORARE: 200 + grezzo salvato
-    DA_ELABORARE --> IN_ELABORAZIONE: fase 2
-    IN_ELABORAZIONE --> INVIATO_TUTTO
-    IN_ELABORAZIONE --> INVIO_PARZIALE
-    IN_ELABORAZIONE --> NESSUN_INVIO
-    IN_ELABORAZIONE --> NESSUNA_SPEDIZIONE: array vuoto
-    IN_ELABORAZIONE --> NON_ELABORABILE: grezzo non JSON
+    [*] --> AVVIATA
+    AVVIATA --> NESSUNA_SPEDIZIONE: 404
+    AVVIATA --> SALVATA: 200 + grezzo salvato
+    AVVIATA --> IN_ERRORE: 401/424/451/500/timeout/errore salvataggio
+    SALVATA --> PUBBLICATA: tutte pubblicate
+    SALVATA --> PARZIALE: almeno una non pubblicata o non identificabile
+    NESSUNA_SPEDIZIONE --> [*]
+    PUBBLICATA --> [*]
+    PARZIALE --> [*]
+    IN_ERRORE --> [*]
 ```
 
-Uno scarico rimasto `CHIAMATA_IN_CORSO` vuol dire che il pod è caduto durante la chiamata: è la
-finestra in cui si possono perdere spedizioni (I1).
-
-**Spedizione** (`eurodis_spedizioni.statoInvio`)
+**Spedizione**
 
 | Stato | Significato | Transizioni |
 |---|---|---|
-| `DA_INVIARE` | salvata, invio non ancora confermato | → `INVIATA`; → `ERRORE_INVIO` dopo 10 tentativi |
-| `INVIATA` | confermata dal broker (`inviataIl`) | → `DA_INVIARE` se la spedizione arriva di nuovo |
-| `ERRORE_INVIO` | tentativi esauriti | → `INVIATA` con il reinvio manuale (RF-17) |
-| `NON_IDENTIFICABILE` | senza `edReference` valido, mai inviata | stato finale; il JSON resta sul record |
+| `RICEVUTA` | salvata, non ancora pubblicata | → `PUBBLICATA`, → `ERRORE_PUBBLICAZIONE` |
+| `PUBBLICATA` | confermata da Kafka | → `RICEVUTA` se arriva una nuova versione con contenuto diverso (RF-09) |
+| `ERRORE_PUBBLICAZIONE` | tentativi esauriti | → `PUBBLICATA` con ripubblicazione manuale (RF-17) |
 
 ## 7. Gestione errori e recupero
 
-| Scenario | Comportamento | Dove si vede | Recupero |
+| Scenario | Comportamento | Alert | Recupero |
 |---|---|---|---|
-| `404` | run `NESSUNA_SPEDIZIONE` | `eurodis_scarichi` | — |
-| `401` (chiave) | run `ERRORE_CHIAMATA`, errore `HTTP 401: Invalid API Key` | `eurodis_scarichi`, span in errore | Verificare il secret `api-key` o la chiave con EURODIS. Nessuna spedizione persa |
-| `424` / `451` | run `ERRORE_CHIAMATA` | idem | Configurazione del partner presso EURODIS (Chiapponi) |
-| `500` | run `ERRORE_CHIAMATA`, nessun retry | idem | Prossimo run. [IPOTESI] Se EURODIS avesse già segnato le spedizioni come consegnate, servirebbe un recupero (PA-09) |
-| Timeout o connessione caduta | run `ERRORE_CHIAMATA` senza esito HTTP, log CRITICO | idem | **Rischio di perdita** (I1): chiedere a EURODIS gli `edReference` del periodo e recuperarli con RF-16 |
-| Pod caduto durante la chiamata | run rimasto `CHIAMATA_IN_CORSO` | `eurodis_scarichi` | come sopra |
-| Mongo giù al salvataggio del grezzo | log CRITICO con gli `edReference` estratti dal testo | log | RF-16 per gli `edReference` del log |
-| Pod caduto durante la fase 2 | scarico rimasto `IN_ELABORAZIONE` | `eurodis_scarichi` | Ripreso automaticamente dopo 15 minuti; i record già inviati vengono reinviati (la deduplica è a valle) |
-| Kafka giù | record `DA_INVIARE` con motivo; scarico `INVIO_PARZIALE` o `NESSUN_INVIO` | `eurodis_spedizioni` | Automatico con RF-11, poi RF-17 |
-| Grezzo non JSON | scarico `NON_ELABORABILE` con errore | `eurodis_scarichi` | Analisi del grezzo salvato |
-| Spedizione senza `edReference` valido | record `NON_IDENTIFICABILE`, scarico `INVIO_PARZIALE` | `eurodis_spedizioni` | Analisi con EURODIS |
-| Risposta molto grande | grezzo in GridFS sopra 10 MB; warning e metrica sopra 100 MB | metrica | Limiti da chiarire con EURODIS (PA-27) |
+| `404` | Esecuzione `NESSUNA_SPEDIZIONE` | no | — |
+| `401` (chiave) | `IN_ERRORE`; corpo registrato come testo | sì, alto | Verificare il secret o la chiave con EURODIS. Nessuna spedizione persa: non è stata restituita |
+| `424` / `451` | `IN_ERRORE` | sì, alto | Problema di configurazione del partner presso EURODIS (Chiapponi) |
+| `500` | `IN_ERRORE`, nessun retry | sì | Si attende la prossima esecuzione. [IPOTESI] Se EURODIS avesse già segnato le spedizioni come consegnate, servirebbe un recupero (PA-09) |
+| Timeout o connessione caduta **durante la risposta** | `IN_ERRORE`, nessun retry; registrati i byte ricevuti, se ci sono | **critico** | **Rischio di perdita** (I1). Chiedere a EURODIS gli `edReference` del periodo e recuperarli con RF-16. Riconciliazione [IPOTESI] |
+| Crash del pod **dopo** la risposta e **prima** del salvataggio | Esecuzione rimasta `AVVIATA` | **critico** (esecuzione non chiusa entro N minuti) | Come sopra: è la finestra critica da tenere più stretta possibile |
+| Crash **dopo** il salvataggio e **prima** della pubblicazione | Spedizioni `RICEVUTA` | no, se il job le recupera | Automatico con RF-11 |
+| Kafka non disponibile | Spedizioni `RICEVUTA` o `ERRORE_PUBBLICAZIONE`; esecuzione `PARZIALE` | sì, se persiste | Automatico con RF-11, poi manuale con RF-17 |
+| MongoDB non disponibile al salvataggio del grezzo | `IN_ERRORE`; `edReference` nel log | **critico** | RF-16 per ogni `edReference` registrato nel log |
+| Corpo `200` non JSON o non array | Grezzo salvato; esecuzione `IN_ERRORE` | sì | Analisi manuale del grezzo |
+| Spedizione senza `edReference` valido | Registrata come non identificabile; esecuzione `PARZIALE` (RF-13) | sì | Analisi del grezzo con EURODIS |
+| `edReference` duplicato, stesso contenuto | Contatore aggiornato, nessuna pubblicazione (RF-09) | no | — |
+| `edReference` duplicato, contenuto diverso | Nuova versione, ripubblicata (RF-09) | no (metrica) | — |
+| Risposta molto grande | Salvataggio su GridFS sopra soglia; pubblicazione in streaming per spedizione | se supera la soglia di guardia | Valutare con EURODIS i limiti (PA-27) |
+| Prima esecuzione in produzione con un grande arretrato | Come sopra | metrica | [DA VERIFICARE, PA-06] Concordare con EURODIS il momento del primo avvio |
 
+**Attenzione al service mesh e agli egress.** OpenShift Service Mesh (Istio) può applicare **retry di default** alle chiamate in uscita. Per l'host EURODIS vanno disattivati esplicitamente (`retries.attempts: 0` sulla route di egress), e lo stesso vale per eventuali proxy. È un requisito da verificare in ambiente (RNF-03).
 
 ## 8. Configurazione
 
-Variabili d'ambiente (Helm) → proprietà `eurodis.in.*` in `application.yaml`.
+| Parametro | Default proposto | Note |
+|---|---|---|
+| `eurodis.in.abilitato` | `false` | RF-01, rilascio incrementale |
+| `eurodis.in.base-url` | TEST: `https://testapi.eurodis.com/receive-pan` | PROD: `https://api.eurodis.com/receive-pan` |
+| `eurodis.in.api-key` | da secret OpenShift | mai in chiaro o nei log |
+| `eurodis.in.cron` | ogni 5 minuti (**provvisorio**) | [DA DECIDERE D4, PA-14] |
+| `eurodis.in.timeout.connect` | 10 s | |
+| `eurodis.in.timeout.read` | 120 s (**provvisorio**) | da tarare sui volumi (PA-27) |
+| `eurodis.in.lock.durata-max` | 15 min | RF-02 |
+| `eurodis.in.topic` | `preadvising.eud.pre.build` | [DECISO 30-10] |
+| `eurodis.in.grezzo.soglia-gridfs` | 10 MB | sotto il limite Mongo di 16 MB |
+| `eurodis.in.grezzo.soglia-guardia` | 100 MB (**provvisorio**) | oltre: alert |
+| `eurodis.in.ripubblicazione.cron` | ogni 2 minuti | RF-11 |
+| `eurodis.in.ripubblicazione.attesa-min` | 5 min | età minima di una `RICEVUTA` da ripubblicare |
+| `eurodis.in.ripubblicazione.tentativi-max` | 10 | |
+| `eurodis.in.alert.esecuzione-assente` | 3 × intervallo del cron | allarme se il batch non gira |
 
-| Variabile | Proprietà | Default | Note |
-|---|---|---|---|
-| `EURODIS_IN_ABILITATO` | `abilitato` | `false` | RF-01 |
-| `EURODIS_BASE_URL` | `base-url` | URL TEST | PROD: `https://api.eurodis.com/receive-pan` |
-| `EURODIS_API_KEY` | `api-key` | secret `ce-dichiarato-eurodis-in-secret`, chiave `api-key` | |
-| `EURODIS_AMBIENTE` | `ambiente` | `TEST` | header `ambiente` |
-| `EURODIS_IN_CRON` | `cron` | `0 */2 * * * *` | scarico ogni 2 minuti [DECISO 04-11] |
-| `EURODIS_ELABORAZIONE_CRON` | `elaborazione.cron` | `30 */2 * * * *` | invio ogni 2 minuti, 30 s dopo lo scarico [DECISO 04-11] |
-| `EURODIS_TIMEOUT_CONNECT` / `_READ` | `timeout.*` | 10 s / 120 s | |
-| `EURODIS_LOCK_DURATA_MAX` | `lock.durata-max` | `PT15M` | anche soglia di ripresa degli scarichi `IN_ELABORAZIONE` |
-| `EURODIS_GREZZO_SOGLIA_GRIDFS` / `_GUARDIA` | `grezzo.*` | 10 MB / 100 MB | |
-| `KAFKA_TOPIC_OUTPUT` | `topic` | `preadvising.eud.pre.build` | |
-| `KAFKA_PRODUCER_SEND_TIMEOUT` | `pubblicazione.timeout` | 10 s | |
-| `EURODIS_RIPUBBLICAZIONE_CRON` / `_ATTESA_MIN` / `_TENTATIVI_MAX` | `ripubblicazione.*` | ogni 2 min / 5 min / 10 | RF-11 |
-| `EURODIS_RECUPERO_CRON` | `recupero.cron` | `30 */5 * * * *` | job delle richieste manuali |
-| `EURODIS_RECUPERO_ED_REFERENCES` | `recupero.ed-references` | vuoto | RF-16, separati da virgola |
-| `EURODIS_RIPUBBLICA_ED_REFERENCES` | `ripubblica.ed-references` | vuoto | RF-17 |
-| `MONGO_STRING_CONNECTION` | `spring.data.mongodb.uri` | secret, chiave `mongo-string-connection` | |
-| `KAFKA_SCRAM_USERNAME` / `_PASSWORD` | SASL | secret | |
+## 9. Osservabilità (Datadog)
 
-## 9. Osservabilità: metriche e span
+**Metriche** (nomi proposti, tag `env`, `esito`):
 
-Lo schema segue `ce-dichiarato-adapter`: OpenTelemetry (BOM 1.54.1, agent autoconfigurato con
-`-Dotel.java.global-autoconfigure.enabled=true`, già in Helm), Micrometer/Prometheus su
-`/actuator/prometheus` (porta 8091), tag comune `service=ce-dichiarato-eurodis-in`. Principio
-invariante: l'instrumentation non manda mai in errore la lavorazione (`TraceUtil`).
+| Metrica | Tipo | Significato |
+|---|---|---|
+| `eurodis.in.chiamata.count` | counter, tag `http_status` | chiamate a `/shipments/v1` per esito |
+| `eurodis.in.chiamata.latenza` | histogram | durata della chiamata |
+| `eurodis.in.risposta.byte` | histogram | dimensione della risposta |
+| `eurodis.in.spedizioni.ricevute` | counter | spedizioni per esecuzione |
+| `eurodis.in.spedizioni.pubblicate` | counter | |
+| `eurodis.in.spedizioni.duplicate` | counter, tag `contenuto=uguale/diverso` | RF-09 |
+| `eurodis.in.spedizioni.non_identificabili` | counter | RF-13 |
+| `eurodis.in.spedizioni.in_attesa` | gauge | spedizioni `RICEVUTA` + `ERRORE_PUBBLICAZIONE` |
+| `eurodis.in.esecuzione.ultima` | gauge (timestamp) | per l'allarme di batch fermo |
 
-**Span**
+**Log**: uno strutturato (JSON) per esecuzione con `idEsecuzione`, `httpStatus`, `durataMs`, `numeroSpedizioni`, `edReferences`; uno per ogni spedizione pubblicata, con `edReference` e partizione/offset. **Mai** dati personali o la chiave API.
 
-| Span | Tipo | Attributi | Errore se |
-|---|---|---|---|
-| `eurodis.scarico` | INTERNAL, radice del job | `id_scarico`, `tipo_scarico`, `stato_scarico`, `http_status` | `ERRORE_CHIAMATA` |
-| `eurodis.rilettura` | INTERNAL, radice | come sopra | come sopra |
-| `eurodis.receive_pan.get` | CLIENT, figlio | `http_status`, `durata_ms` | eccezione o HTTP diverso da 200/404 |
-| `eurodis.elaborazione` | INTERNAL, radice del job | `scarichi` | — |
-| `eurodis.elaborazione.scarico` | INTERNAL, figlio | `id_scarico`, `stato_scarico`, `spedizioni`, `inviate` | esito diverso da `INVIATO_TUTTO` / `NESSUNA_SPEDIZIONE` |
-| `preadvising.eud.pre.build send` | PRODUCER | `topic_output`, `ed_reference` | invio fallito |
-| `eurodis.ripubblicazione` | INTERNAL, radice | `spedizioni` | — |
-| `eurodis.richieste_manuali` | INTERNAL, radice | — | — |
+**Alert**:
 
-Lo span PRODUCER inietta il contesto W3C (`traceparent`) negli header del messaggio: il mapper
-può continuare la stessa traccia.
-
-**Metriche** (nomi Prometheus)
-
-| Metrica | Tipo | Tag | Significato |
-|---|---|---|---|
-| `eurodis_in_chiamata_total` | counter | `tipo`, `esito` (status HTTP o `errore`) | chiamate a EURODIS |
-| `eurodis_in_chiamata_durata` | timer | `tipo` | durata delle chiamate |
-| `eurodis_in_risposta_byte` | summary | — | dimensione delle risposte 200 |
-| `eurodis_in_risposta_oltre_soglia_total` | counter | — | risposte oltre la soglia di guardia |
-| `eurodis_in_scarico_total` | counter | `stato` | run per stato finale della fase 1 |
-| `eurodis_in_scarico_ultimo_epoch_seconds` | gauge | — | ultimo run concluso: allarme di batch fermo |
-| `eurodis_in_grezzo_salvataggio_ko_total` | counter | — | salvataggi del grezzo falliti (critico) |
-| `eurodis_in_elaborazione_total` | counter | `stato` | scarichi elaborati per esito |
-| `eurodis_in_spedizioni_ricevute_total` | counter | — | spedizioni lette dai grezzi |
-| `eurodis_in_spedizioni_inviate_total` | counter | — | invii confermati |
-| `eurodis_in_spedizioni_invio_ko_total` | counter | — | invii falliti |
-| `eurodis_in_spedizioni_non_identificabili_total` | counter | — | spedizioni senza `edReference` valido |
-| `eurodis_in_spedizioni_in_attesa` | gauge | — | record `DA_INVIARE` + `ERRORE_INVIO` |
-
-**Log**: JSON (logstash) con MDC `id_scarico` ed `ed_reference`. Mai dati personali né la chiave.
-
-**Alert da configurare in Datadog** (non sono nel codice):
-
-| Gravità | Condizione |
+| Gravità | Condizioni |
 |---|---|
-| Critico | `eurodis_in_chiamata_total{esito="errore"}` > 0; `eurodis_in_grezzo_salvataggio_ko_total` > 0; scarico rimasto `CHIAMATA_IN_CORSO` |
-| Alto | `esito` 401, 424, 451; `eurodis_in_scarico_ultimo_epoch_seconds` più vecchio di 6 minuti |
-| Medio | `esito` 500; `eurodis_in_spedizioni_in_attesa` > 0 per più di 30 minuti; non identificabili > 0; risposta oltre soglia |
+| Critico | timeout o connessione caduta su `/shipments/v1`; salvataggio del grezzo fallito; esecuzione rimasta `AVVIATA` oltre la durata massima del lock |
+| Alto | `401`, `424`, `451`; batch fermo (`esecuzione.ultima` più vecchia della soglia) |
+| Medio | `500`; `spedizioni.in_attesa` > 0 per più di 30 minuti; spedizioni non identificabili; risposta oltre la soglia di guardia |
 
 ## 10. Requisiti non funzionali
 
@@ -392,72 +372,67 @@ può continuare la stessa traccia.
 |---|---|---|
 | RNF-01 | Il grezzo è salvato prima di qualsiasi altra elaborazione | Test: crash simulato dopo il salvataggio → grezzo presente, spedizioni recuperate da RF-11 |
 | RNF-02 | Zero retry su `GET /shipments/v1` | Test con mock che risponde `500` o va in timeout: una sola richiesta registrata dal mock |
+| RNF-03 | Nessun retry da parte di service mesh o proxy verso EURODIS | Verifica della configurazione di egress in ogni ambiente |
 | RNF-04 | `404` non genera errori, alert o eventi del circuit breaker | Test con coda vuota del mock |
-| RNF-05 | Un record per `edReference` | Test: la stessa spedizione ricevuta due volte → un solo record con `numeroRicezioni` = 2 e due invii (nessun filtro duplicati, RF-09) |
+| RNF-05 | Idempotenza su `edReference` | Test: la stessa spedizione ricevuta due volte → un solo documento, un solo messaggio se il contenuto è uguale |
 | RNF-06 | Un messaggio per spedizione, dimensione del messaggio sotto il limite del topic | Test con 1.000 spedizioni in una risposta |
 | RNF-07 | Lettura tollerante: campi sconosciuti accettati; `edReference` con e senza `.0`; timestamp non interpretati | Test con payload che contengono i campi di `GetShipmentResponse` |
 | RNF-08 | Chiave API solo da secret, mai nei log | Ispezione dei log in test |
 | RNF-09 | Nessun dato personale nei log | Ispezione dei log in test |
 | RNF-10 | Una sola istanza attiva con N repliche | Test con 2 repliche contro il mock: una sola chiamata per ciclo |
-| RNF-12 | Metriche e span su ogni job, chiamata e invio | `ScaricoServiceTracingTest`; verifica in Datadog |
 | RNF-11 | Recupero completo dopo un riavvio a metà elaborazione | Test: kill del pod durante la pubblicazione → tutte le spedizioni `PUBBLICATA` dopo il riavvio |
 
 ## 11. Criteri di accettazione e casi di test
 
-Test automatici nel repository (53, tutti verdi al commit `a53398c`): `ReceivePanClientTest`,
-`ScaricoServiceTest`, `ScaricoServiceTracingTest`, `ElaborazioneServiceTest`,
-`SpedizioneServiceTest`, `AnalizzatoreSpedizioniTest`, `EdReferenceTest`, `GrezzoStoreTest`,
-`RipubblicazioneServiceTest`, `RichiesteManualiServiceTest`, `SpedizioneProducerTest`,
-`EurodisInPropertiesTest`.
+Si eseguono contro **`mock-eurodis`** (`../mock-eurodis/`). Il mock si comporta come EURODIS: consuma senza ack, risponde `404` a coda vuota, `401` con chiave errata (chiave valida `test-key-sda`) e `451` sulle spedizioni di un altro partner. Gli endpoint `/admin/genera`, `/admin/reset` e il blocco `anomalie` servono a preparare gli scenari.
 
-Criteri da verificare anche end-to-end contro `mock-eurodis` (`../mock-eurodis/`, chiave
-`test-key-sda`):
+| ID | Given | When | Then |
+|---|---|---|---|
+| AC-01 | Mock con 5 spedizioni in coda | il batch gira | 1 grezzo salvato, 5 spedizioni `PUBBLICATA`, 5 messaggi con chiave `edReference`, esecuzione `PUBBLICATA` |
+| AC-02 | Coda vuota | il batch gira | esecuzione `NESSUNA_SPEDIZIONE`, nessun alert, nessun messaggio |
+| AC-03 | Chiave errata | il batch gira | esecuzione `IN_ERRORE`, alert alto, corpo `Invalid API Key` registrato come testo, chiave assente dai log |
+| AC-04 | Mock che risponde `500` | il batch gira | **una sola** richiesta ricevuta dal mock, esecuzione `IN_ERRORE`, alert |
+| AC-05 | Mock che va in timeout | il batch gira | una sola richiesta, esecuzione `IN_ERRORE`, alert critico |
+| AC-06 | 3 spedizioni in coda e Kafka spento | il batch gira, poi Kafka torna disponibile | dopo il job di ripubblicazione le 3 spedizioni sono `PUBBLICATA` |
+| AC-07 | 3 spedizioni in coda | kill del pod dopo il salvataggio del grezzo, poi riavvio | tutte le spedizioni `PUBBLICATA`, nessuna persa |
+| AC-08 | Una spedizione già pubblicata riproposta con contenuto uguale | il batch gira | nessun nuovo messaggio, `numeroRicezioni` = 2, contatore `duplicate{uguale}` |
+| AC-09 | Una spedizione già pubblicata riproposta con contenuto diverso | il batch gira | nuovo messaggio, versione aggiornata |
+| AC-10 | Spedizione con `edReference` `7319003746401.0` | il batch gira | chiave del messaggio `7319003746401` |
+| AC-11 | Spedizione senza `edReference` (anomalia del mock) | il batch gira | spedizione registrata come non identificabile, esecuzione `PARZIALE`, alert, le altre spedizioni pubblicate |
+| AC-12 | Spedizione con campi in più (`routingCode`, `colloFlexField1`) | il batch gira | pubblicata con i campi intatti nel messaggio |
+| AC-13 | 2 repliche attive | arriva il cron | una sola chiamata al mock |
+| AC-14 | `edReference` noto | recupero puntuale (RF-16) | grezzo salvato, messaggio con `fonte` = rilettura |
+| AC-15 | `eurodis.in.abilitato=false` | arriva il cron | nessuna chiamata |
+| AC-16 | 1.000 spedizioni in coda | il batch gira | 1.000 messaggi, ognuno sotto il limite del topic, grezzo su GridFS se sopra soglia |
 
-| ID | Given | When | Then | Unit test |
-|---|---|---|---|---|
-| AC-01 | 5 spedizioni in coda | scarico + elaborazione | 1 scarico `INVIATO_TUTTO`, 5 record `INVIATA` con `inviataIl`, 5 messaggi con chiave `edReference` | ✅ |
-| AC-02 | Coda vuota | scarico | scarico `NESSUNA_SPEDIZIONE`, nessun messaggio | ✅ |
-| AC-03 | Chiave errata | scarico | `ERRORE_CHIAMATA`, errore `HTTP 401: Invalid API Key`, chiave assente dai log | ✅ |
-| AC-04 | Mock che risponde `500` | scarico | **una sola** richiesta, `ERRORE_CHIAMATA` | ✅ |
-| AC-05 | Mock in timeout | scarico | una sola richiesta, `ERRORE_CHIAMATA`, span in errore | ✅ |
-| AC-06 | 3 spedizioni e Kafka spento | elaborazione, poi Kafka torna | scarico `NESSUN_INVIO`, record `DA_INVIARE` con motivo; dopo la ripubblicazione `INVIATA` | ✅ (unit) |
-| AC-07 | Kill del pod durante l'elaborazione | riavvio | lo scarico `IN_ELABORAZIONE` si riprende dopo 15 minuti | ✅ (unit) |
-| AC-08 | Spedizione già inviata riproposta | scarico + elaborazione | stesso record, `numeroRicezioni` = 2, nuovo invio | ✅ |
-| AC-09 | Due spedizioni, una non parte | elaborazione | scarico `INVIO_PARZIALE`, motivo sul record | ✅ |
-| AC-10 | `edReference` `7319003746401.0` | elaborazione | chiave e `_id` `7319003746401`, corpo con `.0` intatto | ✅ |
-| AC-11 | Spedizione senza `edReference` | elaborazione | record `NON_IDENTIFICABILE` `<idScarico>#<posizione>`, scarico `INVIO_PARZIALE`, le altre inviate | ✅ |
-| AC-12 | Spedizione con campi in più (`routingCode`) | elaborazione | corpo del messaggio identico al ricevuto | ✅ |
-| AC-13 | 2 repliche | cron | una sola chiamata al mock | da provare in ambiente |
-| AC-14 | `edReference` in `eurodis.in.recupero.ed-references` | job richieste manuali | run `RILETTURA` `DA_ELABORARE`, poi invio con `fonte` = rilettura; non si ripete | ✅ |
-| AC-15 | `eurodis.in.abilitato=false` | cron | nessuna chiamata | ✅ |
-| AC-16 | Grezzo oltre 10 MB | scarico | corpo in GridFS, `gridFsId` sul run | ✅ |
-
-**Il mock va esteso** per gli end-to-end di AC-04, AC-05, AC-10, AC-11 e AC-12:
-- `500` e timeout configurabili;
+**Il mock oggi non copre tutto.** Le anomalie del mock riguardano solo la LDV
+(vuota, duplicata, con check errato). Per AC-04, AC-05, AC-10, AC-11 e AC-12
+servono estensioni:
+- risposta `500` e timeout configurabili;
 - `edReference` con `.0` o assente;
 - campi di `GetShipmentResponse`;
-- `401` in testo semplice.
+- corpo `401` in testo semplice come EURODIS.
 
-## 12. Decisioni e punti aperti
+Sono da aggiungere prima dei test.
 
-| Punto | Stato | Rif. |
-|---|---|---|
-| D1. Dove salvare il grezzo | **DECISO 04-11**: MongoDB, GridFS sopra 10 MB | PA-02 |
-| D2. Contratto del messaggio | **DECISO 04-11**: corpo = spedizione così com'è, chiave `edReference`, metadati negli header | PA-31 |
-| D3. Istanza unica | **IMPLEMENTATO**: ShedLock su Mongo. La call con Tagliente resta utile per conferma | PA-01 |
-| D4. Frequenza | **DECISO 04-11**: scarico e invio ogni 2 minuti | PA-14 |
-| D5. Duplicati | **DECISO 04-11**: nessun filtro in `-in`, si filtra a valle | — |
-| D6. Recupero | **DECISO 04-11**: niente endpoint applicativi (cioè niente API REST esposte dal servizio per comandi dell'operatore); elenchi di `edReference` in configurazione | PA-09 |
-| Disegno in due fasi | **DECISO 04-11**: scarico (run + esito + grezzo) ed elaborazione (record per spedizione + esito dello scarico) | — |
-| Metriche e span | **DECISO 04-11**, implementati sul modello di `ce-dichiarato-adapter` | — |
-| Versione Spring Boot | **DECISO 04-11**: 3.5.14, come blueprint e mapper | assessment AS-17 |
-| Conservazione (TTL) delle collezioni | APERTO | — |
-| Alert Datadog | APERTO, da fare più avanti (sezione 9) | assessment AS-19 |
-| Ack o riconsegna EURODIS | APERTO: si assume che non esistano (I1) | PA-05, PA-09 |
-| Massimo di spedizioni per chiamata, fuso orario, `consigneeAddress` null | APERTO: nessun impatto su `-in` (non interpreta i dati) | PA-27 |
-| Prima chiamata e arretrato | APERTO: gestita come una chiamata grande | PA-06 |
-| Chiave di produzione | APERTO | PA-12 |
-| Riconciliazione con altre API EURODIS | [IPOTESI], non sviluppata | — |
+## 12. Punti aperti e default provvisori
+
+| Punto | Default per partire | Cosa cambia con la risposta | Rif. |
+|---|---|---|---|
+| D1. Dove salvare il grezzo | MongoDB + GridFS | Con Kafka o blob cambia solo l'adapter di salvataggio e il formato di `rifGrezzo` | PA-02, PA-26 |
+| D2. Contratto del messaggio | Corpo = spedizione così com'è, metadati negli header (sezione 3.2); topic `preadvising.eud.pre.build` deciso | Eventuali header in più | PA-31 |
+| D3. Istanza unica | Lock su MongoDB (per esempio ShedLock) | Eventuale leader election diversa, indicata da Tagliente | PA-01 |
+| D4. Frequenza | Ogni 5 minuti, configurabile | Solo la configurazione | PA-14 |
+| D5. Duplicati | RF-09 (ripubblica solo se il contenuto cambia) | Se EURODIS conferma rettifiche o annullamenti, servono regole dedicate | PA-27 |
+| D6. Recupero | Endpoint amministrativi protetti `POST /admin/recupero/{edReference}` e `POST /admin/ripubblica/{edReference}` | Eventuale procedura diversa | PA-09 |
+| Ack o riconsegna EURODIS | Si assume che non esistano (I1) | Se esistono: conferma dopo il salvataggio, e la finestra critica si chiude | PA-05, PA-09 |
+| Marcatura prima o dopo la trasmissione | Si assume che avvenga alla risposta (I1) | Se avviene dopo la trasmissione completa, il timeout in lettura diventa meno grave | PA-09 |
+| Massimo di spedizioni per chiamata | Nessun limite assunto; soglie di guardia | Tarare timeout e soglie | PA-27 |
+| Schema restituito | Lettura generica: entrambi gli schemi passano | Nessun impatto qui; impatta il mapper | — |
+| Fuso dei timestamp | Non interpretati: passano al mapper così come sono | Nessun impatto qui | — |
+| Prima chiamata e arretrato | Gestita come una chiamata grande | Pianificare il primo avvio con EURODIS | PA-06 |
+| Chiave di produzione | Secret vuoto in PROD, flag disattivato | Configurazione | PA-12 |
+| Riconciliazione con altre API EURODIS | Non sviluppata | Eventuale job aggiuntivo, dopo aver letto gli swagger di Receive Tracking e Receive Clearing | [IPOTESI] |
 
 ## 13. Riferimenti
 
@@ -471,10 +446,10 @@ Criteri da verificare anche end-to-end contro `mock-eurodis` (`../mock-eurodis/`
 
 ---
 
-## Storia del documento
+## Domande per Diego prima di passare ad Amelia
 
-- 0.1 (30-10): prima stesura (Mary).
-- 0.2 (02-11): topic `preadvising.eud.pre.build`, metadati negli header, blueprint.
-- 0.3 (04-11): niente endpoint amministrativi, recupero da configurazione.
-- 0.4 (04-11): allineata all'implementazione `a53398c`. Disegno in due fasi, D1/D2/D4/D5 decisi,
-  nessun filtro duplicati, cron a 2 minuti, metriche e span (Amelia).
+1. **D1**: il punto del 30-10 dice "probabilmente Mongo": confermi? Gli altri canali usano il blob per `link_file_fisico_inviato`.
+2. **D2**: il topic è deciso (`preadvising.eud.pre.build`). Va bene la proposta di corpo = spedizione così com'è e metadati negli header (PA-31)?
+3. **D5**: va bene la regola sui duplicati (ripubblicare solo se il contenuto cambia)?
+4. **D6**: gli endpoint amministrativi sono ammessi negli standard del progetto, o si preferisce una procedura o un job?
+5. **Cron di 5 minuti**: va bene come default provvisorio?
