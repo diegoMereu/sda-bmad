@@ -11,8 +11,7 @@
 Il servizio è **implementato secondo la specifica 0.4**, con il disegno in due fasi deciso il 04-11:
 **53 test automatici verdi**. La specifica è stata aggiornata con tutte le decisioni del 04-11.
 Resta aperta una scelta tecnica, la **versione di Spring Boot** (AS-17). Il resto del lavoro
-mancante è infrastrutturale o di verifica in ambiente: secret, rete verso EURODIS, service mesh,
-estensione del mock.
+mancante è infrastrutturale o di verifica in ambiente: verifica di avvio in svil e alert Datadog.
 
 ## Cosa è stato fatto (rispetto all'assessment della mattina)
 
@@ -56,7 +55,7 @@ estensione del mock.
 | AS-9 | Profilo `svil`: log in console non JSON (`logback-svil.xml`), quindi in svil Datadog non vede l'MDC | bassa | — |
 | AS-10 | `codice_iniziativa_goto: "138972"` in `deploy-svil` e `deploy-coll` | da verificare | Diego |
 | AS-11 | Helm `application.properties` ancora il placeholder del template | bassa | — |
-| AS-14 | **Retry del service mesh** verso EURODIS (RNF-03). Se il pod ha il sidecar Istio (`istio-proxy`), il proxy può ripetere da solo una chiamata fallita: per `GET /shipments/v1` vorrebbe dire spedizioni consegnate da EURODIS e mai ricevute da noi. Il chart ha le label Istio ma non abilita il sidecar: l'iniezione dipende dal namespace. Verifica: `oc get pod -l app=ce-dichiarato-eurodis-in -o jsonpath='{.items[0].spec.containers[*].name}'`. Senza `istio-proxy` il punto si chiude; con il sidecar serve una route verso l'host EURODIS con `retries.attempts: 0` | alta, da verificare al primo deploy | Amelia / piattaforma |
+| AS-14 | Retry del service mesh | ✅ non applicabile: il progetto non usa service mesh (Diego, 04-11) | — |
 | AS-15 | Utente SCRAM del secret e scrittura su `preadvising.eud.pre.build` | ✅ confermato che funziona (Diego, 04-11) | — |
 | AS-16 | Stringa Mongo | ✅ il servizio la legge dal secret (`mongo-string-connection`); il valore giusto è impostato per ambiente (Diego, 04-11) | — |
 | AS-18 | Uscita di rete verso `testapi.eurodis.com` | ✅ aperta (Diego, 04-11) | — |
@@ -68,6 +67,5 @@ estensione del mock.
 ## Per andare in svil (aggiornato 04-11 con le risposte di Diego)
 
 1. Deploy con `EURODIS_IN_ABILITATO=false` e verifica di avvio con Mongo e Kafka veri (AS-22).
-2. Al primo pod: verificare il sidecar Istio (AS-14).
-3. Abilitare lo scarico e provare con EURODIS TEST (PA-29).
-4. Più avanti: alert Datadog (AS-19), conservazione delle collezioni (AS-21).
+2. Abilitare lo scarico e provare con EURODIS TEST (PA-29).
+3. Più avanti: alert Datadog (AS-19), conservazione delle collezioni (AS-21).

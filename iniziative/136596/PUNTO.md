@@ -37,7 +37,7 @@ Analisi e mapping in bozza, con i servizi accessori tradotti nel formato PDB; pr
 - Chiudere i dubbi di gravità alta sul mapping — Mary / Diego — da definire
 
 ## Blocchi e rischi
-- 🟡 `-in` mai avviato con Mongo e Kafka veri: la prima verifica reale è il deploy in svil (al primo pod va controllato il sidecar Istio, AS-14).
+- 🟡 `-in` mai avviato con Mongo e Kafka veri: la prima verifica reale è il deploy in svil.
 - 🟡 La sintassi delle LDV non è nota: finché non arriva, il mock genera LDV inventate e non prova che SDA le accetti.
 - 🟡 Perimetro e PRJ non definiti: non si può stimare né pianificare.
 - 🟡 `receive-pan` non ha ack: se EURODIS considera consegnata una spedizione quando la restituisce, un errore prima del salvataggio la fa perdere. Da confermare con EURODIS (domanda 1).

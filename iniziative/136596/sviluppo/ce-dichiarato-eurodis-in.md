@@ -92,7 +92,7 @@ Significato dei codici [FATTO, swagger]:
 
 - [FATTO] La descrizione dello swagger dice: *"Deploys all new shipments, that have not already been deployed to the partner"*.
 - [FATTO] Non esiste un endpoint di conferma (acknowledge o commit).
-- [IPOTESI I1, forte] EURODIS segna una spedizione come consegnata nel momento in cui la restituisce. La consegna è quindi **at-most-once**: una risposta persa per timeout, crash o retry di client, proxy o sidecar fa perdere le spedizioni. Le si può recuperare solo con la GET puntuale, e solo se si conosce l'`edReference` (PA-05, PA-09).
+- [IPOTESI I1, forte] EURODIS segna una spedizione come consegnata nel momento in cui la restituisce. La consegna è quindi **at-most-once**: una risposta persa per timeout, crash o retry del client fa perdere le spedizioni. Le si può recuperare solo con la GET puntuale, e solo se si conosce l'`edReference` (PA-05, PA-09).
 - [IPOTESI I2] La GET puntuale non ha effetti collaterali e funziona anche su spedizioni già scaricate.
 - [IPOTESI I3] La risposta può essere molto grande: lo swagger non dichiara limiti (PA-27).
 
@@ -247,7 +247,7 @@ sequenceDiagram
 | RF-01 | Lo scarico gira solo se `eurodis.in.abilitato=true` (default `false`, rilascio incrementale) [DECISO, PA-28]. La rilettura puntuale funziona anche con lo scarico disabilitato. | `ScaricoService.scarica` |
 | RF-02 | Ogni job gira su **un solo pod** anche con più repliche (ShedLock su Mongo, `lockAtMostFor` 15 min). | `EurodisScheduler`, `SchedulingConfig` |
 | RF-03 | Ogni chiamata invia `X-API-Key` letto dal secret (`api-key`). La chiave non compare mai nei log. | `ReceivePanClient` |
-| RF-04 | `GET /shipments/v1` si chiama **una volta per run e senza retry**: client Apache con `disableAutomaticRetries`, nessun Spring Retry. Il service mesh va verificato (RNF-03). | `AppConfig` |
+| RF-04 | `GET /shipments/v1` si chiama **una volta per run e senza retry**: client Apache con `disableAutomaticRetries`, nessun Spring Retry. Il progetto non usa service mesh: nessun retry fuori dal codice. | `AppConfig` |
 | RF-05 | `404` = nessuna spedizione: run regolare, nessun alert. | `ScaricoService` |
 | RF-06 | Con `200` il corpo si salva **integro e per primo**. Se il salvataggio fallisce: log CRITICO con gli `edReference` estratti dal testo, per il recupero con RF-16. | `ScaricoService`, `GrezzoStore` |
 | RF-07 | `edReference` si normalizza a stringa intera senza decimali (`7319003746401.0` → `7319003746401`), con `BigDecimal`. Parte decimale ≠ 0, fuori intervallo o assente → non identificabile. Accettato anche come testo numerico. | `EdReference` |
@@ -310,8 +310,6 @@ finestra in cui si possono perdere spedizioni (I1).
 | Spedizione senza `edReference` valido | record `NON_IDENTIFICABILE`, scarico `INVIO_PARZIALE` | `eurodis_spedizioni` | Analisi con EURODIS |
 | Risposta molto grande | grezzo in GridFS sopra 10 MB; warning e metrica sopra 100 MB | metrica | Limiti da chiarire con EURODIS (PA-27) |
 
-**Service mesh.** OpenShift Service Mesh può applicare retry di default alle chiamate in uscita:
-per l'host EURODIS vanno disattivati (`retries.attempts: 0`). Da verificare in ambiente (RNF-03).
 
 ## 8. Configurazione
 
@@ -394,7 +392,6 @@ può continuare la stessa traccia.
 |---|---|---|
 | RNF-01 | Il grezzo è salvato prima di qualsiasi altra elaborazione | Test: crash simulato dopo il salvataggio → grezzo presente, spedizioni recuperate da RF-11 |
 | RNF-02 | Zero retry su `GET /shipments/v1` | Test con mock che risponde `500` o va in timeout: una sola richiesta registrata dal mock |
-| RNF-03 | Nessun retry da parte di service mesh o proxy verso EURODIS | Verifica della configurazione di egress in ogni ambiente |
 | RNF-04 | `404` non genera errori, alert o eventi del circuit breaker | Test con coda vuota del mock |
 | RNF-05 | Un record per `edReference` | Test: la stessa spedizione ricevuta due volte → un solo record con `numeroRicezioni` = 2 e due invii (nessun filtro duplicati, RF-09) |
 | RNF-06 | Un messaggio per spedizione, dimensione del messaggio sotto il limite del topic | Test con 1.000 spedizioni in una risposta |
