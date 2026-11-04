@@ -1,6 +1,6 @@
 # `ce-dichiarato-eurodis-in` — Documento funzionale per lo sviluppo
 
-**Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.2 (bozza) · **Data**: 2026-11-02
+**Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.3 (bozza) · **Data**: 2026-11-04
 **Autore**: Mary (analyst) · **Destinatario**: Amelia (dev) e team di sviluppo
 **Repository**: https://posteitaliane.ghe.com/SVILUPPO/CORRIERE-ESPRESSO_PREADVISING_ce-dichiarato-eurodis-in
 **Generato da**: [prompt-ce-dichiarato-eurodis-in.md](prompt-ce-dichiarato-eurodis-in.md)
@@ -270,8 +270,8 @@ Passo per passo:
 | RF-13 | Una spedizione non identificabile (senza `edReference` valido) non si scarta in silenzio. Resta nel grezzo, si registra nell'esecuzione con la sua posizione nell'array e fa scattare un alert. Non si pubblica, perché non ha una chiave. |
 | RF-14 | Il microservizio non modifica il contenuto della spedizione: il campo `spedizione` del messaggio è identico all'elemento ricevuto. |
 | RF-15 | I corpi di errore in testo semplice (per esempio `401 Invalid API Key`) si registrano come testo, senza tentare il parsing JSON. |
-| RF-16 | Recupero puntuale: dato un `edReference`, si chiama `GET /shipment/{edReference}/v1`, si salva la risposta e si pubblica con `fonte` = rilettura. Qui il retry è ammesso, se vale I2 [DA DECIDERE D6]. |
-| RF-17 | Ripubblicazione manuale: dato un `edReference`, si ripubblica l'ultima versione salvata, senza chiamare EURODIS [DA DECIDERE D6]. |
+| RF-16 | Recupero puntuale: dato un `edReference`, si chiama `GET /shipment/{edReference}/v1`, si salva la risposta e si pubblica con `fonte` = rilettura. Qui il retry è ammesso, se vale I2. **Non ci sono endpoint amministrativi** [DECISO 04-11]: l'elenco degli `edReference` da recuperare si passa in configurazione (`eurodis.in.recupero.ed-references`) e lo elabora il job schedulato, una sola volta per valore, con traccia in MongoDB [DA DECIDERE D6, proposta]. |
+| RF-17 | Ripubblicazione manuale: dato un `edReference`, si ripubblica l'ultima versione salvata, senza chiamare EURODIS. Stesso meccanismo di RF-16, con `eurodis.in.ripubblica.ed-references` [DA DECIDERE D6, proposta]. |
 
 ## 6. Stati
 
@@ -338,6 +338,8 @@ stateDiagram-v2
 | `eurodis.in.ripubblicazione.cron` | ogni 2 minuti | RF-11 |
 | `eurodis.in.ripubblicazione.attesa-min` | 5 min | età minima di una `RICEVUTA` da ripubblicare |
 | `eurodis.in.ripubblicazione.tentativi-max` | 10 | |
+| `eurodis.in.recupero.ed-references` | vuoto | RF-16: `edReference` da rileggere con la GET puntuale |
+| `eurodis.in.ripubblica.ed-references` | vuoto | RF-17: `edReference` da ripubblicare dal salvato |
 | `eurodis.in.alert.esecuzione-assente` | 3 × intervallo del cron | allarme se il batch non gira |
 
 ## 9. Osservabilità (Datadog)
@@ -401,7 +403,7 @@ Si eseguono contro **`mock-eurodis`** (`../mock-eurodis/`). Il mock si comporta 
 | AC-11 | Spedizione senza `edReference` (anomalia del mock) | il batch gira | spedizione registrata come non identificabile, esecuzione `PARZIALE`, alert, le altre spedizioni pubblicate |
 | AC-12 | Spedizione con campi in più (`routingCode`, `colloFlexField1`) | il batch gira | pubblicata con i campi intatti nel messaggio |
 | AC-13 | 2 repliche attive | arriva il cron | una sola chiamata al mock |
-| AC-14 | `edReference` noto | recupero puntuale (RF-16) | grezzo salvato, messaggio con `fonte` = rilettura |
+| AC-14 | `edReference` noto inserito in `eurodis.in.recupero.ed-references` | gira il job | grezzo salvato, messaggio con `fonte` = rilettura; al giro successivo lo stesso valore non viene rielaborato |
 | AC-15 | `eurodis.in.abilitato=false` | arriva il cron | nessuna chiamata |
 | AC-16 | 1.000 spedizioni in coda | il batch gira | 1.000 messaggi, ognuno sotto il limite del topic, grezzo su GridFS se sopra soglia |
 
@@ -424,7 +426,7 @@ Sono da aggiungere prima dei test.
 | D3. Istanza unica | Lock su MongoDB (per esempio ShedLock) | Eventuale leader election diversa, indicata da Tagliente | PA-01 |
 | D4. Frequenza | Ogni 5 minuti, configurabile | Solo la configurazione | PA-14 |
 | D5. Duplicati | RF-09 (ripubblica solo se il contenuto cambia) | Se EURODIS conferma rettifiche o annullamenti, servono regole dedicate | PA-27 |
-| D6. Recupero | Endpoint amministrativi protetti `POST /admin/recupero/{edReference}` e `POST /admin/ripubblica/{edReference}` | Eventuale procedura diversa | PA-09 |
+| D6. Recupero | **Niente endpoint amministrativi** [DECISO 04-11]. Elenchi di `edReference` in configurazione (`eurodis.in.recupero.ed-references`, `eurodis.in.ripubblica.ed-references`), elaborati dal job schedulato una volta per valore | Eventuale procedura diversa indicata dal team | PA-09 |
 | Ack o riconsegna EURODIS | Si assume che non esistano (I1) | Se esistono: conferma dopo il salvataggio, e la finestra critica si chiude | PA-05, PA-09 |
 | Marcatura prima o dopo la trasmissione | Si assume che avvenga alla risposta (I1) | Se avviene dopo la trasmissione completa, il timeout in lettura diventa meno grave | PA-09 |
 | Massimo di spedizioni per chiamata | Nessun limite assunto; soglie di guardia | Tarare timeout e soglie | PA-27 |
@@ -451,5 +453,5 @@ Sono da aggiungere prima dei test.
 1. **D1**: il punto del 30-10 dice "probabilmente Mongo": confermi? Gli altri canali usano il blob per `link_file_fisico_inviato`.
 2. **D2**: il topic è deciso (`preadvising.eud.pre.build`). Va bene la proposta di corpo = spedizione così com'è e metadati negli header (PA-31)?
 3. **D5**: va bene la regola sui duplicati (ripubblicare solo se il contenuto cambia)?
-4. **D6**: gli endpoint amministrativi sono ammessi negli standard del progetto, o si preferisce una procedura o un job?
+4. **D6**: gli endpoint amministrativi non esistono (04-11). Va bene il recupero tramite elenchi in configurazione, elaborati dal job?
 5. **Cron di 5 minuti**: va bene come default provvisorio?
