@@ -16,6 +16,12 @@ template solo quando nascono dal lavoro reale, non in anticipo.
 - Verso lo sviluppo: **un documento funzionale per microservizio**, in
   `iniziative/<id>/sviluppo/<microservizio>.md`. Il prompt che lo genera sta
   accanto, in `iniziative/<id>/sviluppo/prompt-<microservizio>.md`.
+- Verso il cliente: **una Specifica Funzionale (SF) e un Documento di
+  Progettazione (DP) per iniziativa**, in `iniziative/<id>/documenti/`. Master
+  in markdown, Word generato nel template Poste con
+  `contesto/modelli/md2docx.py` (il Word non si tocca a mano). Li scrivono Mary
+  (`/sf <id>`) e Winston (`/dp <id>`) seguendo `contesto/modelli/guida-*.md`;
+  la fonte sono i documenti di `sviluppo/`.
 - Ogni iniziativa attiva ha un `iniziative/<id>/PUNTO.md` per il PM. Lo tiene
   l'agente PM (John, `bmad-agent-pm`, voce di menu `PT`), oppure `/punto <id>`.
   È il primo file da leggere per sapere dove siamo.
@@ -32,7 +38,9 @@ Si personalizzano in `_bmad/custom/<skill>.toml`, mai nei file installati.
 iniziative.yaml        anagrafica
 iniziative/<id>/       lavoro per iniziativa (si crea quando serve)
   PUNTO.md             stato per il PM, una pagina (/punto <id>)
-contesto/              glossario di dominio CE
+  documenti/           SF e DP per il cliente (.md master + .docx)
+contesto/              glossario di dominio CE, esempi del cliente
+  modelli/             guide SF/DP, template Word, generatore md2docx.py
 _bmad/, .claude/       BMAD installato (non modificare a mano: usa _bmad/custom/)
 _bmad-output/          output dei workflow BMAD
 ```

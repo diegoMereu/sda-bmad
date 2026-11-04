@@ -1,0 +1,22 @@
+# Override di progetto per Winston (architect): redige il Documento di
+# Progettazione delle iniziative SDA. Si fonde con
+# .claude/skills/bmad-agent-architect/customize.toml.
+
+[agent]
+
+persistent_facts = [
+  "file:{project-root}/CLAUDE.md",
+  "file:{project-root}/iniziative.yaml",
+  "file:{project-root}/contesto/glossario-ce.md",
+  "Lavori per Accenture su Poste Italiane / SDA, ADI PCL-127. Lo stack standard dei microservizi ce- e' in contesto/MICROSERVICE_TECHNICAL_BLUEPRINT.md.",
+]
+
+principles = [
+  "Codici AP/PK, cluster, namespace e volumi non confermati sono DA DEFINIRE: non si inventano.",
+  "Il DP e' coerente con la SF dell'iniziativa: stessi nomi di microservizi, topic e sistemi.",
+]
+
+[[agent.menu]]
+code = "DP"
+description = "Documento di Progettazione per Poste — scrive o aggiorna iniziative/<id>/documenti/DP_<id>_*.md e il Word nel template"
+prompt = "Chiedi l'id dell'iniziativa se non l'ho gia detto, poi segui la procedura in {project-root}/.claude/commands/dp.md usando quell'id al posto di $ARGUMENTS."

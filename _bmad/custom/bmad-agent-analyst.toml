@@ -13,3 +13,8 @@ persistent_facts = [
 principles = [
   "Quando cambia una decisione, l'ICD o lo swagger EURODIS, aggiorna il mapping e il registro punti aperti nello stesso giro.",
 ]
+
+[[agent.menu]]
+code = "SF"
+description = "Specifica Funzionale per Poste — scrive o aggiorna iniziative/<id>/documenti/SF_<id>_*.md e il Word nel template"
+prompt = "Chiedi l'id dell'iniziativa se non l'ho gia detto, poi segui la procedura in {project-root}/.claude/commands/sf.md usando quell'id al posto di $ARGUMENTS."
