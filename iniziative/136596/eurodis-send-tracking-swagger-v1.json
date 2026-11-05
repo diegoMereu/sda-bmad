@@ -1,0 +1,1464 @@
+{
+  "x-generator": "NSwag v14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))",
+  "openapi": "3.0.0",
+  "info": {
+    "title": "EURODIS Platform TEST-API - Send Tracking data to EURODIS (before: Tracking Export)",
+    "description": "<hr />\n<h4 id=\"edApiReferencesHeadline\">Other EURODIS Platform APIs:</h4>\n<ul id=\"edApiReferences\">\n<li><a href=\"/send-pan/documentation\" target=\"_blank\">Send PAN data to EURODIS (before: PAN Export)</a></li>\n<li><a href=\"/receive-pan/documentation\" target=\"_blank\">Receive PAN data from EURODIS (before: PAN Import)</a></li>\n<li><a href=\"/pudo/documentation\" target=\"_blank\">PUDO (Pick-up and Drop-off)</a></li>\n<li><a href=\"/receive-tracking/documentation\" target=\"_blank\">Receive Tracking data from EURODIS (before: Tracking Import)</a></li>\n<li><a href=\"/send-pod/documentation\" target=\"_blank\">Send POD (Proof of delivery) to EURODIS</a></li>\n<li><a href=\"/receive-pod/documentation\" target=\"_blank\">Receive POD (Proof of delivery) from EURODIS</a></li>\n<li><a href=\"/get-label/documentation\" target=\"_blank\">Get Label from EURODIS</a></li>\n<li><a href=\"/pickup/documentation\" target=\"_blank\">Send and receive Pick-up orders</a></li>\n<li><a href=\"/receive-clearing/documentation\" target=\"_blank\">Receive Clearing data from EURODIS</a></li>\n</ul>\n<hr />\n<h4 id=\"edApiAuthHeadline\">Authentication:</h4>\n<p id=\"edApiAuthText\">Authentication takes place via an API key assigned to the partner.<br />This must be transferred via the request header as <b>X-API-Key</b>.</p>\n<p id=\"edApiAuthExampleText\">Example using the <a href=\"https://testapi.eurodis.com/pudo/documentation\" target=\"_blank\">EURODIS Platform TEST-API - PUDO (Pick-up and Drop-off)</a> to receive all parcel stations (<b>remember to replace ******** with your <u>TEST-API</u> key!</b>):</p>\n<code id=\"edApiAuthExample\"><span id=\"comment\">### Returns all parcel stations of the other partners</span>\n<span id=\"key\">GET</span>&nbsp;<span id=\"value\">https://testapi.eurodis.com/pudo/parcel-stations/v1</span>\n<span id=\"key\">X-API-Key</span><span id=\"value\">:&nbsp;<b>********</b></span></code>\n<span id=\"edApiAuthExampleHint\">-&nbsp;<b>Hint</b>: If you save the content of the example in a .http or .rest file, you can execute the request with Visual Studio 2022 (provided a valid key has been inserted). Further information can be found <a target=\"_blank\" href=\"https://learn.microsoft.com/en-us/aspnet/core/test/http-files?view=aspnetcore-8.0\">here</a>.</span>\n<hr />\n",
+    "version": "1"
+  },
+  "servers": [
+    {
+      "url": "https://testapi.eurodis.com/send-tracking"
+    }
+  ],
+  "paths": {
+    "/event/parcel/v1": {
+      "post": {
+        "tags": [
+          "Event"
+        ],
+        "summary": "Creates a new Parcel Event in the system",
+        "description": "Creates a new Parcel Event in the system.",
+        "operationId": "AddParcelEventEndpoint",
+        "requestBody": {
+          "x-name": "AddParcelEventRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddParcelEventRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "401": {
+            "description": "Authorization failed (API key missing or invalid)"
+          },
+          "500": {
+            "description": "An unexpected error occurs"
+          },
+          "424": {
+            "description": "An error occurred while determining the current partner"
+          },
+          "400": {
+            "description": "The request did not pass validation checks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationFailureResponse"
+                },
+                "example": {
+                  "errors": [
+                    {
+                      "code": "02060",
+                      "message": "Invalid event code"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Parcel Event was successfully created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddParcelEventResponse"
+                },
+                "example": {
+                  "edReference": 1234567890124,
+                  "transitUnitBarcode": null,
+                  "europlateBarcode": "123456789012345678901234",
+                  "deliveryPartnerBarcode": null,
+                  "dispatchPartnerBarcode": null,
+                  "alternativeBarcode": null,
+                  "eventCode": "",
+                  "warnings": [
+                    {
+                      "code": "02050E",
+                      "message": "AlternateShipmentReference has exceeded the maximum allowed length (max. 50 characters). Therefore, the text has been truncated accordingly!"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events/parcel/v1": {
+      "post": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Creates several new Parcel Events in the system",
+        "description": "Creates several new Parcel Events in the system.",
+        "operationId": "AddParcelEventsEndpoint",
+        "requestBody": {
+          "x-name": "AddParcelEventRequest[]",
+          "description": "",
+          "content": {
+            "*/*": {
+              "schema": {
+                "type": "array",
+                "example": [
+                  {
+                    "eventCode": "17900",
+                    "edReference": 1234567890123,
+                    "transitUnitBarcode": "143919000000028428538778",
+                    "europlateBarcode": null,
+                    "deliveryPartnerBarcode": null,
+                    "dispatchPartnerBarcode": "51200000225059136400000031001",
+                    "alternativeBarcode": "",
+                    "acceptorName": "Max Mustermann",
+                    "numberOfParcels": 1,
+                    "numberOfPallets": 0,
+                    "alternateShipmentReference": "25088250774",
+                    "eventTimestamp": "2026-11-02T14:33:56",
+                    "freeTextInformation": "",
+                    "locationCode": "CN-CC",
+                    "countryCode": "SK",
+                    "bilateralInformation": "",
+                    "bilateralInformation2": ""
+                  },
+                  {
+                    "eventCode": "1790",
+                    "edReference": 1234567890124,
+                    "transitUnitBarcode": "143919000000028428538779",
+                    "europlateBarcode": null,
+                    "deliveryPartnerBarcode": "JVGTCRDS0000000000015",
+                    "dispatchPartnerBarcode": null,
+                    "alternativeBarcode": "",
+                    "acceptorName": "Max Mustermann",
+                    "numberOfParcels": 2,
+                    "numberOfPallets": 0,
+                    "alternateShipmentReference": "250882507752508825077525088250775250882507752508825077525088250775",
+                    "eventTimestamp": "2026-11-02T14:33:56",
+                    "freeTextInformation": "",
+                    "locationCode": "CN-CC",
+                    "countryCode": "SK",
+                    "bilateralInformation": "",
+                    "bilateralInformation2": ""
+                  }
+                ],
+                "items": {
+                  "$ref": "#/components/schemas/AddParcelEventRequest"
+                }
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "401": {
+            "description": "Authorization failed (API key missing or invalid)"
+          },
+          "500": {
+            "description": "An unexpected error occurs"
+          },
+          "424": {
+            "description": "An error occurred while determining the current partner"
+          },
+          "201": {
+            "description": "Parcel Events are created successfully<br /><br /><hr /><br />`Please note:` **If there is at least one entry in errors, this means that the respective event has not been created!**<br /><br /><hr />",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AddParcelEventsResponse"
+                  }
+                },
+                "example": [
+                  {
+                    "errors": [
+                      {
+                        "code": "02060",
+                        "message": "Invalid event code"
+                      }
+                    ],
+                    "edReference": 1234567890123,
+                    "transitUnitBarcode": "143919000000028428538778",
+                    "europlateBarcode": null,
+                    "deliveryPartnerBarcode": null,
+                    "dispatchPartnerBarcode": "51200000225059136400000031001",
+                    "alternativeBarcode": "",
+                    "eventCode": "17900",
+                    "warnings": []
+                  },
+                  {
+                    "errors": [],
+                    "edReference": 1234567890124,
+                    "transitUnitBarcode": "143919000000028428538779",
+                    "europlateBarcode": null,
+                    "deliveryPartnerBarcode": "JVGTCRDS0000000000015",
+                    "dispatchPartnerBarcode": null,
+                    "alternativeBarcode": "",
+                    "eventCode": "1790",
+                    "warnings": [
+                      {
+                        "code": "02050E",
+                        "message": "AlternateShipmentReference has exceeded the maximum allowed length (max. 50 characters). Therefore, the text has been truncated accordingly!"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/event/pickup-order/v1": {
+      "post": {
+        "tags": [
+          "Event"
+        ],
+        "summary": "Creates a new Pickup Order Event in the system",
+        "description": "Creates a new Pickup Order Event in the system.",
+        "operationId": "AddPickupOrderEventEndpoint",
+        "requestBody": {
+          "x-name": "AddPickupOrderEventRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddPickupOrderEventRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "401": {
+            "description": "Authorization failed (API key missing or invalid)"
+          },
+          "500": {
+            "description": "An unexpected error occurs"
+          },
+          "424": {
+            "description": "An error occurred while determining the current partner"
+          },
+          "400": {
+            "description": "The request did not pass validation checks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationFailureResponse"
+                },
+                "example": {
+                  "errors": [
+                    {
+                      "code": "02060",
+                      "message": "Invalid event code"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Pickup Order Event was successfully created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddPickupOrderEventResponse"
+                },
+                "example": {
+                  "pickUpOrderId": 1234567890123,
+                  "eventCode": "",
+                  "warnings": [
+                    {
+                      "code": "02050E",
+                      "message": "AlternateShipmentReference has exceeded the maximum allowed length (max. 50 characters). Therefore, the text has been truncated accordingly!"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events/pickup-order/v1": {
+      "post": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Creates several new Pickup Order Events in the system",
+        "description": "Creates several new Pickup Order Events in the system.",
+        "operationId": "AddPickupOrderEventsEndpoint",
+        "requestBody": {
+          "x-name": "AddPickupOrderEventRequest[]",
+          "description": "",
+          "content": {
+            "*/*": {
+              "schema": {
+                "type": "array",
+                "example": [
+                  {
+                    "eventCode": "500",
+                    "pickUpOrderId": 1234567890123,
+                    "alternateShipmentReference": "250882507742508825077425088250774250882507742508825077425088250774",
+                    "eventTimestamp": "2026-11-02T14:33:56",
+                    "freeTextInformation": "",
+                    "locationCode": "CN-CC",
+                    "countryCode": "SK",
+                    "bilateralInformation": "",
+                    "bilateralInformation2": ""
+                  },
+                  {
+                    "eventCode": "5013",
+                    "pickUpOrderId": 1234567890124,
+                    "alternateShipmentReference": "25088250775",
+                    "eventTimestamp": "2026-11-02T14:33:56",
+                    "freeTextInformation": "",
+                    "locationCode": "CN-CC",
+                    "countryCode": "SK",
+                    "bilateralInformation": "",
+                    "bilateralInformation2": ""
+                  }
+                ],
+                "items": {
+                  "$ref": "#/components/schemas/AddPickupOrderEventRequest"
+                }
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "401": {
+            "description": "Authorization failed (API key missing or invalid)"
+          },
+          "500": {
+            "description": "An unexpected error occurs"
+          },
+          "424": {
+            "description": "An error occurred while determining the current partner"
+          },
+          "201": {
+            "description": "Pickup Order Events are created successfully<br /><br /><hr /><br />`Please note:` **If there is at least one entry in errors, this means that the respective event has not been created!**<br /><br /><hr />",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AddPickupOrderEventsResponse"
+                  }
+                },
+                "example": [
+                  {
+                    "errors": [],
+                    "pickUpOrderId": 1234567890123,
+                    "eventCode": "500",
+                    "warnings": [
+                      {
+                        "code": "02050E",
+                        "message": "AlternateShipmentReference has exceeded the maximum allowed length (max. 50 characters). Therefore, the text has been truncated accordingly!"
+                      }
+                    ]
+                  },
+                  {
+                    "errors": [
+                      {
+                        "code": "02060",
+                        "message": "Invalid event code"
+                      }
+                    ],
+                    "pickUpOrderId": 1234567890124,
+                    "eventCode": "5013",
+                    "warnings": []
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/event/shipment/v1": {
+      "post": {
+        "tags": [
+          "Event"
+        ],
+        "summary": "Creates a new Shipment Event in the system",
+        "description": "Creates a new Shipment Event in the system.",
+        "operationId": "AddShipmentEventEndpoint",
+        "requestBody": {
+          "x-name": "AddShipmentEventRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddShipmentEventRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "401": {
+            "description": "Authorization failed (API key missing or invalid)"
+          },
+          "500": {
+            "description": "An unexpected error occurs"
+          },
+          "424": {
+            "description": "An error occurred while determining the current partner"
+          },
+          "400": {
+            "description": "The request did not pass validation checks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationFailureResponse"
+                },
+                "example": {
+                  "errors": [
+                    {
+                      "code": "02060",
+                      "message": "Invalid event code"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Shipment Event was successfully created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddShipmentEventResponse"
+                },
+                "example": {
+                  "edReference": 1234567890123,
+                  "eventCode": "101",
+                  "warnings": [
+                    {
+                      "code": "02050E",
+                      "message": "AlternateShipmentReference has exceeded the maximum allowed length (max. 50 characters). Therefore, the text has been truncated accordingly!"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events/shipment/v1": {
+      "post": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Creates several new Shipment Events in the system",
+        "description": "Creates several new Shipment Events in the system.",
+        "operationId": "AddShipmentEventsEndpoint",
+        "requestBody": {
+          "x-name": "AddShipmentEventRequest[]",
+          "description": "",
+          "content": {
+            "*/*": {
+              "schema": {
+                "type": "array",
+                "example": [
+                  {
+                    "eventCode": "101",
+                    "edReference": 1234567890123,
+                    "acceptorName": "Max Mustermann",
+                    "numberOfParcels": 1,
+                    "numberOfPallets": 0,
+                    "alternateShipmentReference": "250882507742508825077425088250774250882507742508825077425088250774",
+                    "eventTimestamp": "2026-11-02T14:33:56",
+                    "freeTextInformation": "",
+                    "locationCode": "CN-CC",
+                    "countryCode": "SK",
+                    "bilateralInformation": "",
+                    "bilateralInformation2": ""
+                  },
+                  {
+                    "eventCode": "1010",
+                    "edReference": 1234567890124,
+                    "acceptorName": "Max Mustermann",
+                    "numberOfParcels": 1,
+                    "numberOfPallets": 0,
+                    "alternateShipmentReference": "25088250775",
+                    "eventTimestamp": "2026-11-02T14:33:56",
+                    "freeTextInformation": "",
+                    "locationCode": "CN-CC",
+                    "countryCode": "SK",
+                    "bilateralInformation": "",
+                    "bilateralInformation2": ""
+                  }
+                ],
+                "items": {
+                  "$ref": "#/components/schemas/AddShipmentEventRequest"
+                }
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "401": {
+            "description": "Authorization failed (API key missing or invalid)"
+          },
+          "500": {
+            "description": "An unexpected error occurs"
+          },
+          "424": {
+            "description": "An error occurred while determining the current partner"
+          },
+          "201": {
+            "description": "Shipment Events are created successfully<br /><br /><hr /><br />`Please note:` **If there is at least one entry in errors, this means that the respective event has not been created!**<br /><br /><hr />",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AddShipmentEventsResponse"
+                  }
+                },
+                "example": [
+                  {
+                    "errors": [],
+                    "edReference": 1234567890123,
+                    "eventCode": "101",
+                    "warnings": [
+                      {
+                        "code": "02050E",
+                        "message": "AlternateShipmentReference has exceeded the maximum allowed length (max. 50 characters). Therefore, the text has been truncated accordingly!"
+                      }
+                    ]
+                  },
+                  {
+                    "errors": [
+                      {
+                        "code": "02060",
+                        "message": "Invalid event code"
+                      }
+                    ],
+                    "edReference": 1234567890124,
+                    "eventCode": "1010",
+                    "warnings": []
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/event/transit/v1": {
+      "post": {
+        "tags": [
+          "Event"
+        ],
+        "summary": "Creates a new Transit Event in the system",
+        "description": "Creates a new Transit Event in the system.",
+        "operationId": "AddTransitEventEndpoint",
+        "requestBody": {
+          "x-name": "AddTransitEventRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddTransitEventRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "401": {
+            "description": "Authorization failed (API key missing or invalid)"
+          },
+          "500": {
+            "description": "An unexpected error occurs"
+          },
+          "424": {
+            "description": "An error occurred while determining the current partner"
+          },
+          "400": {
+            "description": "The request did not pass validation checks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationFailureResponse"
+                },
+                "example": {
+                  "errors": [
+                    {
+                      "code": "02060",
+                      "message": "Invalid event code"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Transit Event was successfully created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddTransitEventResponse"
+                },
+                "example": {
+                  "eventCode": "",
+                  "warnings": []
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events/transit/v1": {
+      "post": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Creates several new Transit Events in the system",
+        "description": "Creates several new Transit Events in the system.",
+        "operationId": "AddTransitEventsEndpoint",
+        "requestBody": {
+          "x-name": "AddTransitEventRequest[]",
+          "description": "",
+          "content": {
+            "*/*": {
+              "schema": {
+                "type": "array",
+                "example": [
+                  {
+                    "eventCode": "",
+                    "edReference": null,
+                    "transitUnitBarcode": null,
+                    "europlateBarcode": null,
+                    "deliveryPartnerBarcode": null,
+                    "dispatchPartnerBarcode": null,
+                    "alternativeBarcode": null,
+                    "acceptorName": null,
+                    "numberOfParcels": null,
+                    "numberOfPallets": null,
+                    "alternateShipmentReference": null,
+                    "eventTimestamp": null,
+                    "freeTextInformation": null,
+                    "locationCode": null,
+                    "countryCode": null,
+                    "bilateralInformation": null,
+                    "bilateralInformation2": null
+                  },
+                  {
+                    "eventCode": "",
+                    "edReference": null,
+                    "transitUnitBarcode": null,
+                    "europlateBarcode": null,
+                    "deliveryPartnerBarcode": null,
+                    "dispatchPartnerBarcode": null,
+                    "alternativeBarcode": null,
+                    "acceptorName": null,
+                    "numberOfParcels": null,
+                    "numberOfPallets": null,
+                    "alternateShipmentReference": null,
+                    "eventTimestamp": null,
+                    "freeTextInformation": null,
+                    "locationCode": null,
+                    "countryCode": null,
+                    "bilateralInformation": null,
+                    "bilateralInformation2": null
+                  }
+                ],
+                "items": {
+                  "$ref": "#/components/schemas/AddTransitEventRequest"
+                }
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "401": {
+            "description": "Authorization failed (API key missing or invalid)"
+          },
+          "500": {
+            "description": "An unexpected error occurs"
+          },
+          "424": {
+            "description": "An error occurred while determining the current partner"
+          },
+          "201": {
+            "description": "Transit Events are created successfully<br /><br /><hr /><br />`Please note:` **If there is at least one entry in errors, this means that the respective event has not been created!**<br /><br /><hr />",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AddTransitEventsResponse"
+                  }
+                },
+                "example": [
+                  {
+                    "errors": [],
+                    "eventCode": "",
+                    "warnings": []
+                  },
+                  {
+                    "errors": [],
+                    "eventCode": "",
+                    "warnings": []
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ValidationFailureResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            }
+          }
+        }
+      },
+      "ValidationError": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "AddParcelEventResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eventCode": {
+            "type": "string"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValidationWarning"
+            }
+          },
+          "edReference": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "transitUnitBarcode": {
+            "type": "string",
+            "nullable": true
+          },
+          "europlateBarcode": {
+            "type": "string",
+            "nullable": true
+          },
+          "deliveryPartnerBarcode": {
+            "type": "string",
+            "nullable": true
+          },
+          "dispatchPartnerBarcode": {
+            "type": "string",
+            "nullable": true
+          },
+          "alternativeBarcode": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "ValidationWarning": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "AddParcelEventRequest": {
+        "type": "object",
+        "example": {
+          "eventCode": "1790",
+          "edReference": 1234567890123,
+          "transitUnitBarcode": "143919000000028428538778",
+          "europlateBarcode": "123456789012345678901234",
+          "deliveryPartnerBarcode": null,
+          "dispatchPartnerBarcode": null,
+          "alternativeBarcode": "",
+          "acceptorName": "Max Mustermann",
+          "numberOfParcels": 1,
+          "numberOfPallets": 0,
+          "alternateShipmentReference": "250882507742508825077425088250774250882507742508825077425088250774",
+          "eventTimestamp": "2026-11-02T14:33:56",
+          "freeTextInformation": "",
+          "locationCode": "CN-CC",
+          "countryCode": "SK",
+          "bilateralInformation": "",
+          "bilateralInformation2": ""
+        },
+        "additionalProperties": false,
+        "required": [
+          "eventCode",
+          "eventTimestamp",
+          "locationCode",
+          "countryCode"
+        ],
+        "properties": {
+          "eventCode": {
+            "type": "string",
+            "maxLength": 4,
+            "minLength": 4,
+            "example": "1790"
+          },
+          "edReference": {
+            "type": "integer",
+            "description": "EURODIS shipment number<br />Empty for transmission of scans on the TU barcode.",
+            "format": "int64",
+            "nullable": true,
+            "example": 1234567890123
+          },
+          "transitUnitBarcode": {
+            "type": "string",
+            "description": "Mandatory in case the collo is consolidated into an Eurodis Transit Unit ",
+            "maxLength": 24,
+            "nullable": true,
+            "example": "143919000000028428538778"
+          },
+          "europlateBarcode": {
+            "type": "string",
+            "description": "Empty in case of Neighbourhood business setup<br />Barcode number of the transit unit in case of PE transmitted on transit units.<br />Mandatory if deliveryPartnerBarcode and deliveryPartnerBarcode are both empty and it is not a neighborhood business setup",
+            "maxLength": 24,
+            "nullable": true,
+            "example": "123456789012345678901234"
+          },
+          "deliveryPartnerBarcode": {
+            "type": "string",
+            "description": "Delivery partner barcode from the central label service (CLS)<br />Mandatory if europlateBarcode and dispatchPartnerBarcode are both empty and it is not a neighborhood business setup",
+            "maxLength": 50,
+            "nullable": true,
+            "example": null
+          },
+          "dispatchPartnerBarcode": {
+            "type": "string",
+            "description": "Dispatch partner barcode from the central label service (CLS)<br />Mandatory if europlateBarcode and deliveryPartnerBarcode are both empty and it is not a neighborhood business setup",
+            "maxLength": 50,
+            "nullable": true,
+            "example": null
+          },
+          "alternativeBarcode": {
+            "type": "string",
+            "description": "Mandatory in Neighbourhood Business setup (SOP 02-11)",
+            "maxLength": 50,
+            "nullable": true,
+            "example": ""
+          },
+          "acceptorName": {
+            "type": "string",
+            "description": "Mandatory for event code 1100",
+            "maxLength": 50,
+            "nullable": true,
+            "example": "Max Mustermann"
+          },
+          "numberOfParcels": {
+            "type": "integer",
+            "maximum": 999.0,
+            "minimum": 0.0,
+            "nullable": true,
+            "example": 1
+          },
+          "numberOfPallets": {
+            "type": "integer",
+            "maximum": 999.0,
+            "minimum": 0.0,
+            "nullable": true,
+            "example": 0
+          },
+          "alternateShipmentReference": {
+            "type": "string",
+            "maxLength": 50,
+            "nullable": true,
+            "example": "250882507742508825077425088250774250882507742508825077425088250774"
+          },
+          "eventTimestamp": {
+            "type": "string",
+            "description": "Date time when the scan event was created<br />The value can be passed according to the <a href=\"https://www.iso.org/obp/ui/#iso:std:iso:8601:-1:ed-1:v1:en\">ISO 8601 standard</a> (yyyy-MM-dd'T'HH:mm:ss.SSSZ)",
+            "maxLength": 26,
+            "minLength": 10,
+            "example": "2026-11-02T14:33:56"
+          },
+          "freeTextInformation": {
+            "type": "string",
+            "maxLength": 50,
+            "nullable": true,
+            "example": ""
+          },
+          "locationCode": {
+            "type": "string",
+            "maxLength": 10,
+            "minLength": 1,
+            "example": "CN-CC"
+          },
+          "countryCode": {
+            "type": "string",
+            "description": "Format = ISO 3166- 2 alpha country code",
+            "maxLength": 2,
+            "minLength": 1,
+            "example": "SK"
+          },
+          "bilateralInformation": {
+            "type": "string",
+            "maxLength": 50,
+            "nullable": true,
+            "example": ""
+          },
+          "bilateralInformation2": {
+            "type": "string",
+            "maxLength": 50,
+            "nullable": true,
+            "example": ""
+          }
+        }
+      },
+      "AddParcelEventsResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "edReference": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "transitUnitBarcode": {
+            "type": "string",
+            "nullable": true
+          },
+          "europlateBarcode": {
+            "type": "string",
+            "nullable": true
+          },
+          "deliveryPartnerBarcode": {
+            "type": "string",
+            "nullable": true
+          },
+          "dispatchPartnerBarcode": {
+            "type": "string",
+            "nullable": true
+          },
+          "alternativeBarcode": {
+            "type": "string",
+            "nullable": true
+          },
+          "eventCode": {
+            "type": "string"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValidationWarning"
+            }
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            }
+          }
+        }
+      },
+      "AddPickupOrderEventResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eventCode": {
+            "type": "string"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValidationWarning"
+            }
+          },
+          "pickUpOrderId": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "AddPickupOrderEventRequest": {
+        "type": "object",
+        "example": {
+          "eventCode": "500",
+          "pickUpOrderId": 1234567890123,
+          "alternateShipmentReference": "250882507742508825077425088250774250882507742508825077425088250774",
+          "eventTimestamp": "2026-11-02T14:33:56",
+          "freeTextInformation": "",
+          "locationCode": "CN-CC",
+          "countryCode": "SK",
+          "bilateralInformation": "",
+          "bilateralInformation2": ""
+        },
+        "additionalProperties": false,
+        "required": [
+          "eventCode",
+          "eventTimestamp",
+          "locationCode",
+          "countryCode"
+        ],
+        "properties": {
+          "eventCode": {
+            "type": "string",
+            "maxLength": 3,
+            "minLength": 3,
+            "example": "500"
+          },
+          "pickUpOrderId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true,
+            "example": 1234567890123
+          },
+          "alternateShipmentReference": {
+            "type": "string",
+            "maxLength": 50,
+            "nullable": true,
+            "example": "250882507742508825077425088250774250882507742508825077425088250774"
+          },
+          "eventTimestamp": {
+            "type": "string",
+            "description": "Date time when the scan event was created<br />The value can be passed according to the <a href=\"https://www.iso.org/obp/ui/#iso:std:iso:8601:-1:ed-1:v1:en\">ISO 8601 standard</a> (yyyy-MM-dd'T'HH:mm:ss.SSSZ)",
+            "maxLength": 26,
+            "minLength": 10,
+            "example": "2026-11-02T14:33:56"
+          },
+          "freeTextInformation": {
+            "type": "string",
+            "maxLength": 50,
+            "nullable": true,
+            "example": ""
+          },
+          "locationCode": {
+            "type": "string",
+            "maxLength": 10,
+            "minLength": 1,
+            "example": "CN-CC"
+          },
+          "countryCode": {
+            "type": "string",
+            "description": "Format = ISO 3166- 2 alpha country code",
+            "maxLength": 2,
+            "minLength": 1,
+            "example": "SK"
+          },
+          "bilateralInformation": {
+            "type": "string",
+            "maxLength": 50,
+            "nullable": true,
+            "example": ""
+          },
+          "bilateralInformation2": {
+            "type": "string",
+            "maxLength": 50,
+            "nullable": true,
+            "example": ""
+          }
+        }
+      },
+      "AddPickupOrderEventsResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "pickUpOrderId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "eventCode": {
+            "type": "string"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValidationWarning"
+            }
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            }
+          }
+        }
+      },
+      "AddShipmentEventResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "edReference"
+        ],
+        "properties": {
+          "eventCode": {
+            "type": "string"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValidationWarning"
+            }
+          },
+          "edReference": {
+            "type": "integer",
+            "description": "The unique shipment number inside the Eurodis network.<br />For a detail definition of the Eurodis shipment number please refer to document A02 of the Eurodis network manual.",
+            "format": "int64",
+            "maximum": 9999999999999.0,
+            "minimum": 1.0
+          }
+        }
+      },
+      "AddShipmentEventRequest": {
+        "type": "object",
+        "example": {
+          "eventCode": "101",
+          "edReference": 1234567890123,
+          "acceptorName": "Max Mustermann",
+          "numberOfParcels": 1,
+          "numberOfPallets": 0,
+          "alternateShipmentReference": "250882507742508825077425088250774250882507742508825077425088250774",
+          "eventTimestamp": "2026-11-02T14:33:56",
+          "freeTextInformation": "",
+          "locationCode": "CN-CC",
+          "countryCode": "SK",
+          "bilateralInformation": "",
+          "bilateralInformation2": ""
+        },
+        "additionalProperties": false,
+        "required": [
+          "eventCode",
+          "numberOfParcels",
+          "numberOfPallets",
+          "eventTimestamp",
+          "locationCode",
+          "countryCode"
+        ],
+        "properties": {
+          "eventCode": {
+            "type": "string",
+            "maxLength": 3,
+            "minLength": 3,
+            "example": "101"
+          },
+          "edReference": {
+            "type": "integer",
+            "description": "EURODIS shipment number",
+            "format": "int64",
+            "nullable": true,
+            "example": 1234567890123
+          },
+          "acceptorName": {
+            "type": "string",
+            "description": "Mandatory for event codes 100 and 101",
+            "maxLength": 50,
+            "nullable": true,
+            "example": "Max Mustermann"
+          },
+          "numberOfParcels": {
+            "type": "integer",
+            "maximum": 999.0,
+            "minimum": 0.0,
+            "example": 1
+          },
+          "numberOfPallets": {
+            "type": "integer",
+            "maximum": 999.0,
+            "minimum": 0.0,
+            "example": 0
+          },
+          "alternateShipmentReference": {
+            "type": "string",
+            "maxLength": 50,
+            "nullable": true,
+            "example": "250882507742508825077425088250774250882507742508825077425088250774"
+          },
+          "eventTimestamp": {
+            "type": "string",
+            "description": "Date time when the scan event was created<br />The value can be passed according to the <a href=\"https://www.iso.org/obp/ui/#iso:std:iso:8601:-1:ed-1:v1:en\">ISO 8601 standard</a> (yyyy-MM-dd'T'HH:mm:ss.SSSZ)",
+            "maxLength": 26,
+            "minLength": 10,
+            "example": "2026-11-02T14:33:56"
+          },
+          "freeTextInformation": {
+            "type": "string",
+            "maxLength": 50,
+            "nullable": true,
+            "example": ""
+          },
+          "locationCode": {
+            "type": "string",
+            "maxLength": 10,
+            "minLength": 1,
+            "example": "CN-CC"
+          },
+          "countryCode": {
+            "type": "string",
+            "description": "Format = ISO 3166- 2 alpha country code",
+            "maxLength": 2,
+            "minLength": 1,
+            "example": "SK"
+          },
+          "bilateralInformation": {
+            "type": "string",
+            "maxLength": 50,
+            "nullable": true,
+            "example": ""
+          },
+          "bilateralInformation2": {
+            "type": "string",
+            "maxLength": 50,
+            "nullable": true,
+            "example": ""
+          }
+        }
+      },
+      "AddShipmentEventsResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "edReference"
+        ],
+        "properties": {
+          "edReference": {
+            "type": "integer",
+            "description": "The unique shipment number inside the Eurodis network.<br />For a detail definition of the Eurodis shipment number please refer to document A02 of the Eurodis network manual.",
+            "format": "int64",
+            "maximum": 9999999999999.0,
+            "minimum": 1.0
+          },
+          "eventCode": {
+            "type": "string"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValidationWarning"
+            }
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            }
+          }
+        }
+      },
+      "AddTransitEventResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eventCode": {
+            "type": "string"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValidationWarning"
+            }
+          }
+        }
+      },
+      "AddTransitEventRequest": {
+        "type": "object",
+        "example": {
+          "eventCode": "",
+          "edReference": null,
+          "transitUnitBarcode": null,
+          "europlateBarcode": null,
+          "deliveryPartnerBarcode": null,
+          "dispatchPartnerBarcode": null,
+          "alternativeBarcode": null,
+          "acceptorName": null,
+          "numberOfParcels": null,
+          "numberOfPallets": null,
+          "alternateShipmentReference": null,
+          "eventTimestamp": null,
+          "freeTextInformation": null,
+          "locationCode": null,
+          "countryCode": null,
+          "bilateralInformation": null,
+          "bilateralInformation2": null
+        },
+        "additionalProperties": false,
+        "required": [
+          "eventCode",
+          "eventTimestamp",
+          "locationCode",
+          "countryCode"
+        ],
+        "properties": {
+          "eventCode": {
+            "type": "string",
+            "maxLength": 4,
+            "minLength": 4,
+            "example": ""
+          },
+          "edReference": {
+            "type": "integer",
+            "description": "EURODIS shipment number<br />Empty for transmission of scans on the TU barcode.",
+            "format": "int64",
+            "nullable": true,
+            "example": null
+          },
+          "transitUnitBarcode": {
+            "type": "string",
+            "description": "Mandatory in case the collo is consolidated into an Eurodis Transit Unit ",
+            "maxLength": 24,
+            "nullable": true,
+            "example": null
+          },
+          "europlateBarcode": {
+            "type": "string",
+            "description": "Empty in case of Neighbourhood business setup<br />Barcode number of the transit unit in case of PE transmitted on transit units.<br />Mandatory if deliveryPartnerBarcode and deliveryPartnerBarcode are both empty and it is not a neighborhood business setup",
+            "maxLength": 24,
+            "nullable": true,
+            "example": null
+          },
+          "deliveryPartnerBarcode": {
+            "type": "string",
+            "description": "Delivery partner barcode from the central label service (CLS)<br />Mandatory if europlateBarcode and dispatchPartnerBarcode are both empty and it is not a neighborhood business setup",
+            "maxLength": 50,
+            "nullable": true,
+            "example": null
+          },
+          "dispatchPartnerBarcode": {
+            "type": "string",
+            "description": "Dispatch partner barcode from the central label service (CLS)<br />Mandatory if europlateBarcode and deliveryPartnerBarcode are both empty and it is not a neighborhood business setup",
+            "maxLength": 50,
+            "nullable": true,
+            "example": null
+          },
+          "alternativeBarcode": {
+            "type": "string",
+            "description": "Mandatory in Neighbourhood Business setup (SOP 02-11)",
+            "maxLength": 50,
+            "nullable": true,
+            "example": null
+          },
+          "acceptorName": {
+            "type": "string",
+            "description": "Mandatory for event code 1100",
+            "maxLength": 50,
+            "nullable": true,
+            "example": null
+          },
+          "numberOfParcels": {
+            "type": "integer",
+            "maximum": 999.0,
+            "minimum": 0.0,
+            "nullable": true,
+            "example": null
+          },
+          "numberOfPallets": {
+            "type": "integer",
+            "maximum": 999.0,
+            "minimum": 0.0,
+            "nullable": true,
+            "example": null
+          },
+          "alternateShipmentReference": {
+            "type": "string",
+            "maxLength": 50,
+            "nullable": true,
+            "example": null
+          },
+          "eventTimestamp": {
+            "type": "string",
+            "description": "Date time when the scan event was created<br />The value can be passed according to the <a href=\"https://www.iso.org/obp/ui/#iso:std:iso:8601:-1:ed-1:v1:en\">ISO 8601 standard</a> (yyyy-MM-dd'T'HH:mm:ss.SSSZ)",
+            "maxLength": 26,
+            "minLength": 10,
+            "example": null
+          },
+          "freeTextInformation": {
+            "type": "string",
+            "maxLength": 50,
+            "nullable": true,
+            "example": null
+          },
+          "locationCode": {
+            "type": "string",
+            "maxLength": 10,
+            "minLength": 1,
+            "example": null
+          },
+          "countryCode": {
+            "type": "string",
+            "description": "Format = ISO 3166- 2 alpha country code",
+            "maxLength": 2,
+            "minLength": 1,
+            "example": null
+          },
+          "bilateralInformation": {
+            "type": "string",
+            "maxLength": 50,
+            "nullable": true,
+            "example": null
+          },
+          "bilateralInformation2": {
+            "type": "string",
+            "maxLength": 50,
+            "nullable": true,
+            "example": null
+          }
+        }
+      },
+      "AddTransitEventsResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eventCode": {
+            "type": "string"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValidationWarning"
+            }
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            }
+          }
+        }
+      }
+    }
+  }
+}
