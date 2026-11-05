@@ -10,7 +10,7 @@ pm_accenture: "Diego Mereu"
 iniziative:
 
   - id: "136596"
-    titolo: "Eurodis autoproduttore"
+    titolo: "EURODIS Autoproduttore"
     prj: null  # non ancora assegnato
     stato: in_analisi
     owner_cliente: "Piergentili"

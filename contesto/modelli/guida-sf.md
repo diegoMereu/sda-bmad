@@ -69,11 +69,13 @@ in Reply v1.0. Altrimenti si usa `# Soluzione` per fasi, come in SI.
 ### Cosa mettere in ogni sezione
 
 - **Scopo**: una o due frasi. Modello: "Il presente documento contiene
-  l'analisi degli impatti funzionali relativi all'Iniziativa "<id> - <titolo>"."
+  l'analisi degli impatti funzionali relativi all'Iniziativa "<titolo della
+  richiesta>"." (il titolo contiene già il codice: non ripeterlo).
 - **Acronimi**: solo le sigle usate nel testo (LDV, ICD, ms, PDB, CE...).
 - **Riferimenti**: documenti che esistono altrove (altre SF, specifiche,
   riscontri del cliente), numerati, con percorso SharePoint o link nella
-  colonna Allegato; se non lo conosci, `DA DEFINIRE` e una domanda per Diego.
+  colonna Allegato. Se il percorso non è noto scrivi "non disponibile" e fai
+  la domanda a Diego in risposta: un link mancante non è un Open Point.
   Nel testo si rimanda con "documento di riferimento ID n".
 - **Allegati** (ultimo capitolo): i file consegnati insieme alla SF (ICD con
   mapping, swagger, drawio). Un file non ancora prodotto si scrive
@@ -86,7 +88,8 @@ in Reply v1.0. Altrimenti si usa `# Soluzione` per fasi, come in SI.
     "assunzione n");
   - Tipo = Vincolo | Assunzione | Esclusione | Open Point, in quest'ordine;
   - gli Open Point sono ordinati per interlocutore (partner, cliente, SDA,
-    team), così ognuno trova i suoi in un blocco;
+    responsabili di sistemi di altri team, team ACN), così ognuno trova i
+    suoi in un blocco;
   - Riferimento = "<sezione>; <interlocutore>";
   - niente codici interni PA-nn / DF-nn;
   - un'esclusione di perimetro non ancora confermata resta Esclusione, con
@@ -168,7 +171,7 @@ in Reply v1.0. Altrimenti si usa `# Soluzione` per fasi, come in SI.
 ```yaml
 ---
 tipo: sf
-titolo: "<titolo della richiesta, come in iniziative.yaml>"
+titolo: "<id> - <titolo in iniziative.yaml>"   # es. "136596 - EURODIS Autoproduttore"
 codice_iniziativa: "<id>"
 prj: "<PRJ o null>"
 ticket: null              # TICKET STS, se esiste

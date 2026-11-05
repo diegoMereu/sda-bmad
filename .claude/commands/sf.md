@@ -14,6 +14,10 @@ Poste (DTO / IT AS Corriere Espresso), che la verifica e la approva.
    chiedi i dati. Non inventare l'id.
 3. Leggi le fonti elencate nella guida: `iniziative/$ARGUMENTS/` (PUNTO,
    analisi, registri dei punti aperti, `sviluppo/*.md`), poi il glossario.
+   Controlla con `git log -5 -- iniziative/$ARGUMENTS/sviluppo/` che le
+   specifiche di sviluppo non siano regredite (versione in intestazione più
+   bassa di un commit precedente): se succede, segnalalo e usa l'ultima
+   versione buona.
 4. Se esiste già `iniziative/$ARGUMENTS/documenti/SF_$ARGUMENTS_*.md`,
    aggiornalo: alza la versione e aggiungi una riga alle revisioni.
    Altrimenti crealo, versione 0.1.

@@ -52,31 +52,44 @@ Tabella 1: Business Architecture – <processo>
 | Pacchetto Applicativo | Software | Versione | Layer Applicativo | Applicativo nuovo o esistente |
 | Flusso dati | Protocollo | Origine | Destinazione | Tipologia | Frequenza | Frequenza di picco | Dimensione media dei messaggi | Dimensione massima dei messaggi | Flusso nuovo o esist. |
 # Scheda HW
+<prosa: cosa serve e cosa non si applica>
 ## Risorse on Prem
+| on prem |       Tabella: Risorse on Prem (HW dedicato o Private Cloud)
+| mainframe |     Tabella: Mainframe
+| HW periferico | Tabella: HW Periferico
 ### Openshift
+| Openshift |     Tabella: Openshift on Prem
 ## Risorse Cloud
+| cloud IaaS |    Tabella: Risorse Cloud IaaS
 ### Openshift
+| Openshift |     Tabella: Openshift Cloud
 # Allegati
 | Codice Documento | Nome |
 ```
 
 ### Cosa mettere in ogni sezione
 
-- **Business Architecture**: una riga per sistema/applicazione coinvolto, con
+- **Business Architecture**: una riga per sistema/applicazione coinvolto
+  (topic Kafka e collezioni MongoDB no: stanno solo nella tabella pacchetti), con
   il formato `<Sistema> (AP-nnnnn) / <applicazione> (PK-nnnnn)`. Codici noti
   dall'esempio 138975: CE `AP-00988`, ce-dichiarato `PK-03089`, T&T2.0
   `AP-00960`, T&T repo `PK-03985`, Portali PCL `AP-01074`, MyPoste delivery
   business `PK-02750`. Per gli altri, e per ogni **nuovo** microservizio, il PK
   è `DA DEFINIRE`: non inventarlo. Includi anche i sistemi esterni (es. il
-  partner) con il ruolo, l'impatto `N` e la dicitura "esterno".
+  partner) con il ruolo, l'impatto `N` e la dicitura "esterno". Sistemi solo
+  consultati (es. F1, ce-rules): impatto `N`.
 - **Information System Architecture**: i flussi numerati (Flusso dati 1, 2,
   …), nello stesso ordine della figura. Una riga = un passaggio di dati fra
   due sistemi o fra un sistema e un topic/DB.
 - **Application Technical Architecture**:
   - tabella pacchetti: ogni microservizio o componente, Software
     (`Microservizio Java/Spring Boot`, `Topic Kafka`, `MongoDB`…), Versione
-    (`1.0` per i nuovi), Layer (`Application`, `Data`, `Integration`);
-  - tabella flussi: stessi numeri della sezione precedente. Protocollo (`https`,
+    (`1.0` per i nuovi; per topic, collezioni ed esistenti di versione ignota
+    "Non applicabile" o `DA DEFINIRE`), Layer (`Application`, `Data`,
+    `Integration`);
+  - tabella flussi: stessi numeri della sezione precedente. Origine = chi
+    avvia la comunicazione (il chiamante, o il produttore su un topic),
+    Destinazione = chi la riceve. Protocollo (`https`,
     `Kafka`, `MongoDB`, `JDBC`), Tipologia `Sincrona`/`Asincrona`. Frequenze e
     dimensioni: valori noti o stime **dichiarate come stime** ("stima: …").
     Altrimenti `DA DEFINIRE`, mai celle vuote.
@@ -87,8 +100,13 @@ Tabella 1: Business Architecture – <processo>
   valore minimo marcato "proposta" (es. request 250 millicore / 512 MB, limit
   1 core / 1024 MB, 1 pod) e apri un open point. Le tabelle che non si
   applicano (mainframe, HW periferico, IaaS) restano con una sola riga
-  "Non applicabile".
-- **Allegati**: SF, drawio, ICD, swagger.
+  "Non applicabile". Se non è noto se il cluster è on prem o cloud, compila
+  la tabella Openshift on prem, metti in cloud una riga che rimanda a quella
+  e scrivi `DA DEFINIRE` la collocazione nella prosa del capitolo.
+  Non riportare le frasi-istruzione del template ("Specificare nella colonna
+  Ambiente…"): sono per chi compila, non per chi legge.
+- **Allegati**: SF (con versione), drawio, ICD, swagger. Codice Documento =
+  nome del file senza estensione, finché Poste non assegna codici `AL_…`.
 
 Le tabelle della Scheda HW riprendono le colonne dell'esempio:
 
@@ -121,6 +139,8 @@ Ogni tabella ha la didascalia `Tabella n: …` sotto, numerata in sequenza.
 
 ## File
 
+- La data delle revisioni è quella di emissione (in bozza non c'è
+  approvazione), anche se il template chiama la colonna "Data di Approvazione".
 - Master: `iniziative/<id>/documenti/DP_<id>_<slug>.md`, es.
   `DP_136596_Eurodis_autoproduttore.md`.
 - Word: `python contesto/modelli/md2docx.py iniziative/<id>/documenti/DP_<id>_<slug>.md`.

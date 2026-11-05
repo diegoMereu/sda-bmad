@@ -248,11 +248,12 @@ class Corpo:
                 aggiungi_inline(c.paragraphs[0], parti[0])
                 for extra in parti[1:]:
                     aggiungi_inline(c.add_paragraph(), extra)
+        corpo = Pt(9) if len(intest) <= 8 else Pt(7)  # le tabelle HW hanno 12-15 colonne
         for riga in t.rows:
             for c in riga.cells:
                 for p in c.paragraphs:
                     for r in p.runs:
-                        r.font.size = Pt(9)
+                        r.font.size = corpo
         self.doc.add_paragraph()
 
     def codice(self, linee):

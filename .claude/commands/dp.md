@@ -13,7 +13,12 @@ per gli architetti e l'infrastruttura di Poste (DTO / ITASCE).
 2. Leggi la voce `$ARGUMENTS` in `iniziative.yaml`. Se non esiste, fermati e
    chiedi i dati. Non inventare l'id.
 3. Leggi la SF dell'iniziativa (`iniziative/$ARGUMENTS/documenti/SF_*.md`) se
-   esiste, poi le altre fonti della guida.
+   esiste, poi le altre fonti della guida. Il DP si scrive su una versione
+   precisa della SF: annotala e citala negli Allegati; se la SF cambia mentre
+   lavori, segnalalo. Controlla con `git log -5 -- iniziative/$ARGUMENTS/sviluppo/`
+   che le specifiche di sviluppo non siano regredite (versione in intestazione
+   più bassa di un commit precedente): se succede, segnalalo e usa l'ultima
+   versione buona.
 4. Se esiste già `iniziative/$ARGUMENTS/documenti/DP_$ARGUMENTS_*.md`,
    aggiornalo: alza la versione e aggiungi una riga alle revisioni.
    Altrimenti crealo, versione 0.1.
