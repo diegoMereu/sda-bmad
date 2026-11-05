@@ -147,7 +147,7 @@ dice `""`/`0` il campo è presente ma vuoto finché il punto non si chiude.
 |---|---|---|---|
 | `progressivo` | — | `1` (un messaggio = una spedizione) | MAP-1. Il foglio dice "1..n nel batch": da allineare |
 | `versione_tracciato` | — | `1` | |
-| `canale` | config `mapper.canale` | default `EURODIS` | **[DA DECIDERE DF-04]** `EURODIS` o `EUD_INVIOSYSTEM`. NB: BEP passa `collo.id_ldv` solo per INVIOSYSTEM |
+| `canale` | config `mapper.canale` | default `EUD_INVIOSYSTEM` | **[DECISO 05-11, DF-04, PA-25]**. BEP passa `collo.id_ldv` solo per INVIOSYSTEM; da verificare che `BepChannel.fromCanale` riconosca il valore |
 | `id_canale` | — | `""` | [DA DECIDERE PA-15] |
 | `id_preadvising` | — | UUID | RF-08 |
 | `flag_autoproduttore` | — | `"S"` | |
@@ -322,7 +322,7 @@ Proposta: `preadvising.eud.pre.build.DLT`, da far creare se si decide.
 |---|---|---|---|
 | `kafka.consumer.topic.input` | `KAFKA_TOPIC_INPUT` | `preadvising.eud.pre.build` | esistente |
 | `kafka.producer.topic.output` | `KAFKA_TOPIC_OUTPUT` | `preadvising.pre-enrichment` | esistente |
-| `mapper.canale` | `MAPPER_CANALE` | `EURODIS` | DF-04 |
+| `mapper.canale` | `MAPPER_CANALE` | `EUD_INVIOSYSTEM` | deciso 05-11 |
 | `mapper.id-partner` | `MAPPER_ID_PARTNER` | `EURODIS` | PA-15 |
 | `mapper.cliente.codice` | `MAPPER_CLIENTE_CODICE` | `""` | → `id_cliente`, `codice_login_cliente`, `codice_auc` |
 | `mapper.cliente.codice-contratto` | `MAPPER_CLIENTE_CONTRATTO` | `""` | |
@@ -381,7 +381,7 @@ valori (gli altri campi `""`/`0`):
 {
   "progressivo": 1,
   "versione_tracciato": 1,
-  "canale": "EURODIS",
+  "canale": "EUD_INVIOSYSTEM",
   "id_canale": "",
   "id_preadvising": "<uuid>",
   "flag_autoproduttore": "S",
@@ -442,7 +442,6 @@ E la metrica `campo_mancante` cresce per `destinatario.cap`,
 | Destinatario assente | si pubblica con campi vuoti | eventuale scarto o altra sorgente | DF-30 |
 | Codice nazione | solo `codice_nazione_iso_2` | eventuale copia in `codice_nazione` o ISO4 | DF-12, DF-27 |
 | Codici servizi | tabella 6.8, disattivabile | si toglie o si completa la tabella | PA-03, DF-05, DF-21 |
-| Canale | `EURODIS` | cambia la configurazione | DF-04 |
 | Cliente, contratto, centro di costo, prodotto | configurazione, default vuoti | valori da F1 o costanti di contratto | PA-10, PA-33, DF-11 |
 | Data spedizione senza `entranceTimestamp` | `clearanceTimestamp` | si toglie il fallback o si scarta | DF-01 |
 | Contrassegno: valuta e tipo | si mappa tutto, warning | eventuale scarto | DF-24 |

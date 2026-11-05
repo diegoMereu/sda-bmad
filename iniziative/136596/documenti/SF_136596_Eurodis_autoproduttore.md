@@ -77,7 +77,7 @@ Il presente documento contiene l'analisi degli impatti funzionali relativi all'I
 | 20 | Open Point | Codice PRJ dell'iniziativa: DA DEFINIRE. | Introduzione; Poste |
 | 21 | Open Point | Durata di conservazione dello storico delle chiamate e delle spedizioni: DA DEFINIRE. | Acquisizione; Poste |
 | 22 | Open Point | Regole di validità e di univocità secondo SDA delle LDV generate da EURODIS. | Trasformazione; SDA (Marzilli), EURODIS |
-| 23 | Chiuso | Valore del `canale`: confermato `EUD_INVIOFILE`. Da verificare che il mapping verso BEP trasmetta `collo.id_ldv` anche per questo canale (oggi lo fa solo per INVIOSYSTEM); dal canale dipende anche il criterio della verifica di duplicato. | Trasformazione; SDA |
+| 23 | Chiuso | Valore del `canale`: confermato `EUD_INVIOSYSTEM`, coerente con il mapping verso BEP che trasmette `collo.id_ldv` solo per il canale INVIOSYSTEM. Da verificare che BEP riconosca il valore; dal canale dipende anche il criterio della verifica di duplicato. | Trasformazione; SDA |
 | 24 | Open Point | Valorizzazione di `id_canale`, `id_file` e `id_partner`. | Trasformazione; SDA |
 | 25 | Open Point | Campo sorgente della data di spedizione (`entranceTimestamp` oppure `clearanceTimestamp`, come nel riscontro SDA) e regola se il campo è assente. | Trasformazione; SDA, EURODIS |
 | 26 | Open Point | Codice nazione: campo ICD in cui scrivere l'ISO2 (`codice_nazione` come nel flusso `EUD_INVIOFILE`, oppure solo `codice_nazione_iso_2`) e componente che produce l'ISO4 richiesto da PDB. | Trasformazione; SDA, responsabile `ce-dichiarato-ldv-pdb-sync` |
@@ -271,7 +271,7 @@ Il mapping campo per campo, con la categoria di ogni campo (diretto, trasformato
 - La consegna senza firma deriva dal tipo di consegna EURODIS (`deliveryType` `S` → `no_firma` `"N"`, `N` → `"S"`).
 - Le note di consegna sono la concatenazione delle note del destinatario e del mittente.
 - Sono costanti: `flag_stampa_ldv` = `"N"`, `flag_attivazione_ritiro` = `"N"`, `internazionale.vettore` = `"EURODIS"`.
-- Il valore del `canale` è `EUD_INVIOFILE` (confermato; Open Point 23).
+- Il valore del `canale` è `EUD_INVIOSYSTEM` (confermato; Open Point 23).
 
 ### Identificativi e lettera di vettura
 
