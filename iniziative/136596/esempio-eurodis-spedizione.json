@@ -1,0 +1,112 @@
+{
+  "edReference": 7319003746401,
+  "referencedEurodisShipmentNumber": 1234567890123,
+  "shipmentTypeIndicator": "N",
+  "lineHaulIndicator": "L",
+  "clearanceTimestamp": "2024-03-29T00:00:00",
+  "entranceTimestamp": "2024-03-29T06:53:55",
+  "numberOfHandlingUnits": 1,
+  "shipmentWeight": 15.00,
+  "consignorsCustomerNumberAtDispatchPartner": "933499999",
+  "consignorsReference": "30151111",
+  "dispatchPartnersDomesticShipmentNumber": "30151111",
+  "truckLicensePlate": "LK 773319",
+  "termsOfDeliveryText": "EXW",
+  "consigneeAddress": null,
+  "returnAddress": {
+    "contactName": "Erika Mustermann",
+    "additionalAddressInfo2": "Additional Info 1",
+    "pudoID": "",
+    "contactTelephone": "+990000000001",
+    "alternativeContactTelephone": "+990000000002",
+    "contactSMS": "+880000000002",
+    "contactEMail": "e.mustermann@muster-company.de",
+    "companyName": "Muster Company",
+    "additionalAddressInfo1": "Additional Info 1",
+    "street": "Demo street",
+    "streetNumber": "1",
+    "region": "",
+    "city": "Berlin",
+    "zipcode": "12345",
+    "countryCode": "DE",
+    "additionalConsigneeInfo": "",
+    "gatewayAssigned": "GET"
+  },
+  "shipperAddress": null,
+  "remunerationAddress": null,
+  "bookingInAddress": null,
+  "deliveryService": {
+    "deliveryService": "N",
+    "deliveryType": "S",
+    "secureDeliveryId": "1234567890",
+    "deliveryBookInRequired": false,
+    "deliveryTimeWindowStart": "08:00:00",
+    "deliveryTimeWindowEnd": "18:00:00",
+    "deliveryDateWindowStart": "2024-04-01",
+    "deliveryDateWindowEnd": "2024-04-03",
+    "completeDeliveryOnly": true,
+    "additionalNotification": false
+  },
+  "cashOnDeliveryService": {
+    "iban": "AA1234567890123456789012",
+    "bic": "ABCDEFGI",
+    "accountHolder": "INTIME",
+    "paymentReason": "9990000000001",
+    "paymentReference": "9990000000001",
+    "amount": 1111.50,
+    "currency": "EUR",
+    "identifierForCODCollection": 3
+  },
+  "customsService": {
+    "commercialValueOfGoods": 1000.50,
+    "currency": "EUR",
+    "dutyCode": "9876543210",
+    "sign": "AA11-00001",
+    "number": 0,
+    "descriptionOfGoods": "FORSCHUNGSCHEMIKALIE"
+  },
+  "hazardousADRServices": [
+    {
+      "billOfDanger": "8",
+      "additionalBillOfDanger1": "61",
+      "additionalBillOfDanger2": "0",
+      "additionalBillOfDanger3": "0",
+      "tunnelLimitationCode": "C/D",
+      "packingGroup": 1,
+      "adrGrossWeight": 10.00,
+      "unNumber": "1831",
+      "transportCategory": "1",
+      "materialDescription": "SCHWEFELSAEURE, RAUCHEND",
+      "technicalName": "(EPOXYDHARZ)",
+      "identifierMassOrVolume": "kg"
+    }
+  ],
+  "consigneePreAdvice": {
+    "smsPreAdvice": false,
+    "eMailPreAdvice": false,
+    "telephonePreAdvice": false
+  },
+  "collis": [
+    {
+      "identifierPalletOrCollo": "C",
+      "weightOfUnit": 15.00,
+      "boxType": "8",
+      "boxDimensionCategory": "A",
+      "boxId": "99887766551",
+      "europlateBarcode": "123459000003770904301090",
+      "referencedEuroplateBarcode": "123456789012345678901234",
+      "volumetric": null,
+      "consignorsColloBarcode": "",
+      "length": 33,
+      "width": 44,
+      "height": 55,
+      "volumetricWeight": null
+    }
+  ],
+  "hazardousCollis": [
+    {
+      "numberOfParcelType": 1,
+      "explanationOfParcelType": "Druckgefaess"
+    }
+  ]
+}

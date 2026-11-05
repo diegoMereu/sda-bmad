@@ -112,3 +112,14 @@ colonna "Stato" della tabella sopra non è stata toccata: qui sotto cosa cambia.
 | DF-27 | alta | ISO4 non risolto e canale `POU` / `WEBSERVICE` nel ms sync | responsabile ms sync |
 | DF-29 | alta | LDV generata da EURODIS: regole di validità secondo SDA e univocità; ogni ripetizione dei test richiede LDV nuove; indirizzi, CAP e nazioni reali. Chiesto con la mail del 29-10 | Chiapponi / EURODIS |
 | DF-28 | media | Scarto: l'unica causa confermata è il nome mittente assente. Vale per l'API? Come si traccia? | Diego |
+
+## Aggiornamento del 05-11: prima spedizione TEST passata nella catena
+
+Fonte: `esempio-eurodis-spedizione.json` (ambiente TEST EURODIS, dati di
+fantasia) e l'output del mapper visto da Diego in svil. Le regole e i default
+sono nella specifica [sviluppo/ce-dichiarato-eurodis-mapper.md](sviluppo/ce-dichiarato-eurodis-mapper.md).
+
+| ID | Gravità | Dubbio | Default nella specifica | Chi |
+|---|---|---|---|---|
+| DF-02 | alta | **Evidenza**: in TEST `consignorsColloBarcode` arriva vuoto, `europlateBarcode` ha 24 cifre. Con la decisione del 22-10 `collo.id_ldv` esce vuoto | resta `consignorsColloBarcode` | Diego / Marzilli |
+| DF-30 | alta | `consigneeAddress` (e `shipperAddress`) a `null` in TEST, c'è solo `returnAddress`. Cap e località del destinatario sono obbligatori per ICD e BEP. Si pubblica, si scarta, o il destinatario sta altrove? Lo swagger dichiara tutti gli indirizzi `nullable` senza spiegare quando | si pubblica con campi vuoti e una metrica; `returnAddress` non si usa | Diego / Chiapponi (EURODIS) |
