@@ -143,17 +143,19 @@ def aggiungi_inline(p, testo):
         if not pezzo:
             continue
         if pezzo.startswith("**") and pezzo.endswith("**"):
-            p.add_run(pezzo[2:-2]).bold = True
+            r = p.add_run(pezzo[2:-2])
+            r.bold = True
         elif pezzo.startswith("`") and pezzo.endswith("`"):
             r = p.add_run(pezzo[1:-1])
             r.font.name = "Courier New"
             r.font.size = Pt(9)
         elif pezzo.startswith("*") and pezzo.endswith("*"):
-            p.add_run(pezzo[1:-1]).italic = True
+            r = p.add_run(pezzo[1:-1])
+            r.italic = True
         else:
             r = p.add_run(pezzo)
-            if "DA DEFINIRE" in pezzo:
-                r.font.highlight_color = WD_COLOR_INDEX.YELLOW
+        if "DA DEFINIRE" in pezzo:
+            r.font.highlight_color = WD_COLOR_INDEX.YELLOW
 
 
 def ombreggia(cella, colore="D9D9D9"):
@@ -192,7 +194,8 @@ class Corpo:
         return p
 
     def titolo(self, livello, testo):
-        self.doc.add_paragraph(testo, style=f"Heading {livello}")
+        p = self.doc.add_paragraph(style=f"Heading {livello}")
+        aggiungi_inline(p, testo)
 
     def num_pallini(self):
         """numId della prima lista a pallini (Symbol) definita nel template."""
@@ -351,7 +354,7 @@ class Corpo:
 def main():
     src = Path(sys.argv[1])
     dst = Path(sys.argv[2]) if len(sys.argv) > 2 else src.with_suffix(".docx")
-    testo = src.read_text(encoding="utf-8")
+    testo = src.read_text(encoding="utf-8").replace("\r\n", "\n")
     m = re.match(r"^---\n(.*?)\n---\n(.*)$", testo, re.S)
     if not m:
         sys.exit("manca il front-matter YAML")

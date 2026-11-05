@@ -25,6 +25,12 @@ risorse**. Non ripete le regole funzionali: rimanda alla SF.
 4. `contesto/MICROSERVICE_TECHNICAL_BLUEPRINT.md` per lo stack standard dei ms
    `ce-` (Java/Spring Boot, OpenShift, Kafka, Helm), da riusare nel "Software".
 
+In `sviluppo/` valgono le stesse regole della SF (vedi `guida-sf.md`, "Fonti"):
+i `prompt-*.md` non sono fonti; a parità di tema vale la decisione datata più
+recente. Al DP servono soprattutto i dati di deploy: namespace, risorse e
+repliche nei `values.yaml` citati da assessment e rapporti. Riportali come
+fatti solo se un documento li verifica; altrimenti scrivili come proposta.
+
 ## Struttura (obbligatoria, numerazione e titoli come l'esempio)
 
 Copertina, ruoli (Redazione/Verifica/Approvazione), versioni, sommario e
@@ -108,7 +114,9 @@ Ogni tabella ha la didascalia `Tabella n: …` sotto, numerata in sequenza.
 - Il DP non ha una sezione open point: elenca i `DA DEFINIRE` in fondo alla
   tua risposta, raggruppati per chi deve rispondere (cliente, infrastruttura,
   team).
-- Figure: `![Figura n: …](<file>.png)`. Se il file non c'è, il generatore
+- Figure: stessa convenzione della SF (`documenti/fig-<n>-<slug>.drawio`
+  e `.png` accanto), `![Figura n: …](fig-<n>-<slug>.png)`. La figura
+  dell'architettura può essere la stessa della SF. Se il file non c'è, il generatore
   lascia un segnaposto rosso. La tabella dei flussi deve comunque bastare.
 
 ## File

@@ -25,12 +25,21 @@ default provvisori di sviluppo.
 1. `iniziative.yaml`: titolo, PRJ, owner, perimetro.
 2. `iniziative/<id>/PUNTO.md`: decisioni prese (con data) e cosa serve dal cliente.
 3. `iniziative/<id>/analisi.md` e registri dei punti aperti (PA-nn, DF-nn).
-4. `iniziative/<id>/sviluppo/*.md`: un documento funzionale per microservizio.
+4. `iniziative/<id>/sviluppo/`:
+   - `<microservizio>.md`: documento funzionale del ms, usa la versione
+     indicata nel file;
+   - `assessment-*`, `rapporto-*`, `verifica-*`: stato del codice; contano
+     solo se più recenti della specifica, e allora la divergenza va segnalata;
+   - `prompt-*.md`: **non** sono fonti, ignorali.
 5. Allegati tecnici dell'iniziativa: ICD, swagger, mapping in xlsx.
 6. `contesto/glossario-ce.md` per i termini.
 
-Se due fonti divergono vale la più recente con una decisione datata; segnala la
+A parità di tema vale la decisione datata più recente, da qualunque fonte
+venga; l'ordine qui sopra serve solo quando mancano le date. Segnala ogni
 divergenza a fine lavoro, non sceglierla in silenzio.
+
+**Microservizio senza documento di sviluppo**: descrivilo da analisi, registri
+e proposte; ciò che non è deciso è `DA DEFINIRE` con il suo Open Point.
 
 ## Struttura (obbligatoria)
 
@@ -62,12 +71,28 @@ in Reply v1.0. Altrimenti si usa `# Soluzione` per fasi, come in SI.
 - **Scopo**: una o due frasi. Modello: "Il presente documento contiene
   l'analisi degli impatti funzionali relativi all'Iniziativa "<id> - <titolo>"."
 - **Acronimi**: solo le sigle usate nel testo (LDV, ICD, ms, PDB, CE...).
-- **Riferimenti**: i documenti citati nel testo, numerati; nel testo si
-  rimanda con "documento di riferimento ID n".
+- **Riferimenti**: documenti che esistono altrove (altre SF, specifiche,
+  riscontri del cliente), numerati, con percorso SharePoint o link nella
+  colonna Allegato; se non lo conosci, `DA DEFINIRE` e una domanda per Diego.
+  Nel testo si rimanda con "documento di riferimento ID n".
+- **Allegati** (ultimo capitolo): i file consegnati insieme alla SF (ICD con
+  mapping, swagger, drawio). Un file non ancora prodotto si scrive
+  "in preparazione".
 - **Vincoli, Assunzioni, Esclusioni ed Open Point**: qui confluiscono i punti
   aperti che interessano il cliente: domande a partner o a terzi, decisioni non
-  prese, esclusioni di perimetro. Tipo = Vincolo | Assunzione | Esclusione |
-  Open Point. Non riportare i punti interni già chiusi.
+  prese, esclusioni di perimetro. Non riportare i punti interni già chiusi.
+  Formato:
+  - Id numerico 1..n, citato nel testo come "Open Point n" (o "vincolo n",
+    "assunzione n");
+  - Tipo = Vincolo | Assunzione | Esclusione | Open Point, in quest'ordine;
+  - gli Open Point sono ordinati per interlocutore (partner, cliente, SDA,
+    team), così ognuno trova i suoi in un blocco;
+  - Riferimento = "<sezione>; <interlocutore>";
+  - niente codici interni PA-nn / DF-nn;
+  - un'esclusione di perimetro non ancora confermata resta Esclusione, con
+    "da confermare" nel testo;
+  - i rilievi su sistemi esistenti di altri team sono un Open Point verso il
+    loro responsabile, più un N.B. nella sezione che li usa.
 - **Obiettivo dell'iniziativa**: l'esigenza di business in prosa (perché
   serve), poi gli obiettivi in elenco. Mezza pagina.
 - **Soluzione**: apre con una frase che elenca i temi trattati (elenco
@@ -99,9 +124,17 @@ in Reply v1.0. Altrimenti si usa `# Soluzione` per fasi, come in SI.
   del cliente e serve tracciarla, va bene "In data gg/mm/aaaa è stato deciso…"
   (stile Reply, Req 10).
 - Il "N.B." si usa per vincoli transitori o di convivenza col legacy.
+- **Livello di dettaglio.** Nella SF vanno ciò che vede chi integra o
+  approva: interfacce e contratti verso altri sistemi (topic, chiave, schema
+  del messaggio), stati di business, regole funzionali, comportamento in caso
+  di errore. Restano nel documento di sviluppo: parametri di esecuzione
+  (cadenze, numero di tentativi, timeout), stati tecnici interni
+  dell'esecuzione, header tecnici come `traceparent`, nomi di collezioni e
+  classi. Una frase di sintesi ("lo scarico è periodico e non viene ripetuto
+  automaticamente") sostituisce il parametro.
 - Lunghezza: quanto serve al cliente per approvare. Per un'iniziativa a tre
-  microservizi sono 6–12 pagine, non 40. Rimanda agli allegati per i mapping
-  campo per campo.
+  microservizi sono 6–12 pagine **di corpo**, esclusa la tabella degli Open
+  Point. Rimanda agli allegati per i mapping campo per campo.
 
 ## Regole sui buchi
 
@@ -113,8 +146,10 @@ in Reply v1.0. Altrimenti si usa `# Soluzione` per fasi, come in SI.
   di…") e ha la sua riga di Open Point.
 - Dati di produzione (nomi, indirizzi, CF, P.IVA) mai, nemmeno negli esempi
   di DTO: si usano valori fittizi evidenti.
-- Le figure (architettura, sequence) sono drawio del team: nel master metti
-  `![Figura n: <didascalia>](<file>.png)`. Se il file non c'è, il generatore
+- Le figure (architettura, sequence) sono drawio del team, salvati in
+  `iniziative/<id>/documenti/fig-<n>-<slug>.drawio` con l'export
+  `fig-<n>-<slug>.png` accanto. Nel master metti
+  `![Figura n: <didascalia>](fig-<n>-<slug>.png)`. Se il file non c'è, il generatore
   lascia un segnaposto rosso. Descrivi comunque in testo o in tabella quello
   che la figura mostra: il documento deve reggere anche senza figura.
 
@@ -152,6 +187,9 @@ Markdown ammesso nel corpo (il generatore capisce solo questo): titoli
 `<br>`), blocchi ```, immagini `![..](..)`, didascalie `Figura n: …` /
 `Tabella n: …` su riga propria, `**grassetto**`, `*corsivo*`, `` `codice` ``.
 Niente Mermaid, HTML, note a piè di pagina o link markdown.
+Limiti del generatore: gli elenchi numerati sono testo "1. " (non numerazione
+Word) e gli elenchi annidati non sono supportati; usa una tabella se serve
+una struttura a due livelli.
 
 ## Prima di consegnare
 
