@@ -12,6 +12,8 @@ Etichette usate nel documento:
 - **[DECISO]**: decisione presa, con data e riferimento.
 - **[DA DECIDERE]**: scelta aperta, con proposta e default provvisorio.
 
+> **Stato 05-11**: client implementato da Amelia (`4cba024` su `feature/eurodis-base-implementation`, 34 test verdi), conforme a RF-01…RF-12 e AC-01…AC-13.
+>
 > **Cosa si sviluppa adesso** (Diego, 05-11): solo il **client verso EURODIS**, cioè le sezioni 3.1, 5 (RF-01…RF-12), 7.1, 8, 9 e 11.1.
 > Sorgente degli eventi SDA, traduzione nei codici EURODIS, persistenza e job (sezioni 3.2, 3.3, 4 e 6) sono **DA DECIDERE**. Finché non si decidono non si scrivono consumer né scheduler.
 
@@ -242,6 +244,7 @@ Metriche (Micrometer/Prometheus, tag comune `service=ce-eurodis-send-tracking`),
 | `eurodis_tracking_errori_eurodis_total` | counter | `codice` (codice errore EURODIS, `locale` per RF-06) |
 | `eurodis_tracking_warning_total` | counter | `codice` |
 | `eurodis_tracking_lotto_non_correlabile_total` | counter | — |
+| `eurodis_tracking_esito_non_coincidente_total` | counter | — (RF-09) |
 
 Span OpenTelemetry: uno per chiamata HTTP, kind CLIENT, nome `eurodis.send-tracking <endpoint>`. Attributi: `http.status_code`, `eurodis.eventi`, `eurodis.creati`, `eurodis.rifiutati`. Il tracing non deve mai far fallire l'invio (principio di `TraceUtil`).
 

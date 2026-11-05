@@ -69,7 +69,7 @@ mancante è infrastrutturale o di verifica in ambiente: verifica di avvio in svi
 | # | Rilievo | Esito | Chi |
 |---|---|---|---|
 | AS-23 | **Dockerfile** confrontato con adapter, orchestratore, mapper e send-tracking. In `-in` mancava `ENV password` (la build in pipeline non si sarebbe autenticata su Nexus), c'era `clean verify` invece di `clean package -DskipTests`, mancavano `--no-check-certificate` sull'agent Datadog, l'aggiornamento dei pacchetti runtime e l'utente 185 | ✅ allineato all'adapter (`db9a56a`) | — |
-| AS-24 | Dockerfile degli altri due servizi (da sistemare quando si lavora su di loro). **Mapper**: niente download dell'agent Datadog, `clean package` con i test. **send-tracking**: tutt'altro modello (JDK 21, `COPY docker .`, nessun `settings.xml` con credenziali, utente 1001): così non builda | media | Amelia |
+| AS-24 | Dockerfile degli altri due servizi. **Mapper**: niente download dell'agent Datadog, `clean package` con i test. **send-tracking**: il 05-11 azzurrazezza era già passata a JDK 17 (`58ff5f2`), ma mancavano `ENV password`, `-DskipTests`, `--no-check-certificate`, l'aggiornamento dei pacchetti e l'utente 185 | send-tracking ✅ allineato (`4cba024`, 05-11); mapper da sistemare | Amelia |
 
 ## Per andare in svil (aggiornato 04-11 con le risposte di Diego)
 
