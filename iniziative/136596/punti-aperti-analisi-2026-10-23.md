@@ -123,3 +123,11 @@ sono nella specifica [sviluppo/ce-dichiarato-eurodis-mapper.md](sviluppo/ce-dich
 |---|---|---|---|---|
 | DF-02 | alta | **Evidenza**: in TEST `consignorsColloBarcode` arriva vuoto, `europlateBarcode` ha 24 cifre. Con la decisione del 22-10 `collo.id_ldv` esce vuoto | resta `consignorsColloBarcode` | Diego / Marzilli |
 | DF-30 | alta | `consigneeAddress` (e `shipperAddress`) a `null` in TEST, c'è solo `returnAddress`. Cap e località del destinatario sono obbligatori per ICD e BEP. Si pubblica, si scarta, o il destinatario sta altrove? Lo swagger dichiara tutti gli indirizzi `nullable` senza spiegare quando | si pubblica con campi vuoti e una metrica; `returnAddress` non si usa | Diego / Chiapponi (EURODIS) |
+
+## Decisioni di Diego del 06-11
+
+| ID | Decisione | Stato |
+|---|---|---|
+| DF-02 | `consignorsColloBarcode` è la LDV del collo (`collo.id_ldv`), `europlateBarcode` è la LDV internazionale (`internazionale.id_ldv_itz`). Confermata la decisione del 22-10. Il valore vuoto in TEST è un problema dei dati di test: si chiede a EURODIS di valorizzarlo (PA-29) | chiuso |
+| DF-12, DF-27 | Codici nazione: il mapper chiama `ce-anagrafica` (`/anagrafica/indirizzi/nazione/{ISO2}`) come `ce-dichiarato-adapter` e valorizza ISO3 in `codice_nazione`, ISO4 in `codice_nazione_poste`, ISO2 in `codice_nazione_iso_2` e `nazione`. Supera la regola del 23-10 "solo `codice_nazione_iso_2`". Il ms sync riceve l'ISO4 già risolto | chiuso |
+| DF-30 | Il destinatario deve essere presente: senza `consigneeAddress`, o senza cap o località, la spedizione è non mappabile e non si pubblica | chiuso |

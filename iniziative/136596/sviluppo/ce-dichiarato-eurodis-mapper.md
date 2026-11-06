@@ -1,6 +1,6 @@
 # `ce-dichiarato-eurodis-mapper` — Documento funzionale per lo sviluppo
 
-**Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.1 (bozza) · **Data**: 2026-11-05
+**Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.2 (bozza) · **Data**: 2026-11-06
 **Autore**: Mary (analyst) · **Destinatario**: Amelia (dev) e team di sviluppo
 **Repository**: https://posteitaliane.ghe.com/SVILUPPO/CORRIERE-ESPRESSO_PREADVISING_ce-dichiarato-eurodis-mapper
 **Generato da**: [prompt-ce-dichiarato-eurodis-mapper.md](prompt-ce-dichiarato-eurodis-mapper.md)
@@ -32,8 +32,9 @@ niente; il ms sync a valle non conosce EURODIS.
 **Cosa non fa**
 - Non scarica da EURODIS e non tiene lo storico: lo fa `-in`.
 - **Non filtra i duplicati** **[DECISO 04-11]**: si filtra a valle.
-- Non chiama F1 né ce-rules finché non si decide dove avviene l'enrichment
-  (PA-33): i dati di cliente e contratto arrivano da configurazione (sezione 8).
+- Non chiama F1 né ce-rules **[DECISO 06-11]**: i dati di cliente e contratto
+  arrivano da configurazione per ambiente (sezione 8). Chiama invece
+  `ce-anagrafica` per i codici nazione, come `ce-dichiarato-adapter` (sezione 6.4).
 - Non mappa, in questa fase, dogana, ADR, assicurazione, ritiro e pickup, Punto
   Poste (sezione 6.10).
 - Non risponde a EURODIS: non esiste un canale di rifiuto (PA-08).
@@ -50,7 +51,11 @@ flowchart LR
 
 **[FATTO]** Il ms sync (`ce-dichiarato-ldv-pdb-sync`) è in test e ha
 osservazioni aperte che toccano i nostri dati: paese ISO4 non risolto, nessun
-default per peso e dimensioni, nessun troncamento (PA-30, DF-26, DF-27).
+default per peso e dimensioni, nessun troncamento (PA-30, DF-26, DF-27). L'ISO4
+glielo passiamo già risolto noi (sezione 6.4).
+
+Dipendenza sincrona: `ce-anagrafica` (namespace `corriere-espresso-preadvising`),
+`GET /anagrafica/indirizzi/nazione/{codice}`.
 
 ## 3. Interfacce
 
@@ -126,14 +131,16 @@ sequenceDiagram
 | RF-03 | Il corpo si legge con DTO tolleranti: proprietà sconosciute ignorate, oggetti e liste `null` gestiti senza eccezioni. `collis: null` dà `collo: []`, non NullPointerException (bug della verifica del 04-11). |
 | RF-04 | Nessun troncamento **[DECISO 22-10, PA-16]**: ogni valore passa intero, anche oltre la dimensione ICD. |
 | RF-05 | Forma del tracciato come nella sezione 3.2. |
-| RF-06 | Messaggio non mappabile (corpo non JSON, `edReference` assente o non intero) → recoverer (sezione 7), nessuna pubblicazione. **Ogni altra mancanza non blocca**: si pubblica con `""`/`0`, con un warning e una metrica per campo (RF-07). La validazione di business è a valle (PA-32, da confermare). |
-| RF-07 | Obbligatori per BEP, controllati dopo il mapping: `destinatario.cap`, `destinatario.localita`, `data_spedizione`, `collo[].id_ldv`, `collo[].peso`. Se vuoti: warning con il **nome** del campo (mai il valore) e metrica `eurodis_mapper_campo_mancante_total{campo}`. |
+| RF-06 | Messaggio non mappabile (corpo non JSON, `edReference` assente o non intero, **destinatario assente**: RF-14) → recoverer (sezione 7), nessuna pubblicazione. **Ogni altra mancanza non blocca**: si pubblica con `""`/`0`, con un warning e una metrica per campo (RF-07). La validazione di business è a valle (PA-32, da confermare). |
+| RF-07 | Obbligatori per BEP, controllati dopo il mapping: `data_spedizione`, `collo[].id_ldv`, `collo[].peso`. Se vuoti: warning con il **nome** del campo (mai il valore) e metrica `eurodis_mapper_campo_mancante_total{campo}`. |
 | RF-08 | `id_preadvising` = `UUID.randomUUID()` a ogni elaborazione **[DECISO 22-10]**. Una rielaborazione produce un secondo preadvising con lo stesso `rif_spedizione`: la deduplica è a valle (MAP-2). |
 | RF-09 | Date e ore si prendono **come arrivano**, senza conversioni di fuso (PA-27: fuso orario non dichiarato). Con o senza `Z` finale, il risultato è lo stesso. |
 | RF-10 | Pesi: kg → grammi (×1000), arrotondamento `HALF_UP` all'intero. |
 | RF-11 | Header mancanti: i campi derivati restano `""`, warning, si pubblica. |
 | RF-12 | Nessun dato personale nei log: solo `edReference`, `idEsecuzione`, esito, nomi dei campi mancanti. |
 | RF-13 | Nessun riferimento a PA/DF o a documenti di analisi nei commenti del codice (MAP-7): le regole aperte stanno in questo documento. |
+| RF-14 | **Il destinatario deve essere presente** **[DECISO 06-11, Diego, DF-30]**: `consigneeAddress` assente, oppure `zipcode` o `city` vuoti (obbligatori per ICD e BEP) → messaggio **non mappabile**, motivo `destinatario_assente`. `returnAddress` non lo sostituisce. |
+| RF-15 | Errore o risposta vuota di `ce-anagrafica` non blocca: i codici restano quelli della sezione 6.4, errore sullo span, avviso `anagrafica_ko`, si pubblica. Come `ce-dichiarato-adapter`. |
 
 ## 6. Regole di mapping
 
@@ -161,7 +168,7 @@ dice `""`/`0` il campo è presente ma vuoto finché il punto non si chiude.
 
 | Campo ICD | Sorgente | Regola | Rif. |
 |---|---|---|---|
-| `id_cliente`, `codice_login_cliente`, `codice_auc` | config `mapper.cliente.codice` | default `""` | [DA DECIDERE PA-10, PA-33] da F1; finché PA-33 è aperto, costante di configurazione per ambiente |
+| `id_cliente`, `codice_login_cliente`, `codice_auc` | config `mapper.cliente.codice` | default `""` | **[DECISO 06-11]** costante di configurazione per ambiente, niente chiamata a F1 (PA-33) |
 | `codice_contratto` | config `mapper.cliente.codice-contratto` | default `""` | idem; il ms sync ha un fallback (S7) |
 | `ragione_sociale` | `shipperAddress.companyName` | diretto | |
 | `no_firma` | `deliveryService.deliveryType` | `S` → `"N"`; `N` → `"S"`; altro o assente → `""` | commento Diego 23-10 |
@@ -204,11 +211,30 @@ dice `""`/`0` il campo è presente ma vuoto finché il punto non si chiude.
 | `cap` | `zipcode` | diretto (CAP esteri ammessi) |
 | `localita` | `city` | diretto |
 | `provincia` | `region` | solo se `countryCode` = `IT` e `region` è una sigla di 2 lettere (maiuscolo); altrimenti `""` (PA-22) |
-| `codice_nazione_iso_2` | `countryCode` | diretto |
-| `codice_nazione`, `nazione`, `codice_nazione_poste` | — | `""` **[DECISO 23-10, Diego]**: `countryCode` va solo in `codice_nazione_iso_2`. Vedi domanda 3 |
+| `nazione` | `countryCode` | diretto (ISO2), come fa l'adapter |
+| `codice_nazione_iso_2` | `countryCode`, poi `ce-anagrafica` | diretto; sovrascritto da `codNazione2` se `ce-anagrafica` risponde |
+| `codice_nazione` | `ce-anagrafica` → `codNazione` | ISO3 (es. `DEU`); `""` se `ce-anagrafica` non risponde |
+| `codice_nazione_poste` | `ce-anagrafica` → `codNazionePoste` | ISO4 Poste (es. `ITA1`); `""` se `ce-anagrafica` non risponde |
 | `note1`, `note2` | `additionalAddressInfo1`, `additionalAddressInfo2` | diretto, intero |
 
-`shipperAddress` assente → tutti i campi `""`.
+`shipperAddress` assente → tutti i campi `""`, nessuna chiamata a `ce-anagrafica`.
+
+**Codici nazione da `ce-anagrafica`** **[DECISO 06-11, Diego]**. Sostituisce la
+regola del 23-10 "solo `codice_nazione_iso_2`" (DF-12, DF-27). Si fa come
+`ce-dichiarato-adapter` (`PdbMapper`, `AnagraficaClient.getCodiciNazione`):
+
+- `GET {client.anagrafica.base-url}/anagrafica/indirizzi/nazione/{countryCode}`:
+  una chiamata per il mittente e una per il destinatario, solo se `countryCode`
+  non è vuoto.
+- **[FATTO]** dal codice di `ce-anagrafica` (`IndirizziRepository.getCodNazione`):
+  - accetta un codice di 2 (ISO2), 3 o 4 caratteri;
+  - risponde `{ "codNazione": ISO3, "codNazionePoste": ISO4, "codNazione2": ISO2 }`;
+  - con un codice sconosciuto risponde 200 senza corpo; con un codice vuoto `400`.
+- Ogni chiamata ha uno span figlio (`getCodiciNazioneMittente`,
+  `getCodiciNazioneDestinatario`), come nell'adapter.
+- Errore, timeout o corpo vuoto: RF-15.
+- `RestTemplate` con pool di connessioni e timeout di connessione e lettura,
+  come `AppConfig` dell'adapter. Nessun retry: il messaggio si pubblica comunque.
 
 ### 6.5 Destinatario (`spedizione.destinatario`) da `consigneeAddress`
 
@@ -217,18 +243,17 @@ Stesse regole del mittente, sugli stessi campi, più:
 | Campo ICD | Regola |
 |---|---|
 | `prefisso_cellulare` | `""`: `contactSMS` va tutto in `cellulare` (commento Diego 23-10) |
-| `cap`, `localita` | obbligatori ICD e BEP: controllati da RF-07 |
+| `cap`, `localita` | obbligatori: se vuoti, RF-14 |
+| codici nazione | come per il mittente, da `ce-anagrafica` |
 
-`consigneeAddress` assente → tutti i campi `""`, warning e metrica
-`campo_mancante{campo=destinatario.cap|destinatario.localita}`, **si pubblica**.
-`returnAddress` **non** si usa al posto del destinatario: è l'indirizzo di
-rientro. **[DA DECIDERE DF-30]**: vedi domanda 2.
+`consigneeAddress` assente → **non mappabile** (RF-14). `returnAddress` non si
+usa al posto del destinatario: è l'indirizzo di rientro.
 
 ### 6.6 Colli (`spedizione.collo[]`): un elemento per ogni `collis[]`, nello stesso ordine
 
 | Campo ICD | Sorgente | Regola | Rif. |
 |---|---|---|---|
-| `id_ldv` | `consignorsColloBarcode` | diretto; `""` se assente | **[DECISO 22-10]**. **[FATTO 05-11]** in TEST arriva vuoto: domanda 1 (DF-02) |
+| `id_ldv` | `consignorsColloBarcode` | diretto; `""` se assente, con metrica (RF-07) | **[DECISO 22-10, confermato 06-11]**. `europlateBarcode` non la sostituisce: va solo in `internazionale.id_ldv_itz`. **[FATTO 05-11]** in TEST arriva vuoto: si chiedono a EURODIS dati di test con il campo valorizzato (PA-29) |
 | `numero_colli_parz` | posizione | 1..n | |
 | `peso` | `weightOfUnit` | ×1000 (RF-10); `0` se assente | |
 | `lunghezza` | `length` | diretto, cm; `0` se assente | |
@@ -241,7 +266,7 @@ rientro. **[DA DECIDERE DF-30]**: vedi domanda 2.
 
 | Campo ICD | Sorgente | Regola | Rif. |
 |---|---|---|---|
-| `id_ldv_itz` | `collis[].europlateBarcode` | il primo non vuoto e diverso da `"0"` | **[DECISO 22-10]**; con più colli, default di DF-03; `"0"` è il neighbourhood business (DF-18) |
+| `id_ldv_itz` | `collis[].europlateBarcode` | il primo non vuoto e diverso da `"0"` | **[DECISO 22-10, confermato 06-11]**; con più colli, default di DF-03; `"0"` è il neighbourhood business (DF-18) |
 | `peso` | `shipmentWeight` | ×1000 (RF-10) | |
 | `vettore` | — | `"EURODIS"` | |
 | `descrizione`, `valuta`, `valore_spedizione` | `customsService` | `""` / `0` in fase 1 | sezione 6.10 |
@@ -256,7 +281,7 @@ contrassegno non arriva a PDB.
 **[DA DECIDERE PA-03]** Diego (23-10) ha indicato ce-rules da `id_ldv` per
 prodotto e servizi e ha lasciato aperti i codici servizi. La proposta del 29-10
 li valorizza nel mapper. **Default di fase 1**: valorizzati secondo la tabella,
-disattivabili con `mapper.codici-servizi.abilitati=false` (domanda 4).
+disattivabili con `mapper.codici-servizi.abilitati=false` (domanda 1).
 
 Stringa di codici separati da `|`: prima il servizio di consegna, poi il
 contrassegno. Vuota (`""`) se non c'è nessun servizio.
@@ -308,7 +333,9 @@ Spring, cioè 9 tentativi senza attesa, poi log e salto del messaggio (MAP-3).
 |---|---|---|---|
 | Corpo non JSON | non mappabile, niente tentativi | `eurodis_mapper_spedizioni_total{esito=non_mappabile}`, ERROR senza payload | DLT se configurata; altrimenti ripubblicazione da `-in` (`eurodis.in.ripubblica.ed-references`, env `EURODIS_RIPUBBLICA_ED_REFERENCES`) |
 | `edReference` assente o non intero | come sopra | idem | idem |
-| Spedizione incompleta (destinatario, data, LDV, peso) | **si pubblica** (RF-06) | `campo_mancante{campo}`, WARN | a valle |
+| Destinatario assente, o senza cap o località (RF-14) | non mappabile, niente tentativi | `esito=non_mappabile`, `motivo=destinatario_assente`, WARN | correzione lato EURODIS, poi ripubblicazione da `-in` |
+| `ce-anagrafica` in errore o lenta | si pubblica senza ISO3/ISO4 (RF-15) | avviso `anagrafica_ko`, errore sullo span | nessuno: il dato arriva incompleto a valle |
+| Spedizione incompleta (data, LDV, peso) | **si pubblica** (RF-06) | `campo_mancante{campo}`, WARN | a valle |
 | Kafka in uscita non disponibile, timeout | eccezione → `DefaultErrorHandler` con backoff (default 3 tentativi, 2 s), poi recoverer | `esito=errore_tecnico`, ERROR | offset non committato durante i tentativi; dopo, DLT o ripubblicazione da `-in` |
 | Errore inatteso nel mapping | come Kafka giù | idem | idem |
 
@@ -324,7 +351,7 @@ Proposta: `preadvising.eud.pre.build.DLT`, da far creare se si decide.
 | `kafka.producer.topic.output` | `KAFKA_TOPIC_OUTPUT` | `preadvising.pre-enrichment` | esistente |
 | `mapper.canale` | `MAPPER_CANALE` | `EUD_INVIOSYSTEM` | deciso 05-11 |
 | `mapper.id-partner` | `MAPPER_ID_PARTNER` | `EURODIS` | PA-15 |
-| `mapper.cliente.codice` | `MAPPER_CLIENTE_CODICE` | `""` | → `id_cliente`, `codice_login_cliente`, `codice_auc` |
+| `mapper.cliente.codice` | `MAPPER_CLIENTE_CODICE` | `""` | → `id_cliente`, `codice_login_cliente`, `codice_auc`. **[DECISO 06-11]** da configurazione per ambiente; valori da ricevere |
 | `mapper.cliente.codice-contratto` | `MAPPER_CLIENTE_CONTRATTO` | `""` | |
 | `mapper.centro-costo` | `MAPPER_CENTRO_COSTO` | `""` | |
 | `mapper.rif-prodotto-cliente` | `MAPPER_RIF_PRODOTTO_CLIENTE` | `""` | |
@@ -332,6 +359,8 @@ Proposta: `preadvising.eud.pre.build.DLT`, da far creare se si decide.
 | `mapper.consegna.separatore-note` | — | `" "` | |
 | `mapper.dlt.topic` | `MAPPER_DLT_TOPIC` | `""` | PA-32 |
 | `mapper.errori.tentativi`, `mapper.errori.attesa-ms` | — | `3`, `2000` | backoff dell'error handler |
+| `client.anagrafica.base-url` | `ANAGRAFICA_URL` | `http://ce-anagrafica.corriere-espresso-preadvising.svc.cluster.local:8080` | come l'adapter |
+| `client.anagrafica.connect-timeout-ms`, `read-timeout-ms` | — | `2000`, `3000` | proposta |
 
 Producer: `acks=all`, `enable.idempotence=true`, invio sincrono. Consumer:
 `ack-mode: record`, `enable-auto-commit: false`. Sono già così.
@@ -345,9 +374,9 @@ Modello: `ce-dichiarato-adapter` e `ce-dichiarato-eurodis-in` (`TraceUtil`,
 | Metrica | Tag | Significato |
 |---|---|---|
 | `kafka_message_consumed_total`, `…_ok`, `…_ko`, `…_errore_tecnico` | — | esistenti, si tengono |
-| `eurodis_mapper_spedizioni_total` | `esito` = `pubblicata`, `non_mappabile`, `errore_tecnico` | esito per messaggio |
+| `eurodis_mapper_spedizioni_total` | `esito` = `pubblicata`, `non_mappabile`, `errore_tecnico`; `motivo` per i non mappabili (`json`, `ed_reference`, `destinatario_assente`) | esito per messaggio |
 | `eurodis_mapper_campo_mancante_total` | `campo` | RF-07 |
-| `eurodis_mapper_avvisi_total` | `motivo` = `colli_incoerenti`, `fallback_data`, `valuta_non_eur`, `tipo_cod_sconosciuto`, `header_mancante` | regole con warning |
+| `eurodis_mapper_avvisi_total` | `motivo` = `colli_incoerenti`, `fallback_data`, `valuta_non_eur`, `tipo_cod_sconosciuto`, `header_mancante`, `anagrafica_ko` | regole con warning |
 | `eurodis_mapper_durata_seconds` | — | timer dall'ingresso alla pubblicazione |
 
 Span: `eurodis.mapper.elabora`, figlio del `traceparent` di `-in`, con
@@ -356,7 +385,7 @@ uscita. MDC: `ed_reference`, `id_esecuzione`, `partition`, `offset`.
 
 Alert Datadog: rimandati come per `-in` (AS-19). Proposta da tenere pronta:
 `non_mappabile` > 0, `errore_tecnico` > 0 per 10 minuti,
-`campo_mancante{campo=destinatario.cap}` in crescita.
+`non_mappabile{motivo=destinatario_assente}` in crescita, `anagrafica_ko` > 0.
 
 ## 10. Requisiti non funzionali
 
@@ -370,8 +399,11 @@ Alert Datadog: rimandati come per `-in` (AS-19). Proposta da tenere pronta:
 
 ## 11. Criteri di accettazione
 
-**AC-01 — esempio TEST del 05-11.** Given il corpo
-`esempio-eurodis-spedizione.json` con header `idEsecuzione=E1`,
+**AC-01 — esempio TEST del 05-11, con destinatario.** Given il corpo
+`esempio-eurodis-spedizione.json` in cui `consigneeAddress` (null nell'originale)
+è sostituito da un indirizzo inventato:
+`{"companyName": "Destinatario Prova", "contactName": "Mario Prova", "contactSMS": "+390000000001", "street": "Via di Prova", "streetNumber": "1", "zipcode": "40121", "city": "BOLOGNA", "countryCode": "IT", "additionalConsigneeInfo": "Citofono 1"}`,
+`ce-anagrafica` simulato che per `IT` risponde `ITA` / `ITA1` / `IT`, header `idEsecuzione=E1`,
 `ricevutoIl=2026-11-05T09:14:02.123Z`, `rifGrezzo=eurodis_scarichi/E1` e
 configurazione di default. When il mapper lo elabora. Then pubblica, con
 chiave `7319003746401`, un tracciato con la forma della sezione 3.2 e questi
@@ -402,10 +434,15 @@ valori (gli altri campi `""`/`0`):
     "data_spedizione": "2024-03-29",
     "ora_spedizione": "06:53:55",
     "mittente": { "ragione_sociale": "", "codice_nazione_iso_2": "" },
-    "destinatario": { "cap": "", "localita": "", "codice_nazione_iso_2": "" },
+    "destinatario": {
+      "ragione_sociale": "Destinatario Prova", "rif_contatto": "Mario Prova", "cellulare": "+390000000001",
+      "indirizzo": "Via di Prova", "numero_civico": "1", "cap": "40121", "localita": "BOLOGNA", "provincia": "",
+      "nazione": "IT", "codice_nazione_iso_2": "IT", "codice_nazione": "ITA", "codice_nazione_poste": "ITA1",
+      "prefisso_cellulare": ""
+    },
     "internazionale": { "id_ldv_itz": "123459000003770904301090", "peso": 15000, "vettore": "EURODIS" },
     "contrassegno": { "flag": "S", "importo_contrassegno": 1111.50, "tipo_pagamento_contrassegno": "CON" },
-    "consegna": { "data_consegna": "2024-04-01", "inizio_ora_consegna": "08:00", "fine_ora_consegna": "18:00", "note": "" },
+    "consegna": { "data_consegna": "2024-04-01", "inizio_ora_consegna": "08:00", "fine_ora_consegna": "18:00", "note": "Citofono 1" },
     "collo": [{
       "id_ldv": "", "numero_colli_parz": 1, "peso": 15000,
       "lunghezza": 33, "altezza": 55, "profondita": 44, "codice_imballo": "CL"
@@ -414,13 +451,19 @@ valori (gli altri campi `""`/`0`):
 }
 ```
 
-E la metrica `campo_mancante` cresce per `destinatario.cap`,
-`destinatario.localita` e `collo[].id_ldv`.
+E la metrica `campo_mancante` cresce per `collo[].id_ldv`; nessuna chiamata a
+`ce-anagrafica` per il mittente (`shipperAddress` null).
+
+**AC-01b — esempio TEST del 05-11 così com'è** (`consigneeAddress` null). Then
+non mappabile, motivo `destinatario_assente`, nessuna pubblicazione (RF-14).
 
 | # | Given | When | Then |
 |---|---|---|---|
 | AC-02 | `collis: null` | elaborazione | pubblica con `collo: []`, nessuna eccezione, `campo_mancante` per `collo[].id_ldv` e `collo[].peso` |
-| AC-03 | `consigneeAddress` completo con `streetNumber` di 40 caratteri | elaborazione | destinatario valorizzato, civico intero (RF-04), `codice_nazione` vuoto |
+| AC-03 | `consigneeAddress` completo con `streetNumber` di 40 caratteri | elaborazione | destinatario valorizzato, civico intero (RF-04) |
+| AC-03b | `consigneeAddress` con `zipcode` vuoto | elaborazione | non mappabile, motivo `destinatario_assente` |
+| AC-03c | `ce-anagrafica` risponde 500, oppure 200 senza corpo | elaborazione | pubblicato, `codice_nazione_iso_2` = `countryCode`, `codice_nazione` e `codice_nazione_poste` vuoti, avviso `anagrafica_ko` |
+| AC-03d | mittente `DE`, destinatario `IT` | elaborazione | due chiamate a `ce-anagrafica`, mittente `DEU` / `DEU1`, destinatario `ITA` / `ITA1` (valori del simulatore) |
 | AC-04 | `entranceTimestamp` assente, `clearanceTimestamp` = `2024-03-28T10:00:00Z` | elaborazione | `data_spedizione` `2024-03-28`, `ora_spedizione` `10:00:00`, avviso `fallback_data` |
 | AC-05 | `deliveryType` `N` / `S` / `D` | elaborazione | `no_firma` `"S"` / `"N"` / `""` |
 | AC-06 | `deliveryService` `6` + contrassegno | elaborazione | `codici_servizi` = `APT000910\|APT000918` |
@@ -438,11 +481,9 @@ E la metrica `campo_mancante` cresce per `destinatario.cap`,
 
 | Punto | Default per partire | Quando arriva la risposta | Rif. |
 |---|---|---|---|
-| LDV del collo vuota in TEST | resta `consignorsColloBarcode` | si cambia la sorgente di `collo.id_ldv` | DF-02, DF-29 |
-| Destinatario assente | si pubblica con campi vuoti | eventuale scarto o altra sorgente | DF-30 |
-| Codice nazione | solo `codice_nazione_iso_2` | eventuale copia in `codice_nazione` o ISO4 | DF-12, DF-27 |
+| LDV del collo vuota in TEST | `consignorsColloBarcode` (confermato 06-11) | EURODIS manda dati di test con il campo valorizzato | DF-02, DF-29, PA-29 |
 | Codici servizi | tabella 6.8, disattivabile | si toglie o si completa la tabella | PA-03, DF-05, DF-21 |
-| Cliente, contratto, centro di costo, prodotto | configurazione, default vuoti | valori da F1 o costanti di contratto | PA-10, PA-33, DF-11 |
+| Valori di cliente, contratto, centro di costo, prodotto | configurazione per ambiente (deciso 06-11), default vuoti | si impostano i valori per svil, coll, prod | PA-10, PA-33, DF-11 |
 | Data spedizione senza `entranceTimestamp` | `clearanceTimestamp` | si toglie il fallback o si scarta | DF-01 |
 | Contrassegno: valuta e tipo | si mappa tutto, warning | eventuale scarto | DF-24 |
 | Messaggi non mappabili | DLT disattivata, log ERROR | si configura il topic | PA-32 |
@@ -459,21 +500,20 @@ E la metrica `campo_mancante` cresce per `destinatario.cap`,
 - `accessori-eurodis-pdb-proposta.md`, `analisi.md`, `punti-aperti-analisi-2026-10-23.md`.
 - `esempio-eud-inviofile.json`, `esempio-eurodis-spedizione.json`, `eurodis-receive-pan-swagger-v1.json`.
 
+## Decisioni di Diego del 06-11
+
+1. LDV: `consignorsColloBarcode` → `collo.id_ldv`; `europlateBarcode` →
+   `internazionale.id_ldv_itz`. Confermata la decisione del 22-10 (DF-02).
+2. Il destinatario deve essere presente: altrimenti non mappabile (RF-14, DF-30).
+3. Codici nazione: il mapper chiama `ce-anagrafica` come `ce-dichiarato-adapter`
+   (sezione 6.4; DF-12, DF-27).
+4. Cliente e contratto da configurazione per ambiente (PA-33).
+
 ## Domande per Diego
 
-1. **LDV del collo.** Nella spedizione TEST `consignorsColloBarcode` è vuoto,
-   quindi `collo.id_ldv` esce vuoto; `europlateBarcode` invece ha 24 cifre. Si
-   resta sulla decisione del 22-10, oppure `europlateBarcode` diventa anche la
-   LDV del collo? (DF-02, DF-29)
-2. **Destinatario assente.** In TEST `consigneeAddress` è `null`, e cap e
-   località sono obbligatori per BEP. Pubblichiamo comunque, come da default,
-   o scartiamo? `returnAddress` va lasciato fuori? (DF-30)
-3. **Codice nazione.** Con la tua regola (solo `codice_nazione_iso_2`) il ms
-   sync legge `codice_nazione` vuoto. Copiamo l'ISO2 anche in `codice_nazione`,
-   come fa l'esempio EUD? (DF-12, DF-27)
-4. **Codici servizi.** Li valorizziamo nel mapper con la tabella 6.8 (default
+1. **Codici servizi.** Li valorizziamo nel mapper con la tabella 6.8 (default
    attivo), o aspettiamo ce-rules? Senza, il contrassegno non arriva a PDB. (PA-03)
-5. **Cliente e contratto.** Va bene passarli da configurazione per ambiente
-   finché non si decide l'enrichment F1? Se sì, servono i valori. (PA-33)
-6. **Data spedizione.** Se manca `entranceTimestamp` va bene `clearanceTimestamp`? (DF-01)
-7. **Scarti.** Creiamo la DLT `preadvising.eud.pre.build.DLT`? (PA-32)
+2. **Valori di configurazione.** Codice cliente, contratto, centro di costo e
+   prodotto per svil (e poi coll e prod): da chi li prendiamo? (PA-33, DF-11)
+3. **Data spedizione.** Se manca `entranceTimestamp` va bene `clearanceTimestamp`? (DF-01)
+4. **Scarti.** Creiamo la DLT `preadvising.eud.pre.build.DLT`? (PA-32)
