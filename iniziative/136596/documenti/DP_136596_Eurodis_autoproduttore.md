@@ -15,7 +15,7 @@ L'iniziativa ha lo scopo di prendere in carico le spedizioni del consorzio EUROD
 
 ## Business Architecture – Preadvising EURODIS autoproduttore
 
-![Figura 1: Business Architecture – Preadvising EURODIS autoproduttore](fig-1-business-architecture.png)
+![Figura 1: Business Architecture – Preadvising EURODIS autoproduttore](fig-1-architettura.png)
 
 | Processo | Fase | Sistema Applicativo (AP) / Applicazione (PK) | Ruolo dell'Applicativo | Impatto Applicativo (S/N) | Applicativo esistente o nuovo |
 |---|---|---|---|---|---|
@@ -37,7 +37,7 @@ Tabella 1: Business Architecture – Preadvising EURODIS autoproduttore
 
 Il dato nasce sulla piattaforma EURODIS e viene letto da `ce-dichiarato-eurodis-in`, che lo storicizza su MongoDB e lo pubblica, una spedizione per messaggio, sul topic `preadvising.eud.pre.build`. `ce-dichiarato-eurodis-mapper` lo converte nel tracciato unico e lo pubblica su `preadvising.pre-enrichment`, da cui la catena di preadvising esistente lo valida (`ce-dichiarato-validatore`) e lo porta fino a `ce-dichiarato-ldv-pdb-sync` e a PDB. Le tracce SDA tornano a EURODIS tramite `ce-eurodis-send-tracking`.
 
-![Figura 2: Information System Architecture – Preadvising EURODIS autoproduttore](fig-2-information-system-architecture.png)
+![Figura 2: Information System Architecture – Preadvising EURODIS autoproduttore](fig-2-flussi-dati.png)
 
 | Flusso dati | Descrizione |
 |---|---|
@@ -165,4 +165,4 @@ Tabella 10: Openshift Cloud
 | ICD_PREADVISING_LDV_EVENT_SOURCE_v11 | ICD v11 del tracciato unico preadvising, con il mapping EURODIS |
 | eurodis-receive-pan-swagger-v1 | Specifica OpenAPI dell'API EURODIS `receive-pan`, Release v1 |
 | eurodis-send-tracking-swagger-v1 | Specifica OpenAPI dell'API EURODIS `send-tracking`, Release v1 |
-| fig-1-business-architecture, fig-2-information-system-architecture | Schemi drawio delle Figure 1 e 2 (in preparazione) |
+| fig-1-architettura | Schema drawio della soluzione: pagina "Architettura" (Figura 1) e pagina "Flussi dati" (Figura 2) |

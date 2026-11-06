@@ -43,6 +43,11 @@ def taglia_corpo(doc):
                 taglio = True
         if taglio:
             body.remove(el)
+    # immagini del corpo tagliato: restano nel pacchetto se non si tolgono le relazioni
+    xml = doc.element.xml
+    for rid, rel in list(doc.part.rels.items()):
+        if "image" in rel.reltype and f'"{rid}"' not in xml:
+            del doc.part.rels[rid]
 
 
 def aggiorna_campi_all_apertura(doc):

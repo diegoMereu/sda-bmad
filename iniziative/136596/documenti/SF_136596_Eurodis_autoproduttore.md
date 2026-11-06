@@ -370,4 +370,4 @@ Ulteriori dettagli: per l'implementazione delle funzionalità sopra descritte vi
 | 1 | ICD | ICD v11 con il mapping EURODIS: fogli "Mapping EURODIS" (una riga per campo ICD), "Mapping inverso EURODIS" (una riga per campo EURODIS), "EURODIS non mappati", "Legenda mapping" | ICD_PREADVISING_LDV_EVENT_SOURCE_v11.xlsx |
 | 2 | Specifica API | Specifica OpenAPI dell'API EURODIS `receive-pan`, Release v1 | eurodis-receive-pan-swagger-v1.json |
 | 3 | Esempio | Tracciato unico del flusso EURODIS esistente, canale `EUD_INVIOFILE`, con dati di test | esempio-eud-inviofile.json |
-| 4 | Architettura | Schema architetturale della soluzione (Figura 1) | fig-1-architettura.drawio, in preparazione |
+| 4 | Architettura | Schema architetturale della soluzione (Figura 1) | fig-1-architettura.drawio |
