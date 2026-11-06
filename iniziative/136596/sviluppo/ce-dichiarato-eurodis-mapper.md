@@ -1,6 +1,6 @@
 # `ce-dichiarato-eurodis-mapper` — Documento funzionale per lo sviluppo
 
-**Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.2 (bozza) · **Data**: 2026-11-06
+**Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.3 (bozza) · **Data**: 2026-11-06
 **Autore**: Mary (analyst) · **Destinatario**: Amelia (dev) e team di sviluppo
 **Repository**: https://posteitaliane.ghe.com/SVILUPPO/CORRIERE-ESPRESSO_PREADVISING_ce-dichiarato-eurodis-mapper
 **Generato da**: [prompt-ce-dichiarato-eurodis-mapper.md](prompt-ce-dichiarato-eurodis-mapper.md)
@@ -71,7 +71,8 @@ Dipendenza sincrona: `ce-anagrafica` (namespace `corriere-espresso-preadvising`)
 | Header | Esempio | Uso nel mapper |
 |---|---|---|
 | `edReference` | `7319003746401` | log e MDC |
-| `idEsecuzione` | `6720f1a2b3c4d5e6f7a8b9c0` | → `id_file` |
+| `idEsecuzione` | `6720f1a2b3c4d5e6f7a8b9c0` | log e MDC |
+| `idFile` | `3f2b8c1e-5a7d-4c1b-9e2f-0a1b2c3d4e5f` | → `id_file`: id del file fittizio dello scarico, lo stesso degli eventi di stato su `preadvising.evensource` (specifica di `-in` 0.5, sezione 3.3) |
 | `ricevutoIl` | `2026-11-05T09:14:02.123Z` | → `upload_time`, `dataInizioFlusso`, `instantInizioFlusso` |
 | `fonte` | `receive-pan/shipments/v1` | log |
 | `rifGrezzo` | `eurodis_scarichi/6720f1a2b3c4d5e6f7a8b9c0` | → `link_file_fisico_inviato` |
@@ -158,7 +159,7 @@ dice `""`/`0` il campo è presente ma vuoto finché il punto non si chiude.
 | `id_canale` | — | `""` | [DA DECIDERE PA-15] |
 | `id_preadvising` | — | UUID | RF-08 |
 | `flag_autoproduttore` | — | `"S"` | |
-| `id_file` | header `idEsecuzione` | così com'è | **[DECISO 04-11]** una chiamata = un "file" |
+| `id_file` | header `idFile` | così com'è | **[DECISO 06-11]** id del file fittizio generato da `-in` per ogni scarico, uguale a quello degli eventi `ST_F0002`/`ST_F0005` |
 | `upload_time` | header `ricevutoIl` | così com'è (ISO-8601) | |
 | `dataInizioFlusso`, `instantInizioFlusso` | header `ricevutoIl` | così com'è | [DA DECIDERE] nessun header porta l'inizio dello scarico: default `ricevutoIl` |
 | `link_file_fisico_inviato` | header `rifGrezzo` | così com'è | |
@@ -403,7 +404,7 @@ Alert Datadog: rimandati come per `-in` (AS-19). Proposta da tenere pronta:
 `esempio-eurodis-spedizione.json` in cui `consigneeAddress` (null nell'originale)
 è sostituito da un indirizzo inventato:
 `{"companyName": "Destinatario Prova", "contactName": "Mario Prova", "contactSMS": "+390000000001", "street": "Via di Prova", "streetNumber": "1", "zipcode": "40121", "city": "BOLOGNA", "countryCode": "IT", "additionalConsigneeInfo": "Citofono 1"}`,
-`ce-anagrafica` simulato che per `IT` risponde `ITA` / `ITA1` / `IT`, header `idEsecuzione=E1`,
+`ce-anagrafica` simulato che per `IT` risponde `ITA` / `ITA1` / `IT`, header `idEsecuzione=E1`, `idFile=F1`,
 `ricevutoIl=2026-11-05T09:14:02.123Z`, `rifGrezzo=eurodis_scarichi/E1` e
 configurazione di default. When il mapper lo elabora. Then pubblica, con
 chiave `7319003746401`, un tracciato con la forma della sezione 3.2 e questi
@@ -417,7 +418,7 @@ valori (gli altri campi `""`/`0`):
   "id_canale": "",
   "id_preadvising": "<uuid>",
   "flag_autoproduttore": "S",
-  "id_file": "E1",
+  "id_file": "F1",
   "upload_time": "2026-11-05T09:14:02.123Z",
   "dataInizioFlusso": "2026-11-05T09:14:02.123Z",
   "instantInizioFlusso": "2026-11-05T09:14:02.123Z",
@@ -508,6 +509,7 @@ non mappabile, motivo `destinatario_assente`, nessuna pubblicazione (RF-14).
 3. Codici nazione: il mapper chiama `ce-anagrafica` come `ce-dichiarato-adapter`
    (sezione 6.4; DF-12, DF-27).
 4. Cliente e contratto da configurazione per ambiente (PA-33).
+5. `id_file` = header `idFile`, il file fittizio di `-in` che compare anche negli eventi di stato.
 
 ## Domande per Diego
 
