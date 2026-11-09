@@ -1,75 +1,54 @@
-# 136596 — Eurodis autoproduttore
+# 136596 — EURODIS Autoproduttore
 
-**Data**: 2026-11-04 · **Stato**: in_analisi · **Semaforo**: 🟡
+**Data**: 2026-11-09 · **Stato**: in_analisi · **Semaforo**: 🟡
 **Owner cliente**: Piergentili · **PRJ**: non ancora assegnato
 
 ## In una riga
-`ce-dichiarato-eurodis-in` implementato e pronto per il deploy in svil (da lanciare su Jenkins); mapper ancora parziale (~10 campi su 73), send-tracking da specificare. Restiamo in attesa della sintassi LDV (Marzilli) e delle risposte di EURODIS alle 13 domande e sui test integrati.
+EURODIS ha risposto alle 13 domande: quasi tutte le assunzioni sono confermate, ma restano da chiarire in call errori e rifiuti, fuso orario e rimando dei dati. `-in` è pronto per il deploy in svil, il mapper è parziale, go-live atteso a fine gennaio 2027.
 
 ## Fatto dall'ultimo punto
-- 2026-11-04 — Dockerfile di `-in` allineato a quello di `ce-dichiarato-adapter` (`db9a56a`): senza `ENV password` la build in pipeline non si sarebbe autenticata su Nexus. Quelli di mapper e send-tracking vanno sistemati (AS-24).
-- 2026-11-04 — **`ce-dichiarato-eurodis-in` implementato** (Amelia, `a53398c` su `feature/eurodis-base-implementation`, 53 test verdi): scarico in due fasi (run + esito HTTP + JSON grezzo su `eurodis_scarichi`; record per spedizione su `eurodis_spedizioni` con ora di invio ed esito), nessuna deserializzazione, nessun filtro duplicati, metriche e span sul modello di `ce-dichiarato-adapter`, job ogni 2 minuti. Specifica portata alla 0.4, assessment rifatto.
-- 2026-11-04 — Mapper: MAP-1 risolto (`flag_autoproduttore`, `versione_tracciato`, `progressivo`); verifica completa rispetto alle decisioni in `sviluppo/verifica-mapper-2026-11-04.md` (copre ~10 campi su 73, un bug su `collis` null).
-- 2026-11-02 — Ricognizione dei tre repository e `CLAUDE.md` in ciascuno (Amelia).
-- 2026-11-02 — Bozza 0.2 del documento funzionale di `ce-dichiarato-eurodis-in` (`sviluppo/`), da passare ad Amelia: 17 regole, 14 scenari di errore, 16 criteri di accettazione sul mock. Allineata al topic `preadvising.eud.pre.build` e al blueprint tecnico dei ms `ce-`.
-- 2026-11-02 — Regola di progetto: un documento funzionale per microservizio, con il suo prompt, in `iniziative/<id>/sviluppo/`.
-- 2026-10-30 — Architettura aggiornata: nuovo ms `ce-dichiarato-eurodis-mapper` (repo creato, solo scheletro). `eurodis-in` legge `receive-pan`, salva lo storico (probabilmente Mongo), scompone e pubblica su `preadvising.eud.pre.build`; il mapper consuma, converte nell'ICD e pubblica su `preadvising.pre-enrichment`. Analisi aggiornata: ripartizione delle responsabilità, PA-26 chiuso, nuovi PA-31…PA-33.
-- 2026-10-29 — Realizzato in Python un mock dell'API `receive-pan` (`mock-eurodis/`, 9 test verdi): configurabile per prodotto, con indirizzi e nazioni reali e dati generati, coda "consuma senza ack" come EURODIS, anomalie iniettabili per i test negativi.
-- 2026-10-29 — Chiesta a Marzilli (team) la sintassi delle LDV autoproduttore EURODIS: nel mock è provvisoria (11 cifre + check Luhn, inventata) e si cambia da configurazione.
-- 2026-10-29 — Servizi accessori EURODIS tradotti nel formato PDB (proposta da validare): sabato, sera, ore 10 e 12, appuntamento, Punto Poste, contrassegno. L'assicurazione risulta fuori perimetro.
-- 2026-10-29 — Mapping ICD rigenerato e registro aggiornato: nuovi dubbi funzionali DF-21…DF-29 e punti aperti PA-29 e PA-30.
-- 2026-10-29 — Letto il ms esistente `ce-dichiarato-ldv-pdb-sync` (in test): emerse osservazioni da segnalare al suo responsabile (canale, codici paese ISO4, default di peso e dimensioni).
-- 2026-10-29 — Inviata a Gianluca Chiapponi la mail per organizzare i test integrati su `receive-pan` (PA-29): scenari proposti da EURODIS, LDV valide e univoche, indirizzi e nazioni reali, modalità operative.
+- 2026-11-09 — **Risposte di EURODIS (via Chiapponi) e documento A03.2**: si riceve solo il non ancora ricevuto; modifiche e annullamenti non rilevano; nessun limite di chiamata; rilettura per `edReference` a 60 giorni; chiavi API senza rotazione; produzione = cambio di endpoint e chiave; dogana e ADR nel perimetro; rollout ibrido, settimana per settimana. Tutto in `assunzioni.md` (13 assunzioni, stato per ciascuna).
+- 2026-11-09 — **EURODIS chiede di non rifiutare le spedizioni** e di riprendere il suo sistema di errori e rifiuti (A03.2): la mail di scarto concordata oggi è da riconsiderare.
+- 2026-11-06 — Specifica di `-in` 0.5 (file fittizio per scarico, eventi ST_F0002/ST_F0005, header `idFile`) e del mapper 0.2/0.3 (LDV confermate, destinatario obbligatorio, codici nazione da `ce-anagrafica`, cliente da configurazione). Figure di SF e DP.
+- 2026-11-05 — SF 0.2 e DP 0.1 per il cliente; client di `ce-eurodis-send-tracking` implementato; canale `EUD_INVIOSYSTEM` confermato da Diego.
+- 2026-11-04 — `ce-dichiarato-eurodis-in` implementato (53 test verdi, `a53398c` su `feature/eurodis-base-implementation`); Dockerfile allineato.
 
 ## Prossimi passi
-- Lanciare su Jenkins `ce-dichiarato-eurodis-in-build` e poi `-deploy` (branch `feature/eurodis-base-implementation`, svil, scarico disabilitato) — Diego — da definire
-- Dopo il deploy: verifica di avvio con Mongo e Kafka veri, poi abilitare lo scarico e provare con EURODIS TEST — Amelia — subito dopo il deploy
-- Comunicare ad azzurrazezza la scelta di Spring Boot 3.5.14 — Diego — da definire
-- Sistemare i Dockerfile di mapper e send-tracking (AS-24) — Amelia — quando si lavora su di loro
-- Alert Datadog di `-in` (specifica, sezione 9) e conservazione delle collezioni (AS-21) — da assegnare — più avanti
-- Documenti funzionali di `ce-dichiarato-eurodis-mapper` e `ce-eurodis-send-tracking` — Mary — da definire
-- Decidere come il mapper gestisce i messaggi non mappabili (PA-32) e dove avviene l'enrichment F1 / ce-rules (PA-33) — Mary / Diego — da definire
-- Risposta di Marzilli sulla sintassi LDV, poi inserirla in `ldv_default` del mock — Marzilli / Paolo — da definire
-- Risposte alle 13 domande EURODIS — Chiapponi (Poste) — da definire
-- Risposta alla mail sui test integrati (scenari, date, modalità) — Chiapponi / EURODIS — da definire
-- Validare con Diego la proposta sui servizi accessori e i nuovi dubbi — Mary / Diego — da definire
-- Segnalare al responsabile del ms sync le osservazioni (PA-30) — da assegnare — da definire
-- Call con Tagliente (Poste) sulle repliche del ms di raccolta (PA-01) — da assegnare — da definire
-- Chiudere i dubbi di gravità alta sul mapping — Mary / Diego — da definire
+- Fissare la call con Chiapponi/EURODIS: errori e rifiuti (A03.2), come si chiede il rimando dei dati, rollout ibrido, `consigneeAddress` e LDV in produzione — Paolo — da fissare
+- Verificare il fuso orario sui dati EURODIS del flusso FTP — Paolo — da definire
+- Ricavare i volumi giornalieri dal flusso FTP — da assegnare — da definire
+- Lanciare su Jenkins `ce-dichiarato-eurodis-in-build` e `-deploy` (svil, scarico disabilitato), poi verifica con Mongo e Kafka veri — Diego / Amelia — da definire
+- Decidere se tenere una copia locale del grezzo e un interruttore di pubblicazione separato in `-in` — Diego / Amelia — da definire
+- Chiedere all'altro gruppo come consegnare gli scarti al ms di invio mail e come funziona `send-pod` — Paolo — da definire
+- Aggiornare i registri PA con le risposte di EURODIS (PA-05, 06, 09, 12, 13, 24, 27, 28) — Mary — da definire
+- Completare la specifica del mapper e di send-tracking; sistemare i Dockerfile (AS-24) — Mary / Amelia — da definire
+- Risposta di Marzilli sulla sintassi LDV — Marzilli — da definire
 
 ## Blocchi e rischi
+- 🟡 Errori e rifiuti: EURODIS dice di non rifiutare, ma non è chiaro cosa significhi «riprendere» il loro sistema; senza chiarimento non si chiude PA-32 né la mail di scarto.
+- 🟡 Perdita di un lotto tra la risposta HTTP e il salvataggio su Mongo: il recupero è un rimando totale su richiesta a EURODIS, ma il modo di chiederlo è da concordare.
 - 🟡 `-in` mai avviato con Mongo e Kafka veri: la prima verifica reale è il deploy in svil.
-- 🟡 La sintassi delle LDV non è nota: finché non arriva, il mock genera LDV inventate e non prova che SDA le accetti.
-- 🟡 Perimetro e PRJ non definiti: non si può stimare né pianificare.
-- 🟡 `receive-pan` non ha ack: se EURODIS considera consegnata una spedizione quando la restituisce, un errore prima del salvataggio la fa perdere. Da confermare con EURODIS (domanda 1).
-- 🟡 Esiste solo l'ambiente TEST: senza chiave e payload di produzione i campi opzionali restano non verificati.
-- 🟡 Il ms `ce-dichiarato-ldv-pdb-sync` è ancora in fase di test e può contenere bug: alcune osservazioni toccano i nostri dati (paese, peso e dimensioni).
-- 🟡 Diversi dubbi funzionali di gravità alta ancora aperti (canale, LDV e multicollo, nome del Punto Poste, centro di costo, lunghezze).
+- 🟡 Il destinatario (`consigneeAddress`) è `null` in TEST e LDV del collo vuota: EURODIS non ha detto se in produzione sono valorizzati.
+- 🟡 Fuso orario dei timestamp non noto; sintassi LDV non nota (il mock genera LDV inventate).
+- 🟡 Perimetro e PRJ non definiti: non si può stimare né pianificare. Go-live a fine gennaio 2027.
+- 🟡 Il ms `ce-dichiarato-ldv-pdb-sync` è ancora in test e alcune osservazioni toccano i nostri dati.
 
 ## Serve dal cliente
 - Codice PRJ.
-- Risposte di EURODIS alle 13 domande (via Chiapponi).
-- Regola di validità e univocità delle LDV SDA (chiesta a Marzilli; se non la conosce, a chi la governa in SDA).
-- Scenari di test proposti da EURODIS, con LDV valide e univoche e dati reali (via Chiapponi).
-- Chiave API di produzione e payload di esempio con dati reali, dati sensibili oscurati.
-- Conferma dei valori del contrassegno (3 → contanti, 5 → assegno bancario) e di come arriva il nome del Punto Poste.
+- Call con Chiapponi/EURODIS su errori e rifiuti, rimando dei dati e rollout ibrido.
+- Data di consegna della chiave API di produzione.
+- Conferma che `consigneeAddress` e `consignorsColloBarcode` sono valorizzati in produzione.
+- Regola di validità e univocità delle LDV SDA (chiesta a Marzilli).
+- Conferma dei valori del contrassegno e di come arriva il nome del Punto Poste.
 - Conferma se `centro_costo` e `rif_prodotto_cliente` sono costanti di contratto.
-- Perimetro: dogana, ADR, volumi e frequenza del batch.
+- Dall'altro gruppo: come si consegnano gli scarti al ms di invio mail e come funziona `send-pod`.
 
 ## Decisioni prese
-- 2026-11-04 — Spring Boot 3.5.14 per tutta la catena (non 4.1.2). Kafka, Mongo e rete verso EURODIS TEST pronti in svil; alert Datadog rimandati.
-- 2026-11-04 — `-in` in due fasi: scarico (run, esito HTTP, grezzo) ed elaborazione (record per spedizione, esito dello scarico: tutto inviato / parziale / nessun invio). Grezzo su Mongo. Nessuna deserializzazione, nessun filtro duplicati (si filtra a valle). Niente endpoint applicativi: recupero da configurazione. Scarico e invio ogni 2 minuti. Metriche e span su tutto.
-- 2026-11-04 — Contratto su `preadvising.eud.pre.build` (PA-31): corpo = spedizione così com'è, chiave `edReference`, metadati negli header.
-- 2026-11-02 — Il tracking (`ce-eurodis-send-tracking`) rientra nel perimetro della 136596 (supera la decisione del 22-10). Tre microservizi, un documento funzionale ciascuno.
-- 2026-10-30 — Due livelli di ingestione (chiude PA-26): `ce-dichiarato-eurodis-in` legge, salva e scompone su `preadvising.eud.pre.build`; `ce-dichiarato-eurodis-mapper` converte nell'ICD e pubblica su `preadvising.pre-enrichment`. Il mapping vive solo nel mapper.
-- 2026-10-29 — Mock dell'API in Python con FastAPI, configurazione per prodotto in YAML; la sintassi LDV è un parametro, non codice.
-- 2026-10-29 — Test integrati: solo ingestione `receive-pan`, in parallelo alle risposte, con scenari proposti da EURODIS.
-- 2026-10-29 — Catena: lettura API → nostro mapping verso l'ICD → ms sync `ce-dichiarato-ldv-pdb-sync` → PDB `waybillCreate` sincrono.
-- 2026-10-22 — Si parte con l'analisi (Mary) prima di qualsiasi PRD o stima.
-- 2026-10-22 — Il ms tracking (`ce-eurodis-send-tracking`) è un task a parte, fuori da questa analisi (superata il 02-11).
-- 2026-10-22 — Il ms di raccolta salva lo storico (con stato).
-- 2026-10-22 — Prodotto e servizi accessori si derivano dalla LDV con ce-rules (rivista il 29-10: proposta di tradurli nel nostro mapping, da validare).
-- 2026-10-22 — Contratto, codice cliente e AUC si reperiscono da F1.
-- 2026-10-22 — Nessun troncamento dei campi lunghi: si passa il valore intero.
-- 2026-10-22 — LDV: `consignorsColloBarcode` → `collo.id_ldv`; `europlateBarcode` → `internazionale.id_ldv_itz`.
-- 2026-10-22 — `id_preadvising` = UUID generato dal servizio.
+- 2026-11-09 — Scarico ogni 2 minuti, nonostante EURODIS consigli 15-20. Storico arretrato della prima chiamata elaborato tutto. Rilettura per `edReference` solo come recupero manuale (già implementata). Chiave API in secret OpenShift.
+- 2026-11-09 — Scarti: mail come in `EUD_INVIOFILE` tramite il ms esistente dell'altro gruppo, insieme agli errori di `INVIOFILE`; **da riconsiderare** dopo la risposta di EURODIS.
+- 2026-11-06 — Mapper senza F1: cliente e contratto da configurazione per ambiente, codici nazione da `ce-anagrafica`, ce-rules a valle (chiude PA-33). `consignorsColloBarcode` → `collo.id_ldv` confermato. Ogni scarico è un file fittizio con `idFile`.
+- 2026-11-05 — Canale `EUD_INVIOSYSTEM`. Tracking nel perimetro: tre ms, un documento funzionale ciascuno.
+- 2026-11-04 — Spring Boot 3.5.14 per tutta la catena. `-in` in due fasi, grezzo su Mongo, nessun filtro duplicati, nessun endpoint applicativo. Contratto su `preadvising.eud.pre.build`: corpo = spedizione così com'è, chiave `edReference`.
+- 2026-10-30 — Due livelli di ingestione: `-in` legge, salva e scompone; il mapper converte nell'ICD. Il mapping vive solo nel mapper.
+- 2026-10-29 — Mock dell'API in Python (FastAPI). Test integrati solo su `receive-pan`. Catena: lettura API → mapping → ms sync → PDB `waybillCreate`.
+- 2026-10-22 — Analisi prima di PRD e stima. Il ms di raccolta salva lo storico. Prodotto e servizi dalla LDV con ce-rules (rivista il 29-10). Contratto, codice cliente e AUC da F1 (rivisto il 06-11). Nessun troncamento dei campi lunghi. `id_preadvising` = UUID. `europlateBarcode` → `internazionale.id_ldv_itz`.
