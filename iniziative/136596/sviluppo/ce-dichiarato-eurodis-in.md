@@ -1,6 +1,6 @@
 # `ce-dichiarato-eurodis-in` — Documento funzionale per lo sviluppo
 
-**Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.6.1 (persistenza su PostgreSQL, eventi di stato, risposte EURODIS; da implementare) · **Data**: 2026-11-10
+**Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.7 (buffer locale del grezzo con recupero automatico) · **Data**: 2026-11-10
 **Autore**: Mary (analyst) · **Destinatario**: Amelia (dev) e team di sviluppo
 **Repository**: https://posteitaliane.ghe.com/SVILUPPO/CORRIERE-ESPRESSO_PREADVISING_ce-dichiarato-eurodis-in
 **Generato da**: [prompt-ce-dichiarato-eurodis-in.md](prompt-ce-dichiarato-eurodis-in.md)
@@ -274,6 +274,84 @@ Indici parziali per le query dei job (scarichi `DA_ELABORARE`/`IN_ELABORAZIONE`,
 **[DA DECIDERE]** La conservazione: ogni run viene salvato, anche i `404` (720 righe al giorno con il
 cron a 2 minuti). Proposta di job di pulizia nel documento DDL, sezione 4.
 
+### 3.5 Buffer locale del grezzo
+
+**[DECISO 10-11, Diego]** Su consiglio di EURODIS ("write all the data you receive parallelly into
+a local script/log and then transfer to your database", risposte del 10-11, punto 1), ogni
+risposta `200` si scrive **prima** su un file locale e solo dopo nel database. Il file si cancella
+quando il salvataggio a database è confermato. Se il salvataggio fallisce il file resta, e un job
+lo ricarica nel database appena questo torna disponibile. Così un database non disponibile non fa
+più perdere spedizioni, e non serve chiedere il rimando a EURODIS.
+
+**Dove nel flusso.** Il run viene inserito in `eurodis_scarichi` come `CHIAMATA_IN_CORSO` *prima*
+della chiamata: se il database è giù a quel punto, la chiamata non parte e non si perde niente.
+Il rischio è dopo: EURODIS ha risposto `200`, le spedizioni per lui sono consegnate, e il
+salvataggio del corpo non riesce. Il file si scrive esattamente lì, dopo la risposta `200` e
+prima di salvare il corpo. Vale per lo scarico e per la rilettura.
+
+**Formato del file.**
+- Nome: `<idScarico>_<yyyyMMddHHmmssSSS>.grezzo`. Durante la scrittura il file si chiama `.tmp`.
+- Prima riga: metadati in JSON (`idScarico`, `tipo`, `edReferenceRichiesto`, `ricevutoIl`,
+  `httpStatus`, `istanza`, `dimensioneByte`, `sha256`).
+- Dal secondo rigo: il corpo **identico** al ricevuto.
+- Scrittura atomica: si scrive il `.tmp`, si forza su disco (`fsync`), poi si rinomina in
+  `.grezzo`. Un file `.grezzo` è quindi sempre completo.
+- Permessi `600` dove il file system li supporta.
+
+**Cancellazione.** Subito dopo il salvataggio del corpo confermato dal database (scarico
+`DA_ELABORARE`). Un errore di cancellazione non è un errore di scarico: il file resta e lo
+cancella il job di recupero, che trova il corpo già salvato.
+
+**Job di recupero** (`eurodis-in-recupero-buffer`):
+- Gira ogni 2 minuti (configurabile) e prende solo i file `.grezzo` più vecchi di 2 minuti
+  (`eta-minima`), per non toccare quelli dello scarico in corso.
+- Per ogni file verifica dimensione e `sha256` rispetto ai metadati, poi cerca lo scarico per id.
+- Scarico presente con il corpo già salvato: cancella il file.
+- Scarico presente senza corpo (rimasto `CHIAMATA_IN_CORSO` o finito in errore dopo la risposta):
+  salva corpo, esito HTTP, `ricevutoIl`, dimensione e hash, porta lo scarico a `DA_ELABORARE`,
+  poi cancella il file.
+- Scarico assente: lo inserisce con l'id del file, già `DA_ELABORARE`, poi cancella il file.
+- Il salvataggio è idempotente: l'aggiornamento scrive il corpo solo se è ancora vuoto.
+- File illeggibile o con hash diverso: lo sposta in `scartati/`, con log e metrica. Non si
+  cancella, perché serve all'analisi.
+- Database ancora giù: il file resta, e riprova al giro successivo.
+
+**Volume: `emptyDir`.** Il job di recupero **non** usa ShedLock, a differenza degli altri job:
+- ogni pod ha il suo volume e vede solo i suoi file, quindi non c'è concorrenza fra pod sullo
+  stesso file;
+- con ShedLock, i file di un pod che non vince mai il lock resterebbero fermi.
+
+Dentro il pod il job gira su un solo thread (lo scheduler), e l'idempotenza copre l'incrocio
+con lo scarico.
+
+Motivi della scelta:
+- **Cosa copre.** `emptyDir` sopravvive ai riavvii del container nello stesso pod (crash, kill
+  della liveness) e copre il caso principale: database giù con il pod vivo.
+- **Cosa non copre.** Si perde se il pod viene cancellato o spostato (deploy, eviction, nodo giù):
+  in quel caso si torna alla richiesta di rimando a EURODIS (sezione 7).
+- **Perché non un PVC.** Coprirebbe anche quel caso, ma nessun servizio `ce-` usa oggi un volume
+  persistente applicativo (verificato nei repo: c'è solo il template Redis di
+  `ce-normalization-starter`, con il PVC vuoto). Servirebbero una storage class e una quota dalla
+  piattaforma, e con più repliche un volume RWX o uno per pod (StatefulSet).
+- **Evoluzione.** Se la piattaforma lo fornisce, si cambia solo il volume in Helm:
+  `persistentVolumeClaim` al posto di `emptyDir`. Codice e configurazione restano uguali.
+
+Il volume ha un limite di spazio (`sizeLimit` 1 Gi) ed è montato su `/buffer`.
+
+**Dati personali.** Il file contiene dati personali, come il corpo nel database:
+- sta solo sul volume dedicato, con permessi ristretti, e mai nei log;
+- dura il tempo del salvataggio: in esercizio normale vive millisecondi;
+- non se ne fanno copie, tranne gli `scartati/`, che restano solo per l'analisi.
+
+**Il buffer non blocca lo scarico.** Se la scrittura del file fallisce (disco pieno, volume non
+montato) si salva comunque nel database, con log ERROR e metrica: il buffer è una protezione in
+più, non un prerequisito. Sopra la soglia di guardia (numero di file o byte pendenti): warning,
+con le gauge `eurodis_in_buffer_file_pendenti` e `eurodis_in_buffer_byte_pendenti` per l'allarme.
+
+**Osservabilità obbligatoria** [DECISO 10-11, Diego]: span e metriche sul modello di
+`ce-dichiarato-adapter` (`MetricheEurodisIn`, `TraceUtil`) per scrittura, cancellazione e recupero
+(sezione 9); l'instrumentation non deve mai far fallire la lavorazione.
+
 ## 4. Flusso di elaborazione
 
 Due job distinti, ognuno con il suo lock: girano su un solo pod alla volta.
@@ -318,7 +396,7 @@ sequenceDiagram
 3. chiama `GET /shipments/v1` una volta sola;
 4. `404` → `NESSUNA_SPEDIZIONE`; non-200 → `ERRORE_CHIAMATA` con esito ed errore; eccezione di
    rete → `ERRORE_CHIAMATA` senza esito HTTP;
-5. `200` → salva il corpo grezzo in `corpo` e porta lo scarico a `DA_ELABORARE`.
+5. `200` → scrive il file nel buffer locale (sezione 3.5), salva il corpo grezzo in `corpo` e porta lo scarico a `DA_ELABORARE`.
 
 **Fase 2, elaborazione** (`ElaborazioneService`):
 1. prende gli scarichi `DA_ELABORARE` in ordine di arrivo, più quelli rimasti `IN_ELABORAZIONE`
@@ -363,6 +441,11 @@ sequenceDiagram
 | RF-19 | **File fittizio** [DECISO 06-11]: ogni scarico (o rilettura) con almeno una spedizione ha un `idFile` (UUID) e un `nomeFile`, assegnati una volta sola e salvati sullo scarico. L'`idFile` va nell'header `idFile` di ogni spedizione inviata, anche nei reinvii (RF-11, RF-17). | da implementare |
 | RF-20 | Prima delle spedizioni si pubblicano su `preadvising.evensource`, in quest'ordine, `ST_F0002` `FILE_PRESO_IN_CARICO` e `ST_F0005` `FILE_IN_ELABORAZIONE` (sezione 3.3), con invio sincrono e `acks=all`. Ogni evento si invia **una volta sola** per scarico: l'invio confermato si scrive sullo scarico (`eventoPresoInCaricoIl`, `eventoInElaborazioneIl`) e alla ripresa non si ripete. | da implementare |
 | RF-21 | Se un evento non parte, lo scarico torna `DA_ELABORARE` con l'errore, nessuna spedizione viene inviata e si riprova al ciclo successivo: un tracciato non arriva mai a valle prima del suo file. | da implementare |
+| RF-22 | **Buffer locale** [DECISO 10-11]: con `200`, prima di salvare il corpo si scrive il file `<idScarico>_<ts>.grezzo` (metadati + corpo identico) in modo atomico (`.tmp`, `fsync`, rename) nella cartella `eurodis.in.buffer.dir`. Vale per scarico e rilettura. | da implementare |
+| RF-23 | Il file si cancella solo dopo il salvataggio del corpo confermato dal database. Se il salvataggio fallisce il file resta. Un errore di cancellazione non fa fallire lo scarico. | da implementare |
+| RF-24 | Il job di recupero (ogni 2 minuti, file più vecchi di `eta-minima`, senza ShedLock: ogni pod il suo volume) ricarica i file pendenti in modo idempotente: corpo già salvato → cancella; scarico senza corpo → salva e porta a `DA_ELABORARE`; scarico assente → inserisce `DA_ELABORARE` con lo stesso id; poi cancella. Database giù → riprova. | da implementare |
+| RF-25 | Un file illeggibile o con `sha256` diverso dai metadati si sposta in `scartati/`, mai cancellato, con log e metrica. | da implementare |
+| RF-26 | Il buffer non blocca: se la scrittura del file fallisce lo scarico prosegue con il salvataggio a database (log ERROR, metrica). Il contenuto dei file non va mai nei log. | da implementare |
 
 ## 6. Stati
 
@@ -404,7 +487,10 @@ finestra in cui si possono perdere spedizioni (I1).
 | `500` | run `ERRORE_CHIAMATA`, nessun retry | idem | Prossimo run. Se EURODIS avesse già segnato le spedizioni come consegnate: richiesta di rimando a EURODIS, come sopra |
 | Timeout o connessione caduta | run `ERRORE_CHIAMATA` senza esito HTTP, log CRITICO | idem | **Rischio di perdita** (I1): chiedere a EURODIS di **rimettere tutti i dati** nella richiesta successiva (risposte EURODIS del 10-11, modalità da concordare), oppure gli `edReference` del periodo da recuperare con RF-16 entro 60 giorni. I doppioni che ne derivano si filtrano a valle |
 | Pod caduto durante la chiamata | run rimasto `CHIAMATA_IN_CORSO` | `eurodis_scarichi` | come sopra |
-| PostgreSQL giù al salvataggio del grezzo | log CRITICO con gli `edReference` estratti dal testo | log | RF-16 per gli `edReference` del log |
+| PostgreSQL giù al salvataggio del grezzo | il file resta nel buffer locale (RF-23); log CRITICO con gli `edReference` estratti dal testo | buffer, metrica `eurodis_in_buffer_file_pendenti` | **Automatico**: il job di recupero ricarica il file quando il database torna (RF-24), senza chiedere nulla a EURODIS |
+| Scrittura del file di buffer fallita (disco pieno, volume assente) | si salva comunque a database (RF-26), log ERROR | metrica `eurodis_in_buffer_scrittura_total{esito="ko"}` | Verificare il volume. Se fallisce anche il database: richiesta di rimando a EURODIS |
+| File di buffer illeggibile o con hash diverso | spostato in `scartati/` (RF-25) | metrica `eurodis_in_buffer_recuperati_total{esito="scartato"}` | Analisi del file. Gli `edReference` leggibili si recuperano con RF-16 entro 60 giorni |
+| Pod cancellato o spostato con file pendenti (`emptyDir` perso) | il file si perde, lo scarico resta `CHIAMATA_IN_CORSO` | `eurodis_scarichi` | Come per il timeout: rimando a EURODIS, o RF-16. Con un PVC (sezione 3.5) questo caso sparisce |
 | Pod caduto durante la fase 2 | scarico rimasto `IN_ELABORAZIONE` | `eurodis_scarichi` | Ripreso automaticamente dopo 15 minuti; i record già inviati vengono reinviati (la deduplica è a valle) |
 | Kafka giù | record `DA_INVIARE` con motivo; scarico `INVIO_PARZIALE` o `NESSUN_INVIO` | `eurodis_spedizioni` | Automatico con RF-11, poi RF-17 |
 | Grezzo non JSON | scarico `NON_ELABORABILE` con errore | `eurodis_scarichi` | Analisi del grezzo salvato |
@@ -442,6 +528,14 @@ Variabili d'ambiente (Helm) → proprietà `eurodis.in.*` in `application.yaml`.
 | `DATASOURCE_USERNAME` / `DATASOURCE_PASSWORD` | `spring.datasource.*` | secret `ce-postgres`, chiavi `datasource-name` / `data-source-password` | stesso secret di `ce-db-sync` [DECISO 10-11] |
 | `DATASOURCE_HIKARI_MINIMUM_IDLE` / `_MAXIMUM_POOL_SIZE` / `_IDLE_TIMEOUT` | `spring.datasource.hikari.*` | 1 / 5 / 30000 | |
 | `KAFKA_SCRAM_USERNAME` / `_PASSWORD` | SASL | secret | |
+| `EURODIS_BUFFER_ABILITATO` | `buffer.abilitato` | `true` | RF-22 |
+| `EURODIS_BUFFER_DIR` | `buffer.dir` | `/buffer/eurodis-in` (volume `emptyDir`); in locale la cartella temporanea | sezione 3.5 |
+| `EURODIS_BUFFER_RECUPERO_CRON` | `buffer.recupero.cron` | `15 */2 * * * *` | job di recupero (RF-24) |
+| `EURODIS_BUFFER_ETA_MINIMA` | `buffer.eta-minima` | `PT2M` | età minima di un file per il recupero |
+| `EURODIS_BUFFER_SOGLIA_FILE` / `_SOGLIA_BYTE` | `buffer.soglia-*` | 100 file / 500 MB | soglia di guardia: warning e metrica |
+
+Helm: volume `buffer` di tipo `emptyDir` con `sizeLimit: 1Gi`, montato su `/buffer`
+(`deployment.yaml` del chart; dimensione in `values.yaml`, `buffer.sizeLimit`).
 
 ## 9. Osservabilità: metriche e span
 
@@ -463,6 +557,10 @@ invariante: l'instrumentation non manda mai in errore la lavorazione (`TraceUtil
 | `preadvising.evensource send` | PRODUCER, figlio di `eurodis.elaborazione.scarico` | `id_file`, `id_stato` | invio fallito |
 | `eurodis.ripubblicazione` | INTERNAL, radice | `spedizioni` | — |
 | `eurodis.richieste_manuali` | INTERNAL, radice | — | — |
+| `eurodis.buffer.scrittura` | INTERNAL, figlio di `eurodis.scarico` / `eurodis.rilettura` | `id_scarico`, `esito`, `dimensione_byte` | scrittura fallita |
+| `eurodis.buffer.cancellazione` | INTERNAL, figlio dello scarico o del recupero | `id_scarico`, `esito` | cancellazione fallita |
+| `eurodis.buffer.recupero` | INTERNAL, radice del job | `file_pendenti`, `recuperati`, `scartati` | errore su un file |
+| `eurodis.buffer.recupero.file` | INTERNAL, figlio di `eurodis.buffer.recupero` | `id_scarico`, `esito` | file scartato o salvataggio fallito |
 
 Lo span PRODUCER inietta il contesto W3C (`traceparent`) negli header del messaggio: il mapper
 può continuare la stessa traccia.
@@ -485,6 +583,11 @@ può continuare la stessa traccia.
 | `eurodis_in_spedizioni_non_identificabili_total` | counter | — | spedizioni senza `edReference` valido |
 | `eurodis_in_spedizioni_in_attesa` | gauge | — | record `DA_INVIARE` + `ERRORE_INVIO` |
 | `eurodis_in_evento_total` | counter | `id_stato`, `esito` (`ok`/`ko`) | eventi di stato del file fittizio |
+| `eurodis_in_buffer_scrittura_total` | counter | `esito` (`ok`/`ko`) | scritture del file di buffer |
+| `eurodis_in_buffer_recuperati_total` | counter | `esito` (`recuperato`, `gia_presente`, `scartato`) | file trattati dal job di recupero |
+| `eurodis_in_buffer_file_pendenti` | gauge | — | file `.grezzo` nel buffer non ancora salvati |
+| `eurodis_in_buffer_byte_pendenti` | gauge | — | byte dei file pendenti |
+| `eurodis_in_buffer_eta_file_piu_vecchio_seconds` | gauge | — | età del file pendente più vecchio |
 
 **Log**: JSON (logstash) con MDC `id_scarico`, `id_file` ed `ed_reference`. Mai dati personali né la chiave.
 
@@ -492,9 +595,9 @@ può continuare la stessa traccia.
 
 | Gravità | Condizione |
 |---|---|
-| Critico | `eurodis_in_chiamata_total{esito="errore"}` > 0; `eurodis_in_grezzo_salvataggio_ko_total` > 0; scarico rimasto `CHIAMATA_IN_CORSO` |
-| Alto | `esito` 401, 424, 451; `eurodis_in_scarico_ultimo_epoch_seconds` più vecchio di 6 minuti |
-| Medio | `esito` 500; `eurodis_in_spedizioni_in_attesa` > 0 per più di 30 minuti; non identificabili > 0; risposta oltre soglia |
+| Critico | `eurodis_in_chiamata_total{esito="errore"}` > 0; `eurodis_in_grezzo_salvataggio_ko_total` > 0; scarico rimasto `CHIAMATA_IN_CORSO`; `eurodis_in_buffer_scrittura_total{esito="ko"}` > 0; `eurodis_in_buffer_recuperati_total{esito="scartato"}` > 0 |
+| Alto | `esito` 401, 424, 451; `eurodis_in_scarico_ultimo_epoch_seconds` più vecchio di 6 minuti; file pendenti da più di 10 minuti (`eurodis_in_buffer_eta_file_piu_vecchio_seconds` > 600) |
+| Medio | `eurodis_in_buffer_byte_pendenti` oltre la soglia di guardia (`EURODIS_BUFFER_SOGLIA_BYTE`); `esito` 500; `eurodis_in_spedizioni_in_attesa` > 0 per più di 30 minuti; non identificabili > 0; risposta oltre soglia |
 
 ## 10. Requisiti non funzionali
 
@@ -546,6 +649,13 @@ Criteri da verificare anche end-to-end contro `mock-eurodis` (`../mock-eurodis/`
 | AC-19 | `preadvising.evensource` non disponibile | elaborazione, poi il topic torna | primo ciclo: scarico `DA_ELABORARE` con errore, nessuna spedizione inviata; ciclo dopo: eventi e spedizioni inviati, stesso `idFile` | da fare |
 | AC-20 | Kill del pod dopo `ST_F0002` | ripresa dopo 15 minuti | `ST_F0002` non ripetuto, `ST_F0005` e spedizioni inviati con lo stesso `idFile` | da fare |
 | AC-21 | Spedizione in `eurodis.in.ripubblica.ed-references` | job richieste manuali | messaggio con l'header `idFile` dello scarico d'origine, nessun nuovo evento | da fare |
+| AC-22 | 3 spedizioni in coda | scarico | file `.grezzo` scritto prima del salvataggio e cancellato dopo; buffer vuoto | da fare |
+| AC-23 | Database giù al salvataggio del corpo | scarico, poi il database torna, poi il job di recupero | primo giro: file pendente, scarico `CHIAMATA_IN_CORSO`; dopo: corpo salvato identico (`sha256` uguale), scarico `DA_ELABORARE`, file cancellato, spedizioni poi inviate dall'elaborazione | da fare |
+| AC-24 | File pendente il cui scarico ha già il corpo | job di recupero | file cancellato, nessuna modifica allo scarico | da fare |
+| AC-25 | File pendente senza riga in `eurodis_scarichi` | job di recupero | scarico inserito con lo stesso id, `DA_ELABORARE`, file cancellato | da fare |
+| AC-26 | File troncato o con hash diverso | job di recupero | file spostato in `scartati/`, metrica, scarico invariato | da fare |
+| AC-27 | Volume non scrivibile | scarico | corpo salvato comunque a database, metrica `eurodis_in_buffer_scrittura_total{esito="ko"}` | da fare |
+| AC-28 | File più giovane di `eta-minima` | job di recupero | non toccato | da fare |
 
 **Il mock va esteso** per gli end-to-end di AC-04, AC-05, AC-10, AC-11 e AC-12:
 - `500` e timeout configurabili;
@@ -573,7 +683,7 @@ Criteri da verificare anche end-to-end contro `mock-eurodis` (`../mock-eurodis/`
 | Conservazione dei dati | APERTO: proposta di job di pulizia (DDL, sezione 4) | — |
 | Alert Datadog | APERTO, da fare più avanti (sezione 9) | assessment AS-19 |
 | Ack o riconsegna EURODIS | **CHIUSO 10-11**: nessun ack (I1 confermata); su richiesta EURODIS rimette tutti i dati nella richiesta successiva. Resta da concordare **come** si chiede il rimando | PA-05, PA-09 |
-| Log parallelo consigliato da EURODIS | APERTO: nei log applicativi no (dati personali); la difesa è il grezzo salvato per primo (RF-06). Se Diego lo vuole, file o volume dedicato | risposte EURODIS, punto 1 |
+| Log parallelo consigliato da EURODIS | **DECISO 10-11** (Diego): buffer locale del grezzo su volume dedicato, cancellato a salvataggio riuscito, con job di recupero (sezione 3.5, RF-22..RF-26). Volume `emptyDir`; PVC se la piattaforma lo fornisce. Mai nei log applicativi | risposte EURODIS, punto 1 |
 | Massimo di spedizioni per chiamata, fuso orario, `consigneeAddress` null | **CHIUSO 10-11**: nessun limite; fuso dello scambio FTP esistente; destinatario in `consigneeAddress` in produzione. Nessun impatto su `-in`, che non interpreta i dati | PA-27 |
 | Prima chiamata e arretrato | **CHIUSO 10-11**: nessun arretrato storico, solo il non ancora ricevuto | PA-06 |
 | Chiave di produzione | APERTO | PA-12 |
@@ -607,6 +717,9 @@ Criteri da verificare anche end-to-end contro `mock-eurodis` (`../mock-eurodis/`
   ShedLock JDBC, credenziali del secret `ce-postgres` (Diego; DDL di Winston).
 - 0.6.1 (10-11): risposte di EURODIS (I1 confermata, rimando dei dati su richiesta, rilettura per
   60 giorni, nessun limite, nessun arretrato) e frequenza: produzione 10 minuti, svil e coll 2 (Mary).
+- 0.7 (10-11): buffer locale del grezzo su `emptyDir`, scrittura atomica prima del salvataggio,
+  cancellazione a salvataggio riuscito, job di recupero idempotente senza ShedLock, file corrotti in
+  `scartati/` (Diego, su consiglio di EURODIS; disegno di Winston).
 
 ## Domande per Diego (0.5)
 
