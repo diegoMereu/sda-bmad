@@ -149,6 +149,8 @@ Non sappiamo ancora da dove arrivano le tracce SDA delle LDV EURODIS né in che 
 
 **Default per lo sviluppo**: nessun consumer. Il client ha un'interfaccia Java chiara, così che il consumer, quando la sorgente è decisa, la chiami senza toccare il client.
 
+**Verifica sui topic Kafka di svil del 10-11 e proposta**: sezione 3.5. In sintesi: `preadvising.eud.send-tracking` non esiste; i topic di tracking con traffico sono della rete pacchi Poste e non portano gli status SDA; i candidati SDA (`CE-TRACKING-EVENTTUP`, `PSDA-*.EVENTTT.ESITO*`) sono vuoti in svil.
+
 ### 3.3 Persistenza e correlazione [DA DECIDERE]
 
 Proposta, da confermare quando si decide la sorgente:
@@ -271,6 +273,81 @@ Tabella del foglio (stessa sequenza del file):
 | `NPO` | Consegna al pomeriggio annullata | `1785` | On Hold |
 | `RUS` | Status Precedente | `1785` | On Hold |
 | `UDO` | Uscita: Mag. Temp. Custodia | `1785` | On Hold |
+
+### 3.5 Proposta per la sorgente delle tracce (PA-35) [DA DECIDERE]
+
+Winston, 10-11. Proposta ricavata dai **topic Kafka di svil** (non dal codice degli altri progetti), letti in sola lettura: metadati, offset e un campione di messaggi con `assign` e senza gruppo, quindi senza commit di offset. I campioni contengono dati personali e restano fuori dal repo; qui ci sono solo nomi dei campi e forme.
+
+**Cosa c'è oggi su Kafka svil** [FATTO, 10-11]
+
+- **`preadvising.eud.send-tracking`**, il topic messo come input in `application.yaml`, **non esiste**: nessuno lo alimenta.
+- I topic di tracking che hanno traffico **non sono del Corriere Espresso SDA**. Nessuno dei codici osservati coincide con i 76 status SDA del foglio IN-BOUND (3.4). Le LDV hanno le forme della rete pacchi Poste (`A9AAAA9999999`, `9AA9AA9999999`).
+
+| Topic | Messaggi presenti / storici | Forma | Perché si esclude |
+|---|---|---|---|
+| `PACCHI.TRACKING` | 265 / 257.561 | JSON `{header{applicativo, timestamp}, payload{ldv, status, dataTrack, idFrazionarioEvento, canale, …}}`. Senza chiave Kafka. Producer `tt2-micro-dbpacchi-event` e `tt2-milkman-async-event` | Status Poste (`MVS`, `NCP`, `SCP`), nessuno nel foglio |
+| `PACCHI.TRACKING.ITZ` | 37 / 7.763 | JSON con chiave = LDV internazionale. `payload{ldv, ldvInternazionale, status, dataTrack, …}` più anagrafiche di mittente e destinatario | Pacchi internazionali Poste |
+| `DESCRITTA.TT.ALL.TRACCE` | 134 / 30.068 | XML da JMS (`MSG/HDR`, sezioni `M1`, `D1`, `MV`, `B2`…, con `OBJ/OBJID`, `OP`, `SUBC`, `TDT`) | Codici `OP`/`SUBC` della rete Poste (`HS4`, `PBS`…), nessuno nel foglio |
+
+- Ci sono invece topic di **esiti SDA** e un topic **CE di tracking**, che in svil oggi sono **vuoti**. Hanno avuto traffico (offset > 0), ma la retention l'ha cancellato: su `CE-TRACKING-EVENTTUP` la retention è di 7 giorni. Il loro formato quindi non si è potuto leggere:
+
+| Topic | Storico (offset) | Nota |
+|---|---|---|
+| `CE-TRACKING-EVENTTUP` | 40, 3 partizioni, retention 7 giorni | L'unico con prefisso Corriere Espresso e "TRACKING" nel nome |
+| `PSDA-23-10.TRACKING.EVENTTT.ESITOUNICO` / `.ESITOCONSEGNA` | 16 / 15 | Esiti SDA dai palmari verso il T&T SDA (`EVENTTT`) |
+| `PSDA-20-09.TRACKING.EVENTTT.ESITOLVSTATUS` | 3 | Esito di stato della LDV |
+| `PSDA-22-02.EVENTMLP.EXTERNAL.ESITI` | 7.266 | "Esiti verso l'esterno": candidato se esiste già una distribuzione degli esiti ai partner |
+
+- **Nome di chi ritira** (`acceptorName` per `1100`): non verificabile su nessun topic SDA. Su `PACCHI.TRACKING`, che non è SDA, i campi anagrafici sono nulli nei campioni.
+
+**Opzione A, consigliata: consumer diretto del topic degli esiti SDA**
+
+- Si legge il topic che porta gli status SDA a 3 caratteri del foglio IN-BOUND. In ordine di probabilità i candidati sono `CE-TRACKING-EVENTTUP`, `PSDA-23-10.TRACKING.EVENTTT.ESITOUNICO`/`ESITOCONSEGNA` e `PSDA-22-02.EVENTMLP.EXTERNAL.ESITI`.
+- Consumer con group id dedicato `ce-eurodis-send-tracking`. Scarta subito le LDV che non sono EURODIS (quasi tutto il traffico) con la tabella `eurodis_ldv` descritta sotto, traduce le altre (3.4), le salva nello storico e le invia a lotti.
+- **Pro**: nessun produttore nuovo da far nascere; latenza minima.
+- **Contro**: dipende da un formato T&T SDA che non possediamo, e c'è traffico alto da filtrare.
+- **Serve da SDA**, il proprietario del T&T: quale topic porta gli status del foglio per il Corriere Espresso (svil e prod), formato, chiave, se c'è il nome di chi ritira, e un campione anche anonimizzato. In alternativa si genera in svil una traccia su una LDV di test e la si cattura.
+
+**Opzione B: topic dedicato `preadvising.eud.send-tracking`**
+
+- Un produttore, lato SDA o un piccolo servizio della catena, pubblica **solo** le tracce delle LDV EURODIS nel formato `TracciaSda` già proposto da Amelia.
+- **Pro**: il contratto è nostro, i volumi sono minimi, e il formato T&T non ci riguarda.
+- **Contro**: serve un produttore che oggi non esiste e qualcuno che lo possieda. Il filtro sulle LDV EURODIS si sposta da lui.
+
+**Default consigliato**: A, se SDA indica il topic. B se il topic SDA non è leggibile da noi (permessi, formato non pubblico) o se SDA preferisce esporre un contratto dedicato.
+
+**Riconoscere le LDV EURODIS** (vale per A e per B se il filtro lo fa send-tracking)
+
+- Tabella `eurodis_ldv` popolata consumando `preadvising.eud.pre.build`. È la spedizione EURODIS così com'è: ha per ogni collo la coppia `deliveryPartnerBarcode` (la LDV SDA PDB Express) ed `europlateBarcode`, cioè quello che serve all'evento EURODIS di collo.
+- Una riga per collo: `ldv` (chiave, = `deliveryPartnerBarcode`), `ed_reference`, `europlate_barcode`, `id_file`, `ricevuto_il`.
+- `preadvising.pre-enrichment` non basta: ha `id_ldv_itz` solo a livello di spedizione.
+- Leggere `eurodis_spedizioni` di `-in` è scartato: accoppia i due servizi su un database e il JSON non è indicizzato.
+- Una traccia per una LDV non ancora in tabella si considera non EURODIS. La traccia arriva dopo il preadvising, quindi la finestra di corsa è trascurabile; se in prova risultasse reale, si aggiunge una tabella di attesa con scadenza.
+
+**Storico degli invii**: PostgreSQL, sul modello di `-in` (JDBC, script DDL in `sql/ddl/`, ShedLock su JDBC). Tabella `eurodis_tracce`, una riga per evento.
+
+| Campi | Contenuto |
+|---|---|
+| `id` | uuid |
+| `ldv`, `ed_reference`, `europlate_barcode` | identificativi del collo |
+| `status_sda`, `data_traccia` | traccia SDA di origine |
+| `codice_eurodis` | codice di 4 cifre (3.4) |
+| `stato` | `DA_INVIARE`, `INVIATO`, `RIFIUTATO`, `SCARTATO`, `ERRORE_INVIO` |
+| `tentativi`, `ultimo_errore`, `inviato_il` | esito dell'invio |
+| `traccia_json` | testo della traccia SDA, contiene dati personali |
+
+Vincolo `UNIQUE (ldv, status_sda, data_traccia)`.
+
+**Idempotenza e doppioni (ST-07)**
+
+- **In ingresso**: la chiave naturale `UNIQUE` scarta le tracce riconsegnate da Kafka (at-least-once). Il consumer fa insert e commit dell'offset; l'invio è disaccoppiato dal job.
+- **In uscita**: un evento `INVIATO` non si reinvia mai. Si ritentano solo gli esiti `ERRORE_TEMPORANEO`, compresi quelli incerti (7.2): accettiamo il rischio di un doppione finché EURODIS non risponde su ST-07.
+
+**Retry**
+
+- Job con ShedLock ogni 2 minuti (configurabile) sui `DA_INVIARE` e sugli errori temporanei, con attesa crescente fra i tentativi.
+- Dopo N tentativi l'evento passa a `ERRORE_INVIO`, con metrica e alert. `RIFIUTATO` (4xx di EURODIS) non si ritenta.
+- Per lo stesso collo gli eventi si inviano in ordine di `data_traccia`.
 
 ## 4. Flusso di elaborazione (proposta, quando la sorgente è decisa)
 
