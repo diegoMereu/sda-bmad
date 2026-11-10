@@ -1,6 +1,6 @@
 # `ce-dichiarato-eurodis-mapper` — Documento funzionale per lo sviluppo
 
-**Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.4 (bozza) · **Data**: 2026-11-10
+**Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.5 (bozza) · **Data**: 2026-11-10
 **Autore**: Mary (analyst) · **Destinatario**: Amelia (dev) e team di sviluppo
 **Repository**: https://posteitaliane.ghe.com/SVILUPPO/CORRIERE-ESPRESSO_PREADVISING_ce-dichiarato-eurodis-mapper
 **Generato da**: [prompt-ce-dichiarato-eurodis-mapper.md](prompt-ce-dichiarato-eurodis-mapper.md)
@@ -157,7 +157,7 @@ sequenceDiagram
 | RF-12 | Nessun dato personale nei log: solo `edReference`, `idEsecuzione`, esito, nomi dei campi mancanti. |
 | RF-13 | Nessun riferimento a PA/DF o a documenti di analisi nei commenti del codice (MAP-7): le regole aperte stanno in questo documento. |
 | RF-14 | **Il destinatario deve essere presente** **[DECISO 06-11, Diego, DF-30; confermato 10-11: in produzione il destinatario è in `consigneeAddress`, il TEST non è rappresentativo]**: `consigneeAddress` assente, oppure `zipcode` o `city` vuoti (obbligatori per ICD e BEP) → messaggio **non mappabile**, motivo `destinatario_assente`. `returnAddress` non lo sostituisce. |
-| RF-15 | Errore o risposta vuota di `ce-anagrafica` non blocca: i codici restano quelli della sezione 6.4, errore sullo span, avviso `anagrafica_ko`, si pubblica. Come `ce-dichiarato-adapter`. |
+| RF-15 | Errore o risposta vuota di `ce-anagrafica` non blocca: si pubblica, con errore sullo span e avviso `anagrafica_ko`. Se il codice paese è IT, ITA o ITA1 si usano le codifiche italiane di configurazione (`mapper.nazione.italia.*`: IT / ITA / ITA1) con l'avviso `nazione_default_italia`; per gli altri paesi ISO3 e ISO4 restano vuoti. Gli errori non entrano in cache (sezione 6.4). **[DECISO 10-11, Diego]** |
 
 ## 6. Regole di mapping
 
@@ -185,8 +185,10 @@ dice `""`/`0` il campo è presente ma vuoto finché il punto non si chiude.
 
 | Campo ICD | Sorgente | Regola | Rif. |
 |---|---|---|---|
-| `id_cliente`, `codice_login_cliente`, `codice_auc` | config `mapper.cliente.codice` | default `""` | **[DECISO 06-11]** costante di configurazione per ambiente, niente chiamata a F1 (PA-33) |
-| `codice_contratto` | config `mapper.cliente.codice-contratto` | default `""` | idem; il ms sync ha un fallback (S7) |
+| `codice_login_cliente` | config `mapper.cliente.codice-login` | `cli_c49353` | **[DECISO 10-11]** stessi valori che `ce-dichiarato-builder` imposta per il flusso a file EURODIS (`EUD_INVIOFILE`): `clientId` del file e `cli_c49353.ini`. Niente chiamata a F1 (PA-33) |
+| `codice_auc` | config `mapper.cliente.codice-auc` | `1335062583` | idem (`cli_c49353.ini`, `Codice_AUC`) |
+| `codice_contratto` | config `mapper.cliente.codice-contratto` | `SFA-00633620` | idem (`Codice_Contratto`) |
+| `id_cliente` | config `mapper.cliente.id-cliente` | `""` | nel flusso a file arriva dal record; l'API non lo fornisce |
 | `ragione_sociale` | `shipperAddress.companyName` | diretto | |
 | `no_firma` | `deliveryService.deliveryType` | `S` → `"N"`; `N` → `"S"`; altro o assente → `""` | commento Diego 23-10 |
 | altri campi dell'esempio EUD | — | `""` | |
@@ -202,8 +204,8 @@ dice `""`/`0` il campo è presente ma vuoto finché il punto non si chiude.
 | `codici_servizi` | `deliveryService`, `cashOnDeliveryService` | sezione 6.8 | [DA DECIDERE PA-03] |
 | `flag_stampa_ldv` | — | `"N"` (etichetta prodotta da EURODIS) | |
 | `flag_attivazione_ritiro` | — | `"N"` | |
-| `centro_costo` | config `mapper.centro-costo` | default `""` | [DA DECIDERE DF-11] il ms sync usa la sua config se vuoto |
-| `rif_prodotto_cliente` | config `mapper.rif-prodotto-cliente` | default `""` | [DA DECIDERE DF-11] il ms sync usa `APT000901` se vuoto |
+| `centro_costo` | config `mapper.centro-costo` | `CDC-00000014` | **[DECISO 10-11]** come il builder per EURODIS (`cli_c49353.ini`, `Centro_Costo`) |
+| `rif_prodotto_cliente` | config `mapper.rif-prodotto-cliente` | `""` | come il builder, che non lo imposta: il servizio a valle usa il prodotto di default |
 | `data_spedizione` | `entranceTimestamp` | `yyyy-MM-dd` (RF-09) | commento Diego 23-10 |
 | `ora_spedizione` | `entranceTimestamp` | `HH:mm:ss` | |
 | | se `entranceTimestamp` è assente | stessa regola su `clearanceTimestamp` (obbligatorio in EURODIS), con warning | **[DA DECIDERE DF-01]** Diego: `clearanceTimestamp` si ignora; ma `data_spedizione` è obbligatoria per BEP |
@@ -249,7 +251,14 @@ regola del 23-10 "solo `codice_nazione_iso_2`" (DF-12, DF-27). Si fa come
   - con un codice sconosciuto risponde 200 senza corpo; con un codice vuoto `400`.
 - Ogni chiamata ha uno span figlio (`getCodiciNazioneMittente`,
   `getCodiciNazioneDestinatario`), come nell'adapter.
-- Errore, timeout o corpo vuoto: RF-15.
+- **Cache** **[DECISO 10-11, Diego]**: la chiamata si fa sempre, anche per IT, ma è
+  in cache per parametro (codice normalizzato: trim + maiuscolo). A parità di codice
+  non si ripete fino alla scadenza (`client.anagrafica.cache-ttl`, default 24 ore).
+  Entrano in cache solo le risposte valide: errori, timeout e risposte vuote no, così
+  il messaggio successivo riprova. Metrica `eurodis_mapper_anagrafica_cache_total{esito=hit|miss}`;
+  lo span della chiamata c'è solo quando la chiamata si fa davvero.
+- Errore, timeout o corpo vuoto: RF-15. Per IT, ITA e ITA1 si usano le codifiche
+  italiane di configurazione (non messe in cache come risposta valida).
 - `RestTemplate` con pool di connessioni e timeout di connessione e lettura,
   come `AppConfig` dell'adapter. Nessun retry: il messaggio si pubblica comunque.
 
@@ -351,7 +360,7 @@ Spring, cioè 9 tentativi senza attesa, poi log e salto del messaggio (MAP-3).
 | Corpo non JSON | non mappabile, niente tentativi | `eurodis_mapper_spedizioni_total{esito=non_mappabile}`, ERROR senza payload | DLT se configurata; altrimenti ripubblicazione da `-in` (`eurodis.in.ripubblica.ed-references`, env `EURODIS_RIPUBBLICA_ED_REFERENCES`) |
 | `edReference` assente o non intero | come sopra | idem | idem |
 | Destinatario assente, o senza cap o località (RF-14) | non mappabile, niente tentativi | `esito=non_mappabile`, `motivo=destinatario_assente`, WARN | correzione lato EURODIS, poi ripubblicazione da `-in` |
-| `ce-anagrafica` in errore o lenta | si pubblica senza ISO3/ISO4 (RF-15) | avviso `anagrafica_ko`, errore sullo span | nessuno: il dato arriva incompleto a valle |
+| `ce-anagrafica` in errore o lenta | si pubblica; per IT/ITA/ITA1 con le codifiche italiane di configurazione, per gli altri paesi senza ISO3/ISO4 (RF-15) | avviso `anagrafica_ko` (+ `nazione_default_italia`), errore sullo span | al messaggio successivo si riprova (gli errori non sono in cache) |
 | Spedizione incompleta (data, LDV, peso) | **si pubblica** (RF-06) | `campo_mancante{campo}`, WARN | a valle |
 | Kafka in uscita non disponibile, timeout | eccezione → `DefaultErrorHandler` con backoff (default 3 tentativi, 2 s), poi recoverer | `esito=errore_tecnico`, ERROR | offset non committato durante i tentativi; dopo, DLT o ripubblicazione da `-in` |
 | Errore inatteso nel mapping | come Kafka giù | idem | idem |
@@ -368,9 +377,11 @@ Proposta: `preadvising.eud.pre.build.DLT`, da far creare se si decide.
 | `kafka.producer.topic.output` | `KAFKA_TOPIC_OUTPUT` | `preadvising.pre-enrichment` | esistente |
 | `mapper.canale` | `MAPPER_CANALE` | `EUD_INVIOSYSTEM` | deciso 05-11 |
 | `mapper.id-partner` | `MAPPER_ID_PARTNER` | `EURODIS` | PA-15 |
-| `mapper.cliente.codice` | `MAPPER_CLIENTE_CODICE` | `""` | → `id_cliente`, `codice_login_cliente`, `codice_auc`. **[DECISO 06-11]** da configurazione per ambiente; valori da ricevere |
-| `mapper.cliente.codice-contratto` | `MAPPER_CLIENTE_CONTRATTO` | `""` | |
-| `mapper.centro-costo` | `MAPPER_CENTRO_COSTO` | `""` | |
+| `mapper.cliente.codice-login` | `MAPPER_CLIENTE_CODICE_LOGIN` | `cli_c49353` | → `codice_login_cliente`; valori del builder per EURODIS (anche in `.helm/values.yaml`) |
+| `mapper.cliente.codice-auc` | `MAPPER_CLIENTE_CODICE_AUC` | `1335062583` | → `codice_auc` |
+| `mapper.cliente.id-cliente` | `MAPPER_CLIENTE_ID` | `""` | → `id_cliente` |
+| `mapper.cliente.codice-contratto` | `MAPPER_CLIENTE_CONTRATTO` | `SFA-00633620` | → `codice_contratto` |
+| `mapper.centro-costo` | `MAPPER_CENTRO_COSTO` | `CDC-00000014` | → `centro_costo` |
 | `mapper.rif-prodotto-cliente` | `MAPPER_RIF_PRODOTTO_CLIENTE` | `""` | |
 | `mapper.codici-servizi.abilitati` | `MAPPER_CODICI_SERVIZI` | `true` | PA-03 |
 | `mapper.consegna.separatore-note` | — | `" "` | |
@@ -378,6 +389,9 @@ Proposta: `preadvising.eud.pre.build.DLT`, da far creare se si decide.
 | `mapper.errori.tentativi`, `mapper.errori.attesa-ms` | — | `3`, `2000` | backoff dell'error handler |
 | `client.anagrafica.base-url` | `ANAGRAFICA_URL` | `http://ce-anagrafica.corriere-espresso-preadvising.svc.cluster.local:8080` | come l'adapter |
 | `client.anagrafica.connect-timeout-ms`, `read-timeout-ms` | — | `2000`, `3000` | proposta |
+| `client.anagrafica.cache-ttl` | `ANAGRAFICA_CACHE_TTL` | `24h` | durata in cache delle risposte valide |
+| `mapper.nazione.italia.codici` | `MAPPER_NAZIONE_ITALIA_CODICI` | `IT,ITA,ITA1` | codici per cui vale il default italiano su errore |
+| `mapper.nazione.italia.iso2`, `iso3`, `iso4` | `MAPPER_NAZIONE_ITALIA_ISO2/ISO3/ISO4` | `IT`, `ITA`, `ITA1` | codifiche italiane usate se `ce-anagrafica` non risponde |
 
 Producer: `acks=all`, `enable.idempotence=true`, invio sincrono. Consumer:
 `ack-mode: record`, `enable-auto-commit: false`. Sono già così.
@@ -559,12 +573,28 @@ non mappabile, motivo `destinatario_assente`, nessuna pubblicazione (RF-14).
 5. **Data spedizione**: `entranceTimestamp` ancora in verifica con EURODIS; resta il
    default con fallback (DF-01 aperto).
 
+## Decisioni di Diego del 10-11 (cliente e codici nazione)
+
+1. **Cliente fisso come il flusso a file**: codice login `cli_c49353`, AUC `1335062583`,
+   contratto `SFA-00633620`, centro di costo `CDC-00000014`, gli stessi che
+   `ce-dichiarato-builder` imposta per EURODIS (`cli_c49353.ini`). Implementato nel
+   mapper (`5e58c23`); in `-in` il `codiceLoginCliente` degli eventi di stato vale
+   `cli_c49353` (`72104e7`). Ragione sociale, partita IVA e nominativo degli eventi
+   restano vuoti: nel builder arrivano dalla richiesta di upload, non da configurazione.
+2. **Codici nazione in cache e default italiano su errore** (sezione 6.4, RF-15),
+   implementato nel mapper (`723eb11`).
+3. **Regola 1039 del validatore**: "Mittente Codice Nazione: campo obbligatorio mancante"
+   (`mittente.codice_nazione`). Riguarda il **mittente**: con mittenti esteri (come nei
+   dati di TEST) dipende dalla risposta di `ce-anagrafica`; il default italiano non la
+   copre. Se `shipperAddress` è assente il mittente è vuoto e la regola scatta comunque.
+
 ## Domande per Diego
 
 1. **Codici servizi.** Li valorizziamo nel mapper con la tabella 6.8 (default
    attivo), o aspettiamo ce-rules? Senza, il contrassegno non arriva a PDB. (PA-03)
-2. **Valori di configurazione.** Codice cliente, contratto, centro di costo e
-   prodotto per svil (e poi coll e prod): da chi li prendiamo? (PA-33, DF-11)
+2. ~~Valori di configurazione~~: chiusa il 10-11, si usano i valori del builder per EURODIS
+   (vedi sopra). Resta da confermare che valgano anche in produzione (nel builder sono uguali
+   per tutti gli ambienti).
 3. **Data spedizione.** Se manca `entranceTimestamp` va bene `clearanceTimestamp`? (DF-01)
 4. **Scarti.** Creiamo la DLT `preadvising.eud.pre.build.DLT`? (PA-32)
 5. **Da chiedere a EURODIS (Chiapponi).** `deliveryPartnerBarcode` non è nello
