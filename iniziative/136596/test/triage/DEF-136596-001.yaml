@@ -4,7 +4,7 @@ campagna: e2e-eurodis-svil
 run: RUN-136596-20261110T170000Z
 tc: [TC-136596-020, TC-136596-021, TC-136596-022]
 gravita: bloccante
-stato: in_correzione
+stato: corretto_da_rilasciare
 titolo: Il canale EUD_INVIOSYSTEM non è riconosciuto a valle del mapper: i tracciati EURODIS finiscono nel flusso SDA e si bloccano
 osservato: >
   Il validatore (ce-dichiarato-validatore, CanaleFlussoResolver) instrada sul flusso PDB solo i canali
@@ -38,7 +38,8 @@ triage_2026_11_10: >
   Opzione B scartata: con le regole di EUD_INVIOFILE la regola pdb_10052 (2007 "Collo id_ldv: campo non
   previsto, deve essere vuoto") rifiuterebbe ogni spedizione con la LDV in deliveryPartnerBarcode. Il canale
   resta EUD_INVIOSYSTEM e a valle si tratta come PDB_INVIOSYSTEM.
-  - validatore: fix su branch feature/eurodis-canale-eud-inviosystem (0db4ca6, test 2c8ba33), da portare su develop;
+  - validatore: fix su develop 2c8ba33 (0db4ca6 + test), da rilasciare in svil. Suite: 750 test, 153 falliti, gli stessi
+    su origin/develop prima della fix (regoledrools.Invio*CsvTest/JsonTest, preesistenti); i test EUD e PdbPreadvisingHandler sono verdi;
   - orchestratore: develop gestisce gia' EUD_INVIOSYSTEM (CANALI_PDB e percorso normalizzazione, enrichment_bep, ldv-pdb);
   - smistatore: correzione su develop in corso (Amelia);
   - state-machine-handler: liste dei canali PDB solo per i timeout LDV PDB; da valutare dopo il primo giro;

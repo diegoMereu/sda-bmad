@@ -19,3 +19,10 @@ ferma al validatore.
 Note:
 - `preadvising.eventsource` non esiste in svil: il topic è `preadvising.evensource` (confermato il default di `-in`).
 - Code di scarto `preadvising.pre-enrichment-dlq` e `preadvising.completed-dlq` vuote.
+
+## Stato al 10-11 sera, dopo il triage
+
+- DEF-136596-001: corretto nel validatore, `develop` `2c8ba33`, **da rilasciare in svil**. Orchestratore gia' pronto su `develop`; smistatore in correzione (Amelia).
+- DEF-136596-002 (bloccante): `ce-anagrafica` svil 500 sui codici nazione; la regola 1039 del validatore richiede `mittente.codice_nazione`.
+- BLOCCO-136596-001: dati cliente EURODIS mancanti nella configurazione del mapper (regole 1010, 1011, 1012).
+- Prossimo run: dopo il rilascio del validatore, iniezione di `9900000000001` (TEST-LIST) su `preadvising.eud.pre.build` e verifica fino a `preadvising.completed`.
