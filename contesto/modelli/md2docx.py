@@ -93,12 +93,22 @@ def righe_revisioni(tabella, revisioni, campi):
 
 
 def intestazione(doc, fm):
-    """Sostituisce il segnaposto "xxxx – iniziativa" delle intestazioni con codice e titolo."""
+    """Intestazioni e piè di pagina del template: il segnaposto "xxxx – iniziativa" diventa
+    codice e titolo; versione, data e codice documento del piè di pagina (DP) quelli del master."""
     cod = str(fm["codice_iniziativa"])
     titolo = re.sub(r"^\s*" + re.escape(cod) + r"\s*[-–]\s*", "", str(fm.get("titolo", "")))
     testo = f"{cod} – {titolo}" if titolo else cod
+    ultima = (fm.get("revisioni") or [{}])[-1]
+    versione = str(fm.get("versione") or ultima.get("versione") or "")
+    data = str(ultima.get("data") or "")
+    sostituzioni = [(r"DDP_\d+", f"DDP_{cod}")]
+    if versione:
+        sostituzioni.append((r"^ver\. .*$", f"ver. {versione}"))
+    if data:
+        sostituzioni.append((r"^del: .*$", f"del: {data}"))
     for s in doc.sections:
-        for parte in (s.header, s.first_page_header, s.even_page_header):
+        for parte in (s.header, s.first_page_header, s.even_page_header,
+                      s.footer, s.first_page_footer, s.even_page_footer):
             pars = list(parte.paragraphs)
             for tb in parte.tables:
                 for riga in tb.rows:
@@ -107,6 +117,11 @@ def intestazione(doc, fm):
             for p in pars:
                 if p.text.strip().lower().startswith("xxxx"):
                     scrivi(p, testo)
+                    continue
+                for r in p.runs:  # run per run: i campi (numero di pagina) restano intatti
+                    for modello, nuovo in sostituzioni:
+                        if re.search(modello, r.text.strip()):
+                            r.text = re.sub(modello, nuovo, r.text.strip())
 
 
 def copertina_sf(doc, fm):
@@ -204,6 +219,7 @@ MONO = 1.4          # il monospazio (`codice`) è più largo del testo proporzio
 MARGINE = 2.5       # margini interni della cella, in caratteri
 GRASSETTO = 1.2     # l'intestazione è in grassetto, più larga
 PAROLA_MAX = 24     # oltre questa larghezza una parola può andare a capo
+INLINE_CODICE = re.compile(r"`[^`]+`")
 
 
 def unita(testo):
@@ -217,24 +233,35 @@ def unita(testo):
     return tot
 
 
-def larghezze(intest, dati, totale):
+def larghezze(intest, dati, totale, corpo_pt=9):
     """Larghezze delle colonne: ogni colonna contiene almeno la sua parola più lunga
     (niente parole spezzate), lo spazio restante va a chi ha più testo."""
-    minimi, desiderati = [], []
+    minimi, testo_min, desiderati = [], [], []
     for j, h in enumerate(intest):
         valori = [r[j] if j < len(r) else "" for r in dati]
         parti = [x.replace("\\|", "|") for v in valori for x in v.split("<br>")]
+        h = h.replace("\\|", "|")
         parole = [unita(w) for x in parti for w in x.split()]
-        parole += [unita(w) * GRASSETTO for w in h.replace("\\|", "|").split()]
+        parole += [unita(w) * GRASSETTO for w in h.split()]
+        # parole di testo normale, senza i `codici`: sono quelle da non spezzare mai
+        normali = [len(w) for x in parti for w in INLINE_CODICE.sub(" ", x).split()]
+        normali += [len(w) * GRASSETTO for w in INLINE_CODICE.sub(" ", h).split()]
         # una parola lunghissima (un percorso di campo) può andare a capo: non ruba spazio alle altre colonne
         parola = min(max(parole, default=1), PAROLA_MAX)
         lunghi = sorted([unita(x) for x in parti] + [unita(h) * GRASSETTO])
         tipico = lunghi[int(len(lunghi) * 0.8)] if lunghi else 1
         minimi.append(max(parola, 2) + MARGINE)
+        testo_min.append(min(max(max(normali, default=1), 2), PAROLA_MAX) + MARGINE)
         desiderati.append(min(max(tipico, parola), 60) + MARGINE)
-    disponibile = totale / CARATTERE
+    disponibile = totale / (CARATTERE * corpo_pt / 9)
     if sum(minimi) >= disponibile:
-        pesi = minimi
+        # spazio insufficiente: prima si garantiscono le parole normali, i codici vanno a capo
+        if sum(testo_min) < disponibile:
+            extra = [max(m - t, 0) for m, t in zip(minimi, testo_min)]
+            resto = disponibile - sum(testo_min)
+            pesi = [t + (resto * e / sum(extra) if sum(extra) else 0) for t, e in zip(testo_min, extra)]
+        else:
+            pesi = testo_min
     else:
         extra = [max(d - m, 0) for d, m in zip(desiderati, minimi)]
         resto = disponibile - sum(minimi)
@@ -358,7 +385,8 @@ class Corpo:
                     for r in p.runs:
                         r.font.size = corpo
         sez = self.doc.sections[-1]
-        imposta_larghezze(t, larghezze(intest, dati, sez.page_width - sez.left_margin - sez.right_margin))
+        imposta_larghezze(t, larghezze(intest, dati, sez.page_width - sez.left_margin - sez.right_margin,
+                                       corpo.pt))
         riga_opzione(t.rows[0], "w:tblHeader")
         for riga in t.rows:
             riga_opzione(riga, "w:cantSplit")
