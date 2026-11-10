@@ -148,7 +148,7 @@ sequenceDiagram
 | RF-11 | Header mancanti: i campi derivati restano `""`, warning, si pubblica. |
 | RF-12 | Nessun dato personale nei log: solo `edReference`, `idEsecuzione`, esito, nomi dei campi mancanti. |
 | RF-13 | Nessun riferimento a PA/DF o a documenti di analisi nei commenti del codice (MAP-7): le regole aperte stanno in questo documento. |
-| RF-14 | **Il destinatario deve essere presente** **[DECISO 06-11, Diego, DF-30]**: `consigneeAddress` assente, oppure `zipcode` o `city` vuoti (obbligatori per ICD e BEP) → messaggio **non mappabile**, motivo `destinatario_assente`. `returnAddress` non lo sostituisce. |
+| RF-14 | **Il destinatario deve essere presente** **[DECISO 06-11, Diego, DF-30; confermato 10-11: in produzione il destinatario è in `consigneeAddress`, il TEST non è rappresentativo]**: `consigneeAddress` assente, oppure `zipcode` o `city` vuoti (obbligatori per ICD e BEP) → messaggio **non mappabile**, motivo `destinatario_assente`. `returnAddress` non lo sostituisce. |
 | RF-15 | Errore o risposta vuota di `ce-anagrafica` non blocca: i codici restano quelli della sezione 6.4, errore sullo span, avviso `anagrafica_ko`, si pubblica. Come `ce-dichiarato-adapter`. |
 
 ## 6. Regole di mapping
@@ -275,7 +275,7 @@ usa al posto del destinatario: è l'indirizzo di rientro.
 
 | Campo ICD | Sorgente | Regola | Rif. |
 |---|---|---|---|
-| `id_ldv_itz` | `collis[].europlateBarcode` | il primo non vuoto e diverso da `"0"` | **[DECISO 22-10, confermato 06-11]**; con più colli, default di DF-03; `"0"` è il neighbourhood business (DF-18) |
+| `id_ldv_itz` | `collis[].europlateBarcode` | il primo non vuoto e diverso da `"0"`; se tutti sono vuoti o `"0"` → `""` | **[DECISO 22-10, confermato 06-11 e 10-11]**. Barcode internazionale a 24 cifre, nei sistemi SDA è `ldv_partner_collo`; opzionale in API perché la LDV SDA è in `deliveryPartnerBarcode`. `"0"` = assente, come il vuoto (DF-18 chiuso). Con più colli, default di DF-03 |
 | `peso` | `shipmentWeight` | ×1000 (RF-10) | |
 | `vettore` | — | `"EURODIS"` | |
 | `descrizione`, `valuta`, `valore_spedizione` | `customsService` | `""` / `0` in fase 1 | sezione 6.10 |
@@ -481,6 +481,7 @@ non mappabile, motivo `destinatario_assente`, nessuna pubblicazione (RF-14).
 | AC-07 | `deliveryService` `Z`, `A`, `D`, `7`, `T` senza contrassegno | elaborazione | `codici_servizi` = `""` |
 | AC-08 | `mapper.codici-servizi.abilitati=false` | elaborazione | `codici_servizi` = `""` sempre |
 | AC-09 | 3 colli, il primo con `europlateBarcode` `"0"` | elaborazione | 3 elementi `collo`, `numero_colli_parz` 1..3, `id_ldv_itz` dal secondo collo |
+| AC-09b | `europlateBarcode` `"0"` o vuoto su tutti i colli | elaborazione | `id_ldv_itz` = `""`, nessun avviso |
 | AC-10 | `edReference` `7319003746401.0` / `7319003746401.5` / assente | elaborazione | `"7319003746401"` / non mappabile / non mappabile, nessuna pubblicazione |
 | AC-11 | corpo non JSON | elaborazione | non mappabile, offset avanti, DLT se configurata |
 | AC-12 | output Kafka non disponibile | elaborazione | 3 tentativi con attesa, offset non committato durante i tentativi, poi recoverer |
@@ -524,7 +525,18 @@ non mappabile, motivo `destinatario_assente`, nessuna pubblicazione (RF-14).
 ## Decisioni di Diego del 10-11
 
 1. **La LDV del collo è `collis[].deliveryPartnerBarcode`**, non `consignorsColloBarcode`
-   come supposto il 22-10 (DF-02, PA-11). `consignorsColloBarcode` non si mappa.
+   come supposto il 22-10 (DF-02, PA-11). EURODIS ci mette il numero di lettera di
+   vettura PDB Express.
+2. **`consignorsColloBarcode` non si mappa e non influisce sull'elaborazione**: è un
+   riferimento del mittente per identificare il collo, senza corrispondenza nei sistemi
+   SDA. Può arrivare valorizzato o vuoto: in nessun caso genera avvisi o scarti (DF-02 chiuso).
+3. **`europlateBarcode`** (24 cifre, `ldv_partner_collo` nei sistemi SDA) resta in
+   `internazionale.id_ldv_itz`; `"0"` e vuoto valgono "assente" → `""` (DF-18 chiuso).
+4. **Destinatario**: in produzione è in `consigneeAddress`; `returnAddress` è l'indirizzo
+   di rientro di una spedizione non consegnabile, non di consegna. RF-14 confermata
+   (DF-30 chiuso; la verifica con EURODIS resta come conferma).
+5. **Data spedizione**: `entranceTimestamp` ancora in verifica con EURODIS; resta il
+   default con fallback (DF-01 aperto).
 
 ## Domande per Diego
 
@@ -538,3 +550,10 @@ non mappabile, motivo `destinatario_assente`, nessuna pubblicazione (RF-14).
    schema che `GET /shipments/v1` dichiara di restituire, e lo swagger lo dice
    "valorizzato solo se il partner di consegna usa il CLS". Confermano che l'API
    lo restituisce per SDA, e che nei dati di test ci sarà? (DF-02, PA-29)
+6. **Campo di collo per `europlateBarcode`.** Nell'ICD v11 non c'è un campo di collo
+   dedicato alla LDV del partner (l'equivalente di `ldv_partner_collo`). I candidati
+   più vicini sono `collo.id_collo` (string 25, "identificativo univoco del singolo
+   collo", oggi vuoto) e `spedizione.id_ldv_partner_master` (string 50, "barcode della
+   LDV del partner", ma di spedizione e già usato per `dispatchPartnersDomesticShipmentNumber`).
+   Vuoi `europlateBarcode` anche in `collo.id_collo`, per collo? La regola decisa
+   (`internazionale.id_ldv_itz`) non cambia.

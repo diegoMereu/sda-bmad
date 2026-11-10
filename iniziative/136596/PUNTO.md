@@ -7,6 +7,7 @@
 EURODIS ha risposto alle 13 domande: quasi tutte le assunzioni sono confermate, ma restano da chiarire in call errori e rifiuti, fuso orario e rimando dei dati. `-in` è pronto per il deploy in svil, il mapper è parziale, go-live atteso a fine gennaio 2027.
 
 ## Fatto dall'ultimo punto
+- 2026-11-10 — **Decisioni e risposte di Diego**: la LDV del collo è `deliveryPartnerBarcode` (`consignorsColloBarcode` non si mappa, `europlateBarcode` vuoto o `0` → `""`), destinatario in `consigneeAddress` confermato (DF-02, DF-18, DF-30 chiusi); traduzione degli stati SDA → EURODIS per send-tracking dal foglio "Decodifica Eurodis IN-BOUND" (PA-34 chiuso); risposte EURODIS registrate in `risposte-eurodis-2026-11-10.md` (PA-05, PA-06, PA-09, PA-27 chiusi). Mapping Excel rigenerato, mapper 0.4, send-tracking 0.2.
 - 2026-11-09 — **Risposte di EURODIS (via Chiapponi) e documento A03.2**: si riceve solo il non ancora ricevuto; modifiche e annullamenti non rilevano; nessun limite di chiamata; rilettura per `edReference` a 60 giorni; chiavi API senza rotazione; produzione = cambio di endpoint e chiave; dogana e ADR nel perimetro; rollout ibrido, settimana per settimana. Tutto in `assunzioni.md` (13 assunzioni, stato per ciascuna).
 - 2026-11-09 — **EURODIS chiede di non rifiutare le spedizioni** e di riprendere il suo sistema di errori e rifiuti (A03.2): la mail di scarto concordata oggi è da riconsiderare.
 - 2026-11-06 — Specifica di `-in` 0.5 (file fittizio per scarico, eventi ST_F0002/ST_F0005, header `idFile`) e del mapper 0.2/0.3 (LDV confermate, destinatario obbligatorio, codici nazione da `ce-anagrafica`, cliente da configurazione). Figure di SF e DP.
@@ -37,13 +38,14 @@ EURODIS ha risposto alle 13 domande: quasi tutte le assunzioni sono confermate, 
 - Codice PRJ.
 - Call con Chiapponi/EURODIS su errori e rifiuti, rimando dei dati e rollout ibrido.
 - Data di consegna della chiave API di produzione.
-- Conferma che `consigneeAddress` e `deliveryPartnerBarcode` (la LDV del collo, schema non referenziato) sono valorizzati in produzione.
+- Conferma che `deliveryPartnerBarcode` (la LDV del collo, schema non referenziato) è valorizzato in produzione. `consigneeAddress` confermato lato Poste il 10-11 (DF-30 chiuso).
 - Regola di validità e univocità delle LDV SDA (chiesta a Marzilli).
 - Conferma dei valori del contrassegno e di come arriva il nome del Punto Poste.
 - Conferma se `centro_costo` e `rif_prodotto_cliente` sono costanti di contratto.
 - Dall'altro gruppo: come si consegnano gli scarti al ms di invio mail e come funziona `send-pod`.
 
 ## Decisioni prese
+- 2026-11-10 — Frequenza: in produzione scarico ed elaborazione ogni 10 minuti (EURODIS consiglia 15-20), in svil e coll restano 2 minuti. LDV del collo = `deliveryPartnerBarcode`. Stati di tracking tradotti con il foglio "Decodifica Eurodis IN-BOUND", eventi di collo.
 - 2026-11-09 — Scarico ogni 2 minuti, nonostante EURODIS consigli 15-20. Storico arretrato della prima chiamata elaborato tutto. Rilettura per `edReference` solo come recupero manuale (già implementata). Chiave API in secret OpenShift.
 - 2026-11-09 — Scarti: mail come in `EUD_INVIOFILE` tramite il ms esistente dell'altro gruppo, insieme agli errori di `INVIOFILE`; **da riconsiderare** dopo la risposta di EURODIS.
 - 2026-11-06 — Mapper senza F1: cliente e contratto da configurazione per ambiente, codici nazione da `ce-anagrafica`, ce-rules a valle (chiude PA-33). `consignorsColloBarcode` → `collo.id_ldv` confermato (superato il 10-11: la LDV è `deliveryPartnerBarcode`). Ogni scarico è un file fittizio con `idFile`.

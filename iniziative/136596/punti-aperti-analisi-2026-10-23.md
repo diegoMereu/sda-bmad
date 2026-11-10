@@ -137,3 +137,12 @@ sono nella specifica [sviluppo/ce-dichiarato-eurodis-mapper.md](sviluppo/ce-dich
 | ID | Decisione | Stato |
 |---|---|---|
 | DF-02 | **La LDV del collo è `collis[].deliveryPartnerBarcode`** ("Delivery partner barcode from the central label service (CLS)", string 50), non `consignorsColloBarcode` come deciso il 22-10 e confermato il 06-11. `consignorsColloBarcode` non si mappa. Il campo è solo nello schema `GetShipmentResponse` (`GetShipmentColliDataResponse`), che gli endpoint non referenziano, ed è "valorizzato solo se il partner di consegna usa il CLS"; manca nella spedizione TEST del 05-11. Da chiedere a EURODIS: l'API lo restituisce per SDA? Ci sarà nei dati di test? (PA-29) | decisione presa, verifica con EURODIS aperta |
+
+## Risposte lato Poste/SDA del 10-11
+
+| ID | Risposta | Stato |
+|---|---|---|
+| DF-01 | `entranceTimestamp`: ancora in verifica con EURODIS. Resta il default: data e ora da `entranceTimestamp`, con fallback su `clearanceTimestamp` | aperto |
+| DF-02 | `consignorsColloBarcode` **non** è la LDV: è un riferimento del mittente per identificare il collo, senza corrispondenza nei sistemi SDA e non significativo per la lavorazione. Può arrivare valorizzato o vuoto e non influisce sull'elaborazione: non si mappa. La LDV del collo è `deliveryPartnerBarcode`, dove EURODIS mette il numero di lettera di vettura PDB Express | chiuso |
+| DF-18 | `europlateBarcode` è il barcode internazionale a 24 cifre sul collo, oggi mappato nei sistemi SDA come `ldv_partner_collo`. In API è opzionale perché il collo ha già la nostra LDV in `deliveryPartnerBarcode`. `0` vuol dire assente, ma può arrivare anche vuoto: in entrambi i casi `internazionale.id_ldv_itz` = `""` | chiuso |
+| DF-30 | In produzione il destinatario sarà in `consigneeAddress`: il TEST non è rappresentativo. `returnAddress` è l'indirizzo di rientro di una spedizione non consegnabile, non quello di consegna. Confermata RF-14 del mapper (destinatario obbligatorio) | chiuso (la verifica con EURODIS resta come conferma) |
