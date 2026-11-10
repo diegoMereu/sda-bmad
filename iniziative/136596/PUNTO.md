@@ -37,7 +37,7 @@ EURODIS ha risposto alle 13 domande: quasi tutte le assunzioni sono confermate, 
 - Codice PRJ.
 - Call con Chiapponi/EURODIS su errori e rifiuti, rimando dei dati e rollout ibrido.
 - Data di consegna della chiave API di produzione.
-- Conferma che `consigneeAddress` e `consignorsColloBarcode` sono valorizzati in produzione.
+- Conferma che `consigneeAddress` e `deliveryPartnerBarcode` (la LDV del collo, schema non referenziato) sono valorizzati in produzione.
 - Regola di validità e univocità delle LDV SDA (chiesta a Marzilli).
 - Conferma dei valori del contrassegno e di come arriva il nome del Punto Poste.
 - Conferma se `centro_costo` e `rif_prodotto_cliente` sono costanti di contratto.
@@ -46,7 +46,7 @@ EURODIS ha risposto alle 13 domande: quasi tutte le assunzioni sono confermate, 
 ## Decisioni prese
 - 2026-11-09 — Scarico ogni 2 minuti, nonostante EURODIS consigli 15-20. Storico arretrato della prima chiamata elaborato tutto. Rilettura per `edReference` solo come recupero manuale (già implementata). Chiave API in secret OpenShift.
 - 2026-11-09 — Scarti: mail come in `EUD_INVIOFILE` tramite il ms esistente dell'altro gruppo, insieme agli errori di `INVIOFILE`; **da riconsiderare** dopo la risposta di EURODIS.
-- 2026-11-06 — Mapper senza F1: cliente e contratto da configurazione per ambiente, codici nazione da `ce-anagrafica`, ce-rules a valle (chiude PA-33). `consignorsColloBarcode` → `collo.id_ldv` confermato. Ogni scarico è un file fittizio con `idFile`.
+- 2026-11-06 — Mapper senza F1: cliente e contratto da configurazione per ambiente, codici nazione da `ce-anagrafica`, ce-rules a valle (chiude PA-33). `consignorsColloBarcode` → `collo.id_ldv` confermato (superato il 10-11: la LDV è `deliveryPartnerBarcode`). Ogni scarico è un file fittizio con `idFile`.
 - 2026-11-05 — Canale `EUD_INVIOSYSTEM`. Tracking nel perimetro: tre ms, un documento funzionale ciascuno.
 - 2026-11-04 — Spring Boot 3.5.14 per tutta la catena. `-in` in due fasi, grezzo su Mongo, nessun filtro duplicati, nessun endpoint applicativo. Contratto su `preadvising.eud.pre.build`: corpo = spedizione così com'è, chiave `edReference`.
 - 2026-10-30 — Due livelli di ingestione: `-in` legge, salva e scompone; il mapper converte nell'ICD. Il mapping vive solo nel mapper.

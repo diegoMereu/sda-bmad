@@ -150,8 +150,8 @@ R.update({
     S + "rif_prodotto_cliente": (DD, "", f'"APT000902" {EX}: costante di contratto o derivato?', "PA-23"),
     S + "centro_costo": (DD, "", f'"CDC-00000014" {EX}: costante di contratto (F1)?', "PA-23"),
     S + "assicurata.spedizione_assicurata": (C, "", f"Vuoto, importo 0 (come {EX}): EURODIS non trasmette assicurazione", ""),
-    # PA-11, decisione 22-Oct: consignorsColloBarcode = LDV del collo, europlateBarcode = id_ldv_itz
-    S + "collo.id_ldv": (D, "collis[].consignorsColloBarcode", "LDV del collo (decisione 22-Oct). Vuoto in EUD_INVIOFILE perche' li' la genera SDA", "PA-11"),
+    # PA-11: deliveryPartnerBarcode = LDV del collo (decisione Diego 10-Nov, sostituisce consignorsColloBarcode del 22-Oct), europlateBarcode = id_ldv_itz
+    S + "collo.id_ldv": (D, "collis[].deliveryPartnerBarcode", "LDV del collo (decisione 10-Nov, prima consignorsColloBarcode). Campo dello schema GetShipmentResponse, non referenziato dagli endpoint: va confermato che l'API lo valorizzi. Vuoto in EUD_INVIOFILE perche' li' la genera SDA", "PA-11, DF-02"),
     S + "internazionale.id_ldv_itz": (D, "collis[].europlateBarcode", "Decisione 22-Oct. ICD: \"previsto per i casi ERS e Eurodis\". Campo a livello spedizione, barcode a livello collo: con piu' colli quale si usa?", "PA-11"),
     S + "collo.id_collo": (DD, "", f'"C-MR-C012-15702" {EX}: da quale campo arriva?', "PA-11"),
     S + "collo.peso": (T, "collis[].weightOfUnit", f"kg -> grammi (x1000): peso 2000 {EX}", ""),
@@ -237,6 +237,7 @@ GAP_23 = {
     "consigneeAddress.alternativeContactTelephone": ("", "", f"Il tracciato non ha un secondo numero di telefono: da chiedere se serve ({K})", "DF-15"),
     "shipperAddress.alternativeContactTelephone": ("", "", f"Il tracciato non ha un secondo numero di telefono: da chiedere se serve ({K})", "DF-15"),
     "deliveryService.deliveryService": ("", "", f"Come si traduce in servizi SDA ({K})", "DF-05"),
+    "collis[].consignorsColloBarcode": ("", "", "Non e' la LDV del collo: la LDV e' deliveryPartnerBarcode (decisione Diego 10-Nov, supera quella del 22-Oct)", "DF-02"),
 }
 
 def default(path, name):
@@ -392,7 +393,8 @@ EF = [
     ("collis[]", "array", "", "SI"),
     ("collis[].identifierPalletOrCollo", "string", 2, "SI"), ("collis[].weightOfUnit", "number", "", "SI"),
     ("collis[].europlateBarcode", "string", 24, "NO"), ("collis[].referencedEuroplateBarcode", "string", 24, "NO"),
-    ("collis[].consignorsColloBarcode", "string", 50, "NO"), ("collis[].length", "integer", "", "SI"),
+    ("collis[].consignorsColloBarcode", "string", 50, "NO"), ("collis[].deliveryPartnerBarcode", "string", 50, "NO"),
+    ("collis[].length", "integer", "", "SI"),
     ("collis[].width", "integer", "", "SI"), ("collis[].height", "integer", "", "SI"),
     ("collis[].volumetric", "integer", "", "NO"), ("collis[].volumetricWeight", "number", "", "NO"),
     ("collis[].boxType / boxDimensionCategory / boxId", "string", "", "NO"),
@@ -413,6 +415,9 @@ def desc_en(field):
     if " / " in leaf:
         leaf = leaf.split(" / ")[0]
     props = _sc[SCHEMA_OF.get(obj, "GetShipmentResponse2")].get("properties", {})
+    if leaf not in props and obj == "collis[]":
+        # campi presenti solo nello schema non referenziato GetShipmentColliDataResponse (es. deliveryPartnerBarcode)
+        props = _sc["GetShipmentColliDataResponse"].get("properties", {})
     d = (props.get(leaf) or {}).get("description") or ""
     return re.sub(r"\s*<br\s*/?>\s*", " ", d).strip()
 
@@ -490,6 +495,7 @@ IT = {
     "collis[].europlateBarcode": "Barcode EURODIS del collo; valore di default (0) in caso di neighbourhood business.",
     "collis[].referencedEuroplateBarcode": "Valorizzato solo se il collo fa parte di un reso: riporta il barcode EURODIS del collo originario.",
     "collis[].consignorsColloBarcode": "Barcode domestico di reso del partner di consegna originario, generato/assegnato dalla soluzione resi EURODIS, oppure barcode del cliente o del partner mittente. Per il neighbourhood business va fornito il barcode domestico del partner secondo la SOP Neighbourhood business.",
+    "collis[].deliveryPartnerBarcode": "Barcode del partner di consegna dal servizio centralizzato di etichettatura (CLS). Valorizzato solo se il partner di consegna usa questo servizio. Presente solo nello schema GetShipmentResponse, non referenziato dagli endpoint.",
     "collis[].length": "In centimetri.",
     "collis[].width": "In centimetri.",
     "collis[].height": "In centimetri.",

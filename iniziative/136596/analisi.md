@@ -135,7 +135,7 @@ Decisioni da girare agli sviluppatori di `ce-dichiarato-eurodis-mapper`
 2. **Nessun troncamento.** I campi EURODIS più lunghi del limite ICD (email,
    SMS, civico, nome contatto, note, codice TARIC) si passano interi. Se la
    validazione a valle li rifiuta, si cambia la validazione (PA-16).
-3. **LDV** (PA-11): `collo.id_ldv` ← `collis[].consignorsColloBarcode`;
+3. **LDV** (PA-11): `collo.id_ldv` ← `collis[].deliveryPartnerBarcode` (decisione 10-11, prima `consignorsColloBarcode`);
    `internazionale.id_ldv_itz` ← `collis[].europlateBarcode`;
    `spedizione.rif_spedizione` ← `edReference` (numero → stringa senza decimali).
 4. **Convenzioni del flusso EUD_INVIOFILE** da replicare: `""` per le
@@ -167,7 +167,8 @@ Codici di errore: `401` chiave non valida, `424` partner non determinabile,
   `lineHaulIndicator` (N/D/L), `termsOfDeliveryText` (Incoterms).
 - **Quantità**: `numberOfHandlingUnits`, `shipmentWeight`, array `collis` con
   dimensioni, peso, tipo (P/C) e barcode (`europlateBarcode`,
-  `consignorsColloBarcode`).
+  `consignorsColloBarcode`; `deliveryPartnerBarcode` solo nello schema non
+  referenziato `GetShipmentResponse`).
 - **Indirizzi**: `consigneeAddress` (con `pudoID` per consegna in punto di
   ritiro), `shipperAddress`, `returnAddress`, `remunerationAddress`,
   `bookingInAddress`. Contatti: telefono, SMS (`+XX…`), email.
@@ -230,7 +231,7 @@ Owner RTI = chi lo porta avanti lato fornitore; Rif. Poste = referente lato clie
 | PA-08 | — | Come si restituisce a EURODIS un errore (validazione o altro) | — | Chiapponi | | aperto | Evidenza 4. Chiesto a Chiapponi con mail del 26-Oct (dom. 7) |
 | PA-09 | — | Errore tra la chiamata a receive-shipments e la persistenza | — | Chiapponi | | aperto | Evidenza 1. Chiesto a Chiapponi con mail del 26-Oct (dom. 1) |
 | PA-10 | — | Reperire contratto / codice cliente / AUC | — | — | Deciso: si reperiscono da F1 | chiuso | |
-| PA-11 | 22-Oct | Quale campo EURODIS diventa la LDV SDA? Una LDV per spedizione o per collo? | da assegnare | — | Deciso: `consignorsColloBarcode` → `collo.id_ldv`; `europlateBarcode` → `internazionale.id_ldv_itz`; `edReference` → `rif_spedizione` | aperto | Restano: (a) `id_ldv_itz` è un campo di spedizione e `europlateBarcode` uno per collo, con più colli quale si usa? (b) da dove arriva `collo.id_collo`; (c) madre/figlio nel multicollo |
+| PA-11 | 22-Oct | Quale campo EURODIS diventa la LDV SDA? Una LDV per spedizione o per collo? | da assegnare | — | Deciso: `deliveryPartnerBarcode` → `collo.id_ldv` (Diego, 10-11, supera `consignorsColloBarcode` del 22-10); `europlateBarcode` → `internazionale.id_ldv_itz`; `edReference` → `rif_spedizione` | aperto | `deliveryPartnerBarcode` è solo nello schema non referenziato `GetShipmentResponse` (CLS): da confermare con EURODIS che l'API lo valorizzi. Restano: (a) `id_ldv_itz` è un campo di spedizione e `europlateBarcode` uno per collo, con più colli quale si usa? (b) da dove arriva `collo.id_collo`; (c) madre/figlio nel multicollo |
 | PA-12 | 22-Oct | Ambiente di produzione EURODIS e chiave API di produzione | da assegnare | Chiapponi | | aperto | Proposto da Mary; oggi c'è solo TEST. Chiesto a Chiapponi con mail del 26-Oct (dom. 9) |
 | PA-13 | 22-Oct | Spedizioni con dogana e ADR: rientrano nel perimetro? | da assegnare | Chiapponi | | aperto | Proposto da Mary. Chiesto a Chiapponi con mail del 26-Oct (dom. 12) |
 | PA-14 | 22-Oct | Frequenza del batch e volumi attesi | da assegnare | Chiapponi |  | in parte | Proposto da Mary. Chiesto a Chiapponi con mail del 26-Oct (dom. 11). 04-11: scarico e invio ogni 2 minuti; volumi ancora da chiedere |

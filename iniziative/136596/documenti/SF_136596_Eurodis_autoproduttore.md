@@ -68,7 +68,7 @@ Il presente documento contiene l'analisi degli impatti funzionali relativi all'I
 | 11 | Open Point | Chiave API di produzione e payload di esempio di produzione, con i dati sensibili oscurati. | Acquisizione; EURODIS (Chiapponi) |
 | 12 | Open Point | Volumi attesi (spedizioni per giorno e per chiamata). | Acquisizione; EURODIS (Chiapponi) |
 | 13 | Open Point | Avvio graduale: perimetro di ogni fase (per mittente, ufficio o volume) e chi lo applica (EURODIS tramite chiave API, o SDA). Un filtro lato SDA non è possibile senza perdita, perché le spedizioni lette risultano già consegnate. | Acquisizione; EURODIS (Chiapponi) |
-| 14 | Open Point | LDV nel multicollo: conferma che `consignorsColloBarcode` contenga la LDV anche nelle spedizioni ordinarie; quale `europlateBarcode` usare per `internazionale.id_ldv_itz` con più colli (si propone il primo valorizzato); valorizzazione di LDV madre, figlia e `collo.id_collo`; trattamento del valore `0` di `europlateBarcode`. | Trasformazione; EURODIS (Chiapponi), SDA |
+| 14 | Open Point | LDV nel multicollo: conferma che l'API valorizzi `deliveryPartnerBarcode`, la LDV del collo (campo dello schema non referenziato dagli endpoint, compilato solo con il servizio CLS); quale `europlateBarcode` usare per `internazionale.id_ldv_itz` con più colli (si propone il primo valorizzato); valorizzazione di LDV madre, figlia e `collo.id_collo`; trattamento del valore `0` di `europlateBarcode`. | Trasformazione; EURODIS (Chiapponi), SDA |
 | 15 | Open Point | Conferma della traduzione proposta dei servizi accessori EURODIS nei codici PDB, e trattamento dei valori non coperti (`D`, `7`, `T`; `W` come appuntamento) o fuori perimetro (`A`, Locker, assicurazione, tipo P): servizio, spedizione ordinaria o scarto. | Servizi accessori; EURODIS (Chiapponi), SDA |
 | 16 | Open Point | Punto Poste: sorgente del nome del punto, obbligatorio per PDB e non garantito da EURODIS, e comportamento se assente. | Servizi accessori; EURODIS (Chiapponi) |
 | 17 | Open Point | Contrassegno: formato e valuta dell'importo e codifica del tipo di incasso (3 → `CON`, 5 → `ABM`). | Servizi accessori; EURODIS (Chiapponi) |
@@ -199,7 +199,7 @@ Corpo:
   "shipperAddress":   { "companyName": "MITTENTE DI PROVA", "countryCode": "AT", ... },
   "deliveryService":  { "deliveryService": "6", ... },
   "consigneePreAdvice": { "smsPreAdvice": false, "eMailPreAdvice": true, "telephonePreAdvice": false },
-  "collis": [ { "europlateBarcode": "000000000000000000000001", "consignorsColloBarcode": "LDV0000000001", "weightOfUnit": 2.5, ... } ]
+  "collis": [ { "europlateBarcode": "000000000000000000000001", "deliveryPartnerBarcode": "LDV0000000001", "weightOfUnit": 2.5, ... } ]
 }
 ```
 
@@ -279,7 +279,7 @@ Il mapping campo per campo, con la categoria di ogni campo (diretto, trasformato
 |---|---|
 | `id_preadvising` | UUID generato dal microservizio per ogni tracciato |
 | `spedizione.rif_spedizione` | `edReference`, come stringa senza decimali |
-| `collo.id_ldv` | `collis[].consignorsColloBarcode`, la LDV assegnata da EURODIS |
+| `collo.id_ldv` | `collis[].deliveryPartnerBarcode`, la LDV assegnata da EURODIS (servizio CLS) |
 | `internazionale.id_ldv_itz` | `collis[].europlateBarcode`; con più colli si propone il primo valorizzato (Open Point 14) |
 | `id_ldv_partner_master` | `dispatchPartnersDomesticShipmentNumber`, numero della spedizione presso il partner mittente |
 | `spedizione.numero_colli` | `numberOfHandlingUnits` |

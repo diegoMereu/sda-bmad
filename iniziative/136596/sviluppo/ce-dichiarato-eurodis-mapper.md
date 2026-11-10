@@ -1,6 +1,6 @@
 # `ce-dichiarato-eurodis-mapper` — Documento funzionale per lo sviluppo
 
-**Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.3 (bozza) · **Data**: 2026-11-06
+**Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.4 (bozza) · **Data**: 2026-11-10
 **Autore**: Mary (analyst) · **Destinatario**: Amelia (dev) e team di sviluppo
 **Repository**: https://posteitaliane.ghe.com/SVILUPPO/CORRIERE-ESPRESSO_PREADVISING_ce-dichiarato-eurodis-mapper
 **Generato da**: [prompt-ce-dichiarato-eurodis-mapper.md](prompt-ce-dichiarato-eurodis-mapper.md)
@@ -81,9 +81,17 @@ Dipendenza sincrona: `ce-anagrafica` (namespace `corriere-espresso-preadvising`)
 | `traceparent` | W3C | lo span del mapper è figlio di quello di `-in` |
 
 **[FATTO, 05-11]** In TEST EURODIS arrivano spedizioni con `consigneeAddress`,
-`shipperAddress`, `remunerationAddress` e `bookingInAddress` a `null`, e
-`consignorsColloBarcode` vuoto (`esempio-eurodis-spedizione.json`). Lo swagger
-dichiara `nullable` tutti gli indirizzi, senza dire quando mancano.
+`shipperAddress`, `remunerationAddress` e `bookingInAddress` a `null`,
+`consignorsColloBarcode` vuoto e senza `deliveryPartnerBarcode`
+(`esempio-eurodis-spedizione.json`). Lo swagger dichiara `nullable` tutti gli
+indirizzi, senza dire quando mancano.
+
+**[FATTO]** `deliveryPartnerBarcode`, la LDV del collo (sezione 6.6), esiste
+solo nello schema `GetShipmentColliDataResponse` (dentro `GetShipmentResponse`),
+che gli endpoint **non** referenziano: "Delivery partner barcode from the central
+label service (CLS). Only filled, when the delivery partner is using this
+service", string 50. Nello schema dichiarato (`GetShipmentColliDataResponse2`)
+non c'è. Il DTO lo legge comunque (RF-03, proprietà sconosciute tollerate).
 
 ### 3.2 In uscita: `preadvising.pre-enrichment`
 
@@ -254,7 +262,7 @@ usa al posto del destinatario: è l'indirizzo di rientro.
 
 | Campo ICD | Sorgente | Regola | Rif. |
 |---|---|---|---|
-| `id_ldv` | `consignorsColloBarcode` | diretto; `""` se assente, con metrica (RF-07) | **[DECISO 22-10, confermato 06-11]**. `europlateBarcode` non la sostituisce: va solo in `internazionale.id_ldv_itz`. **[FATTO 05-11]** in TEST arriva vuoto: si chiedono a EURODIS dati di test con il campo valorizzato (PA-29) |
+| `id_ldv` | `deliveryPartnerBarcode` | diretto; `""` se assente, con metrica (RF-07) | **[DECISO 10-11, Diego]**: supera `consignorsColloBarcode` (decisione del 22-10). `consignorsColloBarcode` non si mappa; `europlateBarcode` non sostituisce la LDV: va solo in `internazionale.id_ldv_itz`. Il campo è dello schema non referenziato (sezione 3.1): domanda 5 |
 | `numero_colli_parz` | posizione | 1..n | |
 | `peso` | `weightOfUnit` | ×1000 (RF-10); `0` se assente | |
 | `lunghezza` | `length` | diretto, cm; `0` se assente | |
@@ -404,6 +412,7 @@ Alert Datadog: rimandati come per `-in` (AS-19). Proposta da tenere pronta:
 `esempio-eurodis-spedizione.json` in cui `consigneeAddress` (null nell'originale)
 è sostituito da un indirizzo inventato:
 `{"companyName": "Destinatario Prova", "contactName": "Mario Prova", "contactSMS": "+390000000001", "street": "Via di Prova", "streetNumber": "1", "zipcode": "40121", "city": "BOLOGNA", "countryCode": "IT", "additionalConsigneeInfo": "Citofono 1"}`,
+e il collo con in più `"deliveryPartnerBarcode": "SDA0000000000001"` (inventato),
 `ce-anagrafica` simulato che per `IT` risponde `ITA` / `ITA1` / `IT`, header `idEsecuzione=E1`, `idFile=F1`,
 `ricevutoIl=2026-11-05T09:14:02.123Z`, `rifGrezzo=eurodis_scarichi/E1` e
 configurazione di default. When il mapper lo elabora. Then pubblica, con
@@ -445,14 +454,14 @@ valori (gli altri campi `""`/`0`):
     "contrassegno": { "flag": "S", "importo_contrassegno": 1111.50, "tipo_pagamento_contrassegno": "CON" },
     "consegna": { "data_consegna": "2024-04-01", "inizio_ora_consegna": "08:00", "fine_ora_consegna": "18:00", "note": "Citofono 1" },
     "collo": [{
-      "id_ldv": "", "numero_colli_parz": 1, "peso": 15000,
+      "id_ldv": "SDA0000000000001", "numero_colli_parz": 1, "peso": 15000,
       "lunghezza": 33, "altezza": 55, "profondita": 44, "codice_imballo": "CL"
     }]
   }]
 }
 ```
 
-E la metrica `campo_mancante` cresce per `collo[].id_ldv`; nessuna chiamata a
+E la metrica `campo_mancante` non cresce; nessuna chiamata a
 `ce-anagrafica` per il mittente (`shipperAddress` null).
 
 **AC-01b — esempio TEST del 05-11 così com'è** (`consigneeAddress` null). Then
@@ -460,6 +469,7 @@ non mappabile, motivo `destinatario_assente`, nessuna pubblicazione (RF-14).
 
 | # | Given | When | Then |
 |---|---|---|---|
+| AC-01c | come AC-01 ma senza `deliveryPartnerBarcode` (come la spedizione TEST originale), con `consignorsColloBarcode` valorizzato | elaborazione | pubblicato con `collo[].id_ldv` = `""` (`consignorsColloBarcode` ignorato), `campo_mancante{campo=collo[].id_ldv}` |
 | AC-02 | `collis: null` | elaborazione | pubblica con `collo: []`, nessuna eccezione, `campo_mancante` per `collo[].id_ldv` e `collo[].peso` |
 | AC-03 | `consigneeAddress` completo con `streetNumber` di 40 caratteri | elaborazione | destinatario valorizzato, civico intero (RF-04) |
 | AC-03b | `consigneeAddress` con `zipcode` vuoto | elaborazione | non mappabile, motivo `destinatario_assente` |
@@ -482,7 +492,7 @@ non mappabile, motivo `destinatario_assente`, nessuna pubblicazione (RF-14).
 
 | Punto | Default per partire | Quando arriva la risposta | Rif. |
 |---|---|---|---|
-| LDV del collo vuota in TEST | `consignorsColloBarcode` (confermato 06-11) | EURODIS manda dati di test con il campo valorizzato | DF-02, DF-29, PA-29 |
+| LDV del collo: `deliveryPartnerBarcode` assente in TEST e nello schema dichiarato | `deliveryPartnerBarcode` (deciso 10-11), `""` + metrica se assente | EURODIS conferma che l'API lo valorizza e manda dati di test con il campo | DF-02, DF-29, PA-29 |
 | Codici servizi | tabella 6.8, disattivabile | si toglie o si completa la tabella | PA-03, DF-05, DF-21 |
 | Valori di cliente, contratto, centro di costo, prodotto | configurazione per ambiente (deciso 06-11), default vuoti | si impostano i valori per svil, coll, prod | PA-10, PA-33, DF-11 |
 | Data spedizione senza `entranceTimestamp` | `clearanceTimestamp` | si toglie il fallback o si scarta | DF-01 |
@@ -503,13 +513,18 @@ non mappabile, motivo `destinatario_assente`, nessuna pubblicazione (RF-14).
 
 ## Decisioni di Diego del 06-11
 
-1. LDV: `consignorsColloBarcode` → `collo.id_ldv`; `europlateBarcode` →
-   `internazionale.id_ldv_itz`. Confermata la decisione del 22-10 (DF-02).
+1. LDV: `europlateBarcode` → `internazionale.id_ldv_itz` (confermata la decisione
+   del 22-10). La LDV del collo: superata il 10-11, vedi sotto.
 2. Il destinatario deve essere presente: altrimenti non mappabile (RF-14, DF-30).
 3. Codici nazione: il mapper chiama `ce-anagrafica` come `ce-dichiarato-adapter`
    (sezione 6.4; DF-12, DF-27).
 4. Cliente e contratto da configurazione per ambiente (PA-33).
 5. `id_file` = header `idFile`, il file fittizio di `-in` che compare anche negli eventi di stato.
+
+## Decisioni di Diego del 10-11
+
+1. **La LDV del collo è `collis[].deliveryPartnerBarcode`**, non `consignorsColloBarcode`
+   come supposto il 22-10 (DF-02, PA-11). `consignorsColloBarcode` non si mappa.
 
 ## Domande per Diego
 
@@ -519,3 +534,7 @@ non mappabile, motivo `destinatario_assente`, nessuna pubblicazione (RF-14).
    prodotto per svil (e poi coll e prod): da chi li prendiamo? (PA-33, DF-11)
 3. **Data spedizione.** Se manca `entranceTimestamp` va bene `clearanceTimestamp`? (DF-01)
 4. **Scarti.** Creiamo la DLT `preadvising.eud.pre.build.DLT`? (PA-32)
+5. **Da chiedere a EURODIS (Chiapponi).** `deliveryPartnerBarcode` non è nello
+   schema che `GET /shipments/v1` dichiara di restituire, e lo swagger lo dice
+   "valorizzato solo se il partner di consegna usa il CLS". Confermano che l'API
+   lo restituisce per SDA, e che nei dati di test ci sarà? (DF-02, PA-29)
