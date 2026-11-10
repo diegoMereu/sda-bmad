@@ -19,7 +19,7 @@
         <mxCell id="in" value="&lt;b&gt;ce-dichiarato-eurodis-in&lt;/b&gt;&lt;br&gt;acquisizione e storico" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
           <mxGeometry x="230" y="90" width="160" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="mongo" value="MongoDB&lt;br&gt;storico chiamate&lt;br&gt;e spedizioni" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;size=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+        <mxCell id="mongo" value="PostgreSQL&lt;br&gt;ce_eud_api_in&lt;br&gt;storico chiamate&lt;br&gt;e spedizioni" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;size=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
           <mxGeometry x="250" y="220" width="120" height="80" as="geometry" />
         </mxCell>
         <mxCell id="t1" value="topic Kafka&lt;br&gt;&lt;b&gt;preadvising.eud.pre.build&lt;/b&gt;" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
@@ -40,7 +40,7 @@
         <mxCell id="pdb" value="&lt;b&gt;PDB&lt;/b&gt;&lt;br&gt;waybillCreate" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1">
           <mxGeometry x="1420" y="90" width="130" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="f1" value="F1 / ce-rules&lt;br&gt;&lt;i&gt;chi li interroga: DA DEFINIRE&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;fontSize=11;" vertex="1" parent="1">
+        <mxCell id="f1" value="ce-rules&lt;br&gt;&lt;i&gt;prodotto e servizi, a valle&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1">
           <mxGeometry x="1110" y="230" width="170" height="60" as="geometry" />
         </mxCell>
 
@@ -62,7 +62,15 @@
         <mxCell id="e7" value="" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="t2" target="val"><mxGeometry relative="1" as="geometry" /></mxCell>
         <mxCell id="e8" value="" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="val" target="sync"><mxGeometry relative="1" as="geometry" /></mxCell>
         <mxCell id="e9" value="" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="sync" target="pdb"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e10" value="" style="endArrow=block;startArrow=block;html=1;dashed=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="f1" target="val"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e10" value="" style="endArrow=block;startArrow=block;html=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="f1" target="val"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="t3" value="topic Kafka&lt;br&gt;&lt;b&gt;preadvising.evensource&lt;/b&gt;&lt;br&gt;&lt;i&gt;eventi di stato del file&lt;/i&gt;" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="410" y="230" width="200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="anag" value="&lt;b&gt;ce-anagrafica&lt;/b&gt;&lt;br&gt;codici nazione" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="640" y="230" width="150" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="e13" value="" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="in" target="t3"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e14" value="" style="endArrow=block;startArrow=block;html=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="mapper" target="anag"><mxGeometry relative="1" as="geometry" /></mxCell>
         <mxCell id="e11" value="" style="endArrow=block;html=1;dashed=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="src" target="trk"><mxGeometry relative="1" as="geometry" /></mxCell>
         <mxCell id="e12" value="" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="trk" target="eudt"><mxGeometry relative="1" as="geometry" /></mxCell>
 
@@ -104,7 +112,7 @@
         <mxCell id="f_in" value="&lt;b&gt;ce-dichiarato-eurodis-in&lt;/b&gt;&lt;br&gt;acquisizione e storico" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
           <mxGeometry x="230" y="90" width="160" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="f_mongo" value="MongoDB&lt;br&gt;storico chiamate&lt;br&gt;e spedizioni" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;size=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+        <mxCell id="f_mongo" value="PostgreSQL&lt;br&gt;ce_eud_api_in&lt;br&gt;storico chiamate&lt;br&gt;e spedizioni" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;size=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
           <mxGeometry x="250" y="220" width="120" height="80" as="geometry" />
         </mxCell>
         <mxCell id="f_t1" value="topic Kafka&lt;br&gt;&lt;b&gt;preadvising.eud.pre.build&lt;/b&gt;" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">

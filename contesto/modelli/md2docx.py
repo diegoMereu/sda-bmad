@@ -19,10 +19,11 @@ from pathlib import Path
 
 import docx
 import yaml
-from docx.enum.text import WD_COLOR_INDEX
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_COLOR_INDEX
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.shared import Pt, RGBColor
+from docx.shared import Emu, Pt, RGBColor
+from docx.text.paragraph import Paragraph
 
 QUI = Path(__file__).parent
 TEMPLATE = {"sf": QUI / "template-sf.docx", "dp": QUI / "template-dp.docx"}
@@ -87,6 +88,25 @@ def righe_revisioni(tabella, revisioni, campi):
         for i, campo in enumerate(campi):
             if i < len(riga.cells):
                 scrivi(riga.cells[i], str(rev.get(campo, "") or ""))
+                for p in riga.cells[i].paragraphs:
+                    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+
+
+def intestazione(doc, fm):
+    """Sostituisce il segnaposto "xxxx – iniziativa" delle intestazioni con codice e titolo."""
+    cod = str(fm["codice_iniziativa"])
+    titolo = re.sub(r"^\s*" + re.escape(cod) + r"\s*[-–]\s*", "", str(fm.get("titolo", "")))
+    testo = f"{cod} – {titolo}" if titolo else cod
+    for s in doc.sections:
+        for parte in (s.header, s.first_page_header, s.even_page_header):
+            pars = list(parte.paragraphs)
+            for tb in parte.tables:
+                for riga in tb.rows:
+                    for c in riga.cells:
+                        pars.extend(c.paragraphs)
+            for p in pars:
+                if p.text.strip().lower().startswith("xxxx"):
+                    scrivi(p, testo)
 
 
 def copertina_sf(doc, fm):
@@ -148,19 +168,26 @@ def aggiungi_inline(p, testo):
         if not pezzo:
             continue
         if pezzo.startswith("**") and pezzo.endswith("**"):
-            r = p.add_run(pezzo[2:-2])
-            r.bold = True
+            testo_run, fmt = pezzo[2:-2], "b"
         elif pezzo.startswith("`") and pezzo.endswith("`"):
-            r = p.add_run(pezzo[1:-1])
-            r.font.name = "Courier New"
-            r.font.size = Pt(9)
+            testo_run, fmt = pezzo[1:-1], "c"
         elif pezzo.startswith("*") and pezzo.endswith("*"):
-            r = p.add_run(pezzo[1:-1])
-            r.italic = True
+            testo_run, fmt = pezzo[1:-1], "i"
         else:
-            r = p.add_run(pezzo)
-        if "DA DEFINIRE" in pezzo:
-            r.font.highlight_color = WD_COLOR_INDEX.YELLOW
+            testo_run, fmt = pezzo, ""
+        for parte in re.split(r"(DA DEFINIRE)", testo_run):
+            if not parte:
+                continue
+            r = p.add_run(parte)
+            if fmt == "b":
+                r.bold = True
+            elif fmt == "i":
+                r.italic = True
+            elif fmt == "c":
+                r.font.name = "Courier New"
+                r.font.size = Pt(9)
+            if parte == "DA DEFINIRE":
+                r.font.highlight_color = WD_COLOR_INDEX.YELLOW
 
 
 def ombreggia(cella, colore="D9D9D9"):
@@ -170,6 +197,76 @@ def ombreggia(cella, colore="D9D9D9"):
     shd.set(qn("w:color"), "auto")
     shd.set(qn("w:fill"), colore)
     tcPr.append(shd)
+
+
+CARATTERE = 57150   # larghezza media di un carattere del corpo tabella (9 pt), in EMU
+MONO = 1.4          # il monospazio (`codice`) è più largo del testo proporzionale
+MARGINE = 2.5       # margini interni della cella, in caratteri
+GRASSETTO = 1.2     # l'intestazione è in grassetto, più larga
+PAROLA_MAX = 24     # oltre questa larghezza una parola può andare a capo
+
+
+def unita(testo):
+    """Larghezza di un testo in caratteri del corpo tabella, contando il monospazio più largo."""
+    tot = 0.0
+    for pezzo in INLINE.split(testo):
+        if pezzo.startswith("`") and pezzo.endswith("`") and len(pezzo) > 1:
+            tot += (len(pezzo) - 2) * MONO
+        else:
+            tot += len(re.sub(r"\*\*|(?<!\w)\*|\*(?!\w)", "", pezzo))
+    return tot
+
+
+def larghezze(intest, dati, totale):
+    """Larghezze delle colonne: ogni colonna contiene almeno la sua parola più lunga
+    (niente parole spezzate), lo spazio restante va a chi ha più testo."""
+    minimi, desiderati = [], []
+    for j, h in enumerate(intest):
+        valori = [r[j] if j < len(r) else "" for r in dati]
+        parti = [x.replace("\\|", "|") for v in valori for x in v.split("<br>")]
+        parole = [unita(w) for x in parti for w in x.split()]
+        parole += [unita(w) * GRASSETTO for w in h.replace("\\|", "|").split()]
+        # una parola lunghissima (un percorso di campo) può andare a capo: non ruba spazio alle altre colonne
+        parola = min(max(parole, default=1), PAROLA_MAX)
+        lunghi = sorted([unita(x) for x in parti] + [unita(h) * GRASSETTO])
+        tipico = lunghi[int(len(lunghi) * 0.8)] if lunghi else 1
+        minimi.append(max(parola, 2) + MARGINE)
+        desiderati.append(min(max(tipico, parola), 60) + MARGINE)
+    disponibile = totale / CARATTERE
+    if sum(minimi) >= disponibile:
+        pesi = minimi
+    else:
+        extra = [max(d - m, 0) for d, m in zip(desiderati, minimi)]
+        resto = disponibile - sum(minimi)
+        if sum(extra) <= resto or sum(extra) == 0:
+            pesi = [m + e for m, e in zip(minimi, extra)]
+        else:
+            pesi = [m + resto * e / sum(extra) for m, e in zip(minimi, extra)]
+    somma = sum(pesi)
+    return [int(totale * w / somma) for w in pesi]
+
+
+def imposta_larghezze(t, misure):
+    t.autofit = False
+    tblPr = t._tbl.tblPr
+    tblW = tblPr.find(qn("w:tblW"))
+    if tblW is None:
+        tblW = OxmlElement("w:tblW")
+        tblPr.append(tblW)
+    tblW.set(qn("w:type"), "dxa")
+    tblW.set(qn("w:w"), str(int(sum(misure) / 635)))
+    griglia = t._tbl.tblGrid
+    for col, w in zip(griglia.findall(qn("w:gridCol")), misure):
+        col.set(qn("w:w"), str(int(w / 635)))
+    for riga in t.rows:
+        for c, w in zip(riga.cells, misure):
+            c.width = Emu(w)
+
+
+def riga_opzione(riga, nome):
+    trPr = riga._tr.get_or_add_trPr()
+    el = OxmlElement(nome)
+    trPr.append(el)
 
 
 def celle(riga):
@@ -201,6 +298,7 @@ class Corpo:
     def titolo(self, livello, testo):
         p = self.doc.add_paragraph(style=f"Heading {livello}")
         aggiungi_inline(p, testo)
+        p.paragraph_format.keep_with_next = True  # il titolo non resta solo in fondo alla pagina
 
     def num_pallini(self):
         """numId della prima lista a pallini (Symbol) definita nel template."""
@@ -259,9 +357,21 @@ class Corpo:
                 for p in c.paragraphs:
                     for r in p.runs:
                         r.font.size = corpo
+        sez = self.doc.sections[-1]
+        imposta_larghezze(t, larghezze(intest, dati, sez.page_width - sez.left_margin - sez.right_margin))
+        riga_opzione(t.rows[0], "w:tblHeader")
+        for riga in t.rows:
+            riga_opzione(riga, "w:cantSplit")
+        for c in t.rows[0].cells:
+            for p in c.paragraphs:
+                p.paragraph_format.keep_with_next = True
         self.doc.add_paragraph()
 
     def codice(self, linee):
+        body = self.doc.element.body
+        precedenti = [el for el in body if el.tag == qn("w:p")]
+        if precedenti:  # la frase che introduce l'esempio resta con l'esempio
+            Paragraph(precedenti[-1], self.doc._body).paragraph_format.keep_with_next = True
         t = self.doc.add_table(rows=1, cols=1)
         t.style = self.stile("Table Grid")
         c = t.rows[0].cells[0]
@@ -272,6 +382,8 @@ class Corpo:
             r.font.size = Pt(8)
             if i < len(linee) - 1:
                 r.add_break()
+        if len(linee) <= 40:  # un esempio breve non si spezza fra due pagine
+            riga_opzione(t.rows[0], "w:cantSplit")
         self.doc.add_paragraph()
 
     def immagine(self, didascalia, percorso):
@@ -369,6 +481,7 @@ def main():
     doc = docx.Document(str(TEMPLATE[tipo]))
     taglia_corpo(doc)
     (copertina_sf if tipo == "sf" else copertina_dp)(doc, fm)
+    intestazione(doc, fm)
     Corpo(doc, src.parent).scrivi(m.group(2))
     aggiorna_campi_all_apertura(doc)
     doc.save(str(dst))
