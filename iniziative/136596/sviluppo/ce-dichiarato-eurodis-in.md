@@ -1,6 +1,6 @@
 # `ce-dichiarato-eurodis-in` — Documento funzionale per lo sviluppo
 
-**Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.6 (persistenza su PostgreSQL ed eventi di stato, da implementare) · **Data**: 2026-11-10
+**Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.6.1 (persistenza su PostgreSQL, eventi di stato, risposte EURODIS; da implementare) · **Data**: 2026-11-10
 **Autore**: Mary (analyst) · **Destinatario**: Amelia (dev) e team di sviluppo
 **Repository**: https://posteitaliane.ghe.com/SVILUPPO/CORRIERE-ESPRESSO_PREADVISING_ce-dichiarato-eurodis-in
 **Generato da**: [prompt-ce-dichiarato-eurodis-in.md](prompt-ce-dichiarato-eurodis-in.md)
@@ -93,9 +93,9 @@ Significato dei codici [FATTO, swagger]:
 
 - [FATTO] La descrizione dello swagger dice: *"Deploys all new shipments, that have not already been deployed to the partner"*.
 - [FATTO] Non esiste un endpoint di conferma (acknowledge o commit).
-- [IPOTESI I1, forte] EURODIS segna una spedizione come consegnata nel momento in cui la restituisce. La consegna è quindi **at-most-once**: una risposta persa per timeout, crash o retry del client fa perdere le spedizioni. Le si può recuperare solo con la GET puntuale, e solo se si conosce l'`edReference` (PA-05, PA-09).
+- [FATTO I1, confermata da EURODIS il 10-11] `GET /shipments/v1` restituisce solo le spedizioni non ancora ricevute e non c'è ack: la consegna è **at-most-once**. Una risposta persa per timeout, crash o retry del client fa perdere le spedizioni. Due vie di recupero: la GET puntuale, se si conosce l'`edReference` (disponibile per **60 giorni**); oppure la **richiesta a EURODIS di rimettere tutti i dati** nella richiesta successiva (modalità da concordare in call). Vedi [risposte-eurodis-2026-11-10.md](../risposte-eurodis-2026-11-10.md) (PA-05, PA-09 chiusi).
 - [IPOTESI I2] La GET puntuale non ha effetti collaterali e funziona anche su spedizioni già scaricate.
-- [IPOTESI I3] La risposta può essere molto grande: lo swagger non dichiara limiti (PA-27).
+- [FATTO 10-11] Nessun limite né paginazione, per ora; EURODIS consiglia una chiamata ogni 15-20 minuti (frequenza decisa: sezione 8). Prima chiamata: solo il non ancora ricevuto, nessun arretrato storico. Nessuna rettifica dopo l'attivazione (PA-06, PA-27 chiusi).
 
 Ne segue che **`GET /shipments/v1` non è sicura né idempotente**, anche se è una GET. Va trattata come un'operazione che consuma i dati.
 
@@ -357,7 +357,7 @@ sequenceDiagram
 | RF-13 | Una spedizione non identificabile non si scarta in silenzio: record `NON_IDENTIFICABILE` con JSON e motivo, scarico `INVIO_PARZIALE`. | `SpedizioneService.registraNonIdentificabile` |
 | RF-14 | Il corpo del messaggio è il testo della spedizione **identico** a quello ricevuto (non riserializzato). | `AnalizzatoreSpedizioni.elementi` |
 | RF-15 | I corpi di errore in testo semplice (`401 Invalid API Key`) si registrano come testo nell'`errore` del run. | `ScaricoService` |
-| RF-16 | Recupero puntuale: gli `edReference` in `eurodis.in.recupero.ed-references` si rileggono con `GET /shipment/{edReference}/v1` (run `RILETTURA`), una volta per valore; i fallimenti 5xx o di rete si ritentano al giro dopo. **Nessun endpoint applicativo** [DECISO 04-11]. | `RichiesteManualiService` |
+| RF-16 | Recupero puntuale: gli `edReference` in `eurodis.in.recupero.ed-references` si rileggono con `GET /shipment/{edReference}/v1` (run `RILETTURA`), una volta per valore. **[FATTO 10-11]** EURODIS tiene la spedizione rileggibile per **60 giorni**: oltre, resta solo il grezzo salvato; i fallimenti 5xx o di rete si ritentano al giro dopo. **Nessun endpoint applicativo** [DECISO 04-11]. | `RichiesteManualiService` |
 | RF-17 | Reinvio manuale: gli `edReference` in `eurodis.in.ripubblica.ed-references` si reinviano dal record salvato, senza chiamare EURODIS, una volta per valore. | `RichiesteManualiService` |
 | RF-18 | **Metriche e span su tutto** [DECISO 04-11]: ogni job, la chiamata EURODIS e l'invio Kafka hanno uno span OpenTelemetry e metriche Micrometer (sezione 9). Il contesto W3C va negli header Kafka. Il tracing non deve mai mandare in errore la lavorazione. | `TraceUtil`, `MetricheEurodisIn` |
 | RF-19 | **File fittizio** [DECISO 06-11]: ogni scarico (o rilettura) con almeno una spedizione ha un `idFile` (UUID) e un `nomeFile`, assegnati una volta sola e salvati sullo scarico. L'`idFile` va nell'header `idFile` di ogni spedizione inviata, anche nei reinvii (RF-11, RF-17). | da implementare |
@@ -401,8 +401,8 @@ finestra in cui si possono perdere spedizioni (I1).
 | `404` | run `NESSUNA_SPEDIZIONE` | `eurodis_scarichi` | — |
 | `401` (chiave) | run `ERRORE_CHIAMATA`, errore `HTTP 401: Invalid API Key` | `eurodis_scarichi`, span in errore | Verificare il secret `api-key` o la chiave con EURODIS. Nessuna spedizione persa |
 | `424` / `451` | run `ERRORE_CHIAMATA` | idem | Configurazione del partner presso EURODIS (Chiapponi) |
-| `500` | run `ERRORE_CHIAMATA`, nessun retry | idem | Prossimo run. [IPOTESI] Se EURODIS avesse già segnato le spedizioni come consegnate, servirebbe un recupero (PA-09) |
-| Timeout o connessione caduta | run `ERRORE_CHIAMATA` senza esito HTTP, log CRITICO | idem | **Rischio di perdita** (I1): chiedere a EURODIS gli `edReference` del periodo e recuperarli con RF-16 |
+| `500` | run `ERRORE_CHIAMATA`, nessun retry | idem | Prossimo run. Se EURODIS avesse già segnato le spedizioni come consegnate: richiesta di rimando a EURODIS, come sopra |
+| Timeout o connessione caduta | run `ERRORE_CHIAMATA` senza esito HTTP, log CRITICO | idem | **Rischio di perdita** (I1): chiedere a EURODIS di **rimettere tutti i dati** nella richiesta successiva (risposte EURODIS del 10-11, modalità da concordare), oppure gli `edReference` del periodo da recuperare con RF-16 entro 60 giorni. I doppioni che ne derivano si filtrano a valle |
 | Pod caduto durante la chiamata | run rimasto `CHIAMATA_IN_CORSO` | `eurodis_scarichi` | come sopra |
 | PostgreSQL giù al salvataggio del grezzo | log CRITICO con gli `edReference` estratti dal testo | log | RF-16 per gli `edReference` del log |
 | Pod caduto durante la fase 2 | scarico rimasto `IN_ELABORAZIONE` | `eurodis_scarichi` | Ripreso automaticamente dopo 15 minuti; i record già inviati vengono reinviati (la deduplica è a valle) |
@@ -424,8 +424,8 @@ Variabili d'ambiente (Helm) → proprietà `eurodis.in.*` in `application.yaml`.
 | `EURODIS_BASE_URL` | `base-url` | URL TEST | PROD: `https://api.eurodis.com/receive-pan` |
 | `EURODIS_API_KEY` | `api-key` | secret `ce-dichiarato-eurodis-in-secret`, chiave `api-key` | |
 | `EURODIS_AMBIENTE` | `ambiente` | `TEST` | header `ambiente` |
-| `EURODIS_IN_CRON` | `cron` | `0 */2 * * * *` | scarico ogni 2 minuti [DECISO 04-11] |
-| `EURODIS_ELABORAZIONE_CRON` | `elaborazione.cron` | `30 */2 * * * *` | invio ogni 2 minuti, 30 s dopo lo scarico [DECISO 04-11] |
+| `EURODIS_IN_CRON` | `cron` | `0 */2 * * * *` | scarico ogni 2 minuti in svil e coll; **in produzione ogni 10 minuti** (`0 */10 * * * *`, nel `values_TEMPLATE` di prod) [DECISO 10-11, Diego; EURODIS consiglia 15-20 minuti] |
+| `EURODIS_ELABORAZIONE_CRON` | `elaborazione.cron` | `30 */2 * * * *` | invio 30 s dopo lo scarico: ogni 2 minuti in svil e coll, **in produzione ogni 10 minuti** (`30 */10 * * * *`) [DECISO 10-11] |
 | `EURODIS_TIMEOUT_CONNECT` / `_READ` | `timeout.*` | 10 s / 120 s | |
 | `EURODIS_LOCK_DURATA_MAX` | `lock.durata-max` | `PT15M` | anche soglia di ripresa degli scarichi `IN_ELABORAZIONE` |
 | `EURODIS_GREZZO_SOGLIA_GUARDIA` | `grezzo.soglia-guardia` | 100 MB | warning e metrica; la soglia GridFS non esiste più |
@@ -560,7 +560,7 @@ Criteri da verificare anche end-to-end contro `mock-eurodis` (`../mock-eurodis/`
 | D1. Dove salvare il grezzo | **DECISO 10-11** (supera il 04-11): PostgreSQL `ce_eud_api_in`, colonne `text`, niente GridFS; DDL in [ddl-ce-eurodis-api-in.md](ddl-ce-eurodis-api-in.md) | PA-02 |
 | D2. Contratto del messaggio | **DECISO 04-11**: corpo = spedizione così com'è, chiave `edReference`, metadati negli header | PA-31 |
 | D3. Istanza unica | **IMPLEMENTATO** con ShedLock su Mongo; da portare su ShedLock JDBC (tabella `shedlock`). La call con Tagliente resta utile per conferma | PA-01 |
-| D4. Frequenza | **DECISO 04-11**: scarico e invio ogni 2 minuti | PA-14 |
+| D4. Frequenza | **DECISO 10-11** (Diego): produzione ogni 10 minuti, svil e coll ogni 2 minuti, scarico e invio. EURODIS consiglia 15-20 minuti, nessun limite. Si cambia solo da configurazione (sezione 8) | PA-14 |
 | D5. Duplicati | **DECISO 04-11**: nessun filtro in `-in`, si filtra a valle | — |
 | D6. Recupero | **DECISO 04-11**: niente endpoint applicativi (cioè niente API REST esposte dal servizio per comandi dell'operatore); elenchi di `edReference` in configurazione | PA-09 |
 | Disegno in due fasi | **DECISO 04-11**: scarico (run + esito + grezzo) ed elaborazione (record per spedizione + esito dello scarico) | — |
@@ -572,9 +572,10 @@ Criteri da verificare anche end-to-end contro `mock-eurodis` (`../mock-eurodis/`
 | Credenziali del database | **DECISO 10-11**: secret `ce-postgres` di `ce-db-sync` | — |
 | Conservazione dei dati | APERTO: proposta di job di pulizia (DDL, sezione 4) | — |
 | Alert Datadog | APERTO, da fare più avanti (sezione 9) | assessment AS-19 |
-| Ack o riconsegna EURODIS | APERTO: si assume che non esistano (I1) | PA-05, PA-09 |
-| Massimo di spedizioni per chiamata, fuso orario, `consigneeAddress` null | APERTO: nessun impatto su `-in` (non interpreta i dati) | PA-27 |
-| Prima chiamata e arretrato | APERTO: gestita come una chiamata grande | PA-06 |
+| Ack o riconsegna EURODIS | **CHIUSO 10-11**: nessun ack (I1 confermata); su richiesta EURODIS rimette tutti i dati nella richiesta successiva. Resta da concordare **come** si chiede il rimando | PA-05, PA-09 |
+| Log parallelo consigliato da EURODIS | APERTO: nei log applicativi no (dati personali); la difesa è il grezzo salvato per primo (RF-06). Se Diego lo vuole, file o volume dedicato | risposte EURODIS, punto 1 |
+| Massimo di spedizioni per chiamata, fuso orario, `consigneeAddress` null | **CHIUSO 10-11**: nessun limite; fuso dello scambio FTP esistente; destinatario in `consigneeAddress` in produzione. Nessun impatto su `-in`, che non interpreta i dati | PA-27 |
+| Prima chiamata e arretrato | **CHIUSO 10-11**: nessun arretrato storico, solo il non ancora ricevuto | PA-06 |
 | Chiave di produzione | APERTO | PA-12 |
 | Riconciliazione con altre API EURODIS | [IPOTESI], non sviluppata | — |
 
@@ -604,6 +605,8 @@ Criteri da verificare anche end-to-end contro `mock-eurodis` (`../mock-eurodis/`
   da una copia della 0.2 (commit `c35093d`).
 - 0.6 (10-11): persistenza su PostgreSQL (`ce_eud_api_in`) al posto di MongoDB, niente GridFS,
   ShedLock JDBC, credenziali del secret `ce-postgres` (Diego; DDL di Winston).
+- 0.6.1 (10-11): risposte di EURODIS (I1 confermata, rimando dei dati su richiesta, rilettura per
+  60 giorni, nessun limite, nessun arretrato) e frequenza: produzione 10 minuti, svil e coll 2 (Mary).
 
 ## Domande per Diego (0.5)
 
