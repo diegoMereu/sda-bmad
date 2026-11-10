@@ -93,7 +93,7 @@
     </mxGraphModel>
   </diagram>
   <diagram id="flussi-136596" name="Flussi dati">
-    <mxGraphModel dx="1600" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="560" math="0" shadow="0">
+    <mxGraphModel dx="1800" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="560" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -101,78 +101,101 @@
         <mxCell id="f_titolo" value="136596 - EURODIS Autoproduttore: flussi dati" style="text;html=1;fontSize=16;fontStyle=1;align=left;verticalAlign=middle;" vertex="1" parent="1">
           <mxGeometry x="20" y="10" width="700" height="30" as="geometry" />
         </mxCell>
-
         <mxCell id="f_ns" value="OpenShift - namespace corriere-espresso-preadvising" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;fillColor=none;strokeColor=#6c8ebf;verticalAlign=top;align=left;spacingLeft=8;fontSize=11;fontColor=#6c8ebf;arcSize=3;" vertex="1" parent="1">
-          <mxGeometry x="200" y="50" width="1180" height="430" as="geometry" />
+          <mxGeometry x="185" y="50" width="1420" height="480" as="geometry" />
         </mxCell>
-
         <mxCell id="f_eud" value="&lt;b&gt;EURODIS&lt;/b&gt;&lt;br&gt;API receive-pan" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
           <mxGeometry x="20" y="90" width="140" height="60" as="geometry" />
         </mxCell>
         <mxCell id="f_in" value="&lt;b&gt;ce-dichiarato-eurodis-in&lt;/b&gt;&lt;br&gt;acquisizione e storico" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
-          <mxGeometry x="230" y="90" width="160" height="60" as="geometry" />
-        </mxCell>
-        <mxCell id="f_mongo" value="PostgreSQL&lt;br&gt;ce_eud_api_in&lt;br&gt;storico chiamate&lt;br&gt;e spedizioni" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;size=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
-          <mxGeometry x="250" y="220" width="120" height="80" as="geometry" />
+          <mxGeometry x="205" y="90" width="170" height="60" as="geometry" />
         </mxCell>
         <mxCell id="f_t1" value="topic Kafka&lt;br&gt;&lt;b&gt;preadvising.eud.pre.build&lt;/b&gt;" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="420" y="90" width="180" height="60" as="geometry" />
+          <mxGeometry x="400" y="90" width="180" height="60" as="geometry" />
         </mxCell>
         <mxCell id="f_mapper" value="&lt;b&gt;ce-dichiarato-eurodis-mapper&lt;/b&gt;&lt;br&gt;trasformazione in tracciato unico" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
-          <mxGeometry x="630" y="90" width="170" height="60" as="geometry" />
+          <mxGeometry x="605" y="90" width="175" height="60" as="geometry" />
         </mxCell>
         <mxCell id="f_t2" value="topic Kafka&lt;br&gt;&lt;b&gt;preadvising.pre-enrichment&lt;/b&gt;" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="830" y="90" width="180" height="60" as="geometry" />
+          <mxGeometry x="805" y="90" width="180" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="f_val" value="&lt;b&gt;ce-dichiarato-validatore&lt;/b&gt;&lt;br&gt;e catena di preadvising" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1">
-          <mxGeometry x="1040" y="90" width="150" height="60" as="geometry" />
+        <mxCell id="f_val" value="&lt;b&gt;ce-dichiarato-validatore&lt;/b&gt;&lt;br&gt;validazione" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="1010" y="90" width="160" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="f_sync" value="&lt;b&gt;ce-dichiarato-ldv-pdb&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1">
-          <mxGeometry x="1215" y="90" width="150" height="60" as="geometry" />
+        <mxCell id="f_orch" value="&lt;b&gt;ce-dichiarato-orchestratore&lt;/b&gt;&lt;br&gt;normalizzazione, enrichment BEP" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="1205" y="90" width="180" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="f_ldv" value="&lt;b&gt;ce-dichiarato-ldv-pdb&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="1420" y="90" width="160" height="60" as="geometry" />
         </mxCell>
         <mxCell id="f_pdb" value="&lt;b&gt;PDB&lt;/b&gt;&lt;br&gt;waybillCreate" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1">
-          <mxGeometry x="1420" y="90" width="130" height="60" as="geometry" />
+          <mxGeometry x="1640" y="90" width="130" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="f_f1" value="F1 / ce-rules&lt;br&gt;&lt;i&gt;chi li interroga: DA DEFINIRE&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="1110" y="230" width="170" height="60" as="geometry" />
+        <mxCell id="f_buf" value="area di appoggio&lt;br&gt;locale /buffer&lt;br&gt;(volume del pod)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="200" y="230" width="100" height="70" as="geometry" />
         </mxCell>
-
+        <mxCell id="f_pg" value="PostgreSQL&lt;br&gt;ce_eud_api_in&lt;br&gt;storico chiamate&lt;br&gt;e spedizioni" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;size=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="310" y="225" width="115" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="f_ev" value="topic Kafka&lt;br&gt;&lt;b&gt;preadvising.evensource&lt;/b&gt;" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="440" y="240" width="180" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="f_ana" value="&lt;b&gt;ce-anagrafica&lt;/b&gt;&lt;br&gt;codici nazione" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="625" y="240" width="145" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="f_t3" value="topic Kafka&lt;br&gt;&lt;b&gt;preadvising.enrichment&lt;/b&gt;" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="240" width="180" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="f_t4" value="topic Kafka&lt;br&gt;&lt;b&gt;preadvising.completed&lt;/b&gt;" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1405" y="240" width="180" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="f_rules" value="ce-rules&lt;br&gt;&lt;i&gt;consultato dalla catena esistente&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1215" y="350" width="160" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="f_smi" value="&lt;b&gt;ce-dichiarato-smistatore&lt;/b&gt;&lt;br&gt;canali Poste" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="1415" y="350" width="170" height="60" as="geometry" />
+        </mxCell>
         <mxCell id="f_eudt" value="&lt;b&gt;EURODIS&lt;/b&gt;&lt;br&gt;API send-tracking" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
-          <mxGeometry x="20" y="380" width="140" height="60" as="geometry" />
+          <mxGeometry x="20" y="440" width="140" height="60" as="geometry" />
         </mxCell>
         <mxCell id="f_trk" value="&lt;b&gt;ce-eurodis-send-tracking&lt;/b&gt;&lt;br&gt;tracciamento" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
-          <mxGeometry x="230" y="380" width="160" height="60" as="geometry" />
+          <mxGeometry x="205" y="440" width="170" height="60" as="geometry" />
         </mxCell>
         <mxCell id="f_src" value="Tracce SDA&lt;br&gt;&lt;i&gt;sorgente DA DEFINIRE&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="440" y="380" width="150" height="60" as="geometry" />
+          <mxGeometry x="430" y="440" width="160" height="60" as="geometry" />
         </mxCell>
-
         <mxCell id="f_e1" value="1" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="f_eud" target="f_in"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="f_e23" value="2, 3" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="f_in" target="f_mongo"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="f_e4" value="4" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="f_in" target="f_t1"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="f_e5" value="5" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="f_t1" target="f_mapper"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="f_e6" value="6" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="f_mapper" target="f_t2"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="f_e7" value="7" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="f_t2" target="f_val"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="f_e8" value="8" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="f_val" target="f_sync"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="f_e9" value="9" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="f_sync" target="f_pdb"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="f_e10" value="10" style="endArrow=block;startArrow=block;html=1;dashed=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="f_f1" target="f_val"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="f_e11" value="11" style="endArrow=block;html=1;dashed=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="f_src" target="f_trk"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="f_e12" value="12" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="f_trk" target="f_eudt"><mxGeometry relative="1" as="geometry" /></mxCell>
-
+        <mxCell id="f_e2" value="2" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="f_in" target="f_buf"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="f_e3_4" value="3, 4" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="f_in" target="f_pg"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="f_e5" value="5" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="f_in" target="f_ev"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="f_e6" value="6" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="f_in" target="f_t1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="f_e7" value="7" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="f_t1" target="f_mapper"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="f_e8" value="8" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontStyle=1;startArrow=block;" edge="1" parent="1" source="f_mapper" target="f_ana"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="f_e9" value="9" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="f_mapper" target="f_t2"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="f_e10" value="10" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="f_t2" target="f_val"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="f_e11" value="11" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="f_val" target="f_t3"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="f_e12" value="12" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="f_t3" target="f_orch"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="f_e13" value="13" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="f_orch" target="f_ldv"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="f_e14" value="14" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="f_ldv" target="f_pdb"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="f_e15" value="15" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="f_orch" target="f_t4"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="f_e16" value="16" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="f_t4" target="f_smi"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="f_e17" value="17" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontStyle=1;dashed=1;" edge="1" parent="1" source="f_src" target="f_trk"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="f_e18" value="18" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontStyle=1;" edge="1" parent="1" source="f_trk" target="f_eudt"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="f_erules" value="" style="endArrow=none;html=1;strokeColor=#999999;" edge="1" parent="1" source="f_orch" target="f_rules"><mxGeometry relative="1" as="geometry" /></mxCell>
         <mxCell id="f_leg" value="&lt;b&gt;Legenda&lt;/b&gt;" style="text;html=1;align=left;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="830" y="350" width="100" height="20" as="geometry" />
+          <mxGeometry x="640" y="410" width="100" height="20" as="geometry" />
         </mxCell>
         <mxCell id="f_lnew" value="Nuovo (questa iniziativa)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="1">
-          <mxGeometry x="830" y="375" width="160" height="25" as="geometry" />
+          <mxGeometry x="640" y="435" width="160" height="25" as="geometry" />
         </mxCell>
         <mxCell id="f_lold" value="Esistente" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;" vertex="1" parent="1">
-          <mxGeometry x="1000" y="375" width="110" height="25" as="geometry" />
+          <mxGeometry x="810" y="435" width="110" height="25" as="geometry" />
         </mxCell>
         <mxCell id="f_lext" value="Esterno (EURODIS)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;" vertex="1" parent="1">
-          <mxGeometry x="1120" y="375" width="130" height="25" as="geometry" />
+          <mxGeometry x="930" y="435" width="130" height="25" as="geometry" />
         </mxCell>
         <mxCell id="f_ldash" value="Tratteggio: da definire. Numeri: flussi dati del Documento di Progettazione." style="text;html=1;align=left;fontSize=10;fontColor=#555555;" vertex="1" parent="1">
-          <mxGeometry x="830" y="410" width="440" height="20" as="geometry" />
+          <mxGeometry x="640" y="470" width="440" height="20" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>

@@ -7,6 +7,9 @@ markdown ristretto: titoli #..####, paragrafi, elenchi "- " e "1. ", tabelle
 pipe, blocchi ``` (resi come riquadro monospazio, come i DTO negli esempi),
 immagini ![didascalia](file) e didascalie "Figura n: ..." / "Tabella n: ...".
 Inline: **grassetto**, *corsivo*, `codice`.
+Orientamento: una riga `<!-- orientamento: orizzontale -->` (o `verticale`) apre una
+nuova sezione su pagina nuova con quell'orientamento, per le tabelle con molte colonne;
+senza questa riga il documento resta tutto verticale.
 
 Dal template si tiene solo la copertina (tutto quello che precede il primo
 Heading 1); il sommario si aggiorna all'apertura del file in Word.
@@ -19,6 +22,7 @@ from pathlib import Path
 
 import docx
 import yaml
+from docx.enum.section import WD_ORIENT, WD_SECTION
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_COLOR_INDEX
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
@@ -322,6 +326,19 @@ class Corpo:
         aggiungi_inline(p, testo)
         return p
 
+    def orientamento(self, orizzontale):
+        """Nuova sezione su pagina nuova, orizzontale o verticale; intestazioni e piè di pagina
+        restano quelli della sezione precedente."""
+        prec = self.doc.sections[-1]
+        voluto = WD_ORIENT.LANDSCAPE if orizzontale else WD_ORIENT.PORTRAIT
+        if prec.orientation == voluto:
+            return
+        sez = self.doc.add_section(WD_SECTION.NEW_PAGE)
+        larga, alta = max(prec.page_width, prec.page_height), min(prec.page_width, prec.page_height)
+        sez.orientation = voluto
+        sez.page_width, sez.page_height = (larga, alta) if orizzontale else (alta, larga)
+        sez.different_first_page_header_footer = False
+
     def titolo(self, livello, testo):
         p = self.doc.add_paragraph(style=f"Heading {livello}")
         aggiungi_inline(p, testo)
@@ -393,7 +410,15 @@ class Corpo:
         for c in t.rows[0].cells:
             for p in c.paragraphs:
                 p.paragraph_format.keep_with_next = True
-        self.doc.add_paragraph()
+        spazio = self.doc.add_paragraph()
+        return t, spazio
+
+    def lega_didascalia(self, t, spazio):
+        """La didascalia "Tabella n: ..." resta sulla pagina dell'ultima riga della tabella."""
+        for c in t.rows[-1].cells:
+            for p in c.paragraphs:
+                p.paragraph_format.keep_with_next = True
+        spazio.paragraph_format.keep_with_next = True
 
     def codice(self, linee):
         body = self.doc.element.body
@@ -433,6 +458,11 @@ class Corpo:
         while i < len(linee):
             l = linee[i]
             s = l.strip()
+            m = re.match(r"^<!--\s*orientamento:\s*(orizzontale|verticale)\s*-->$", s)
+            if m:
+                self.orientamento(m.group(1) == "orizzontale")
+                i += 1
+                continue
             if not s or s.startswith("<!--"):
                 while s.startswith("<!--") and "-->" not in s and i + 1 < len(linee):
                     i += 1
@@ -458,7 +488,10 @@ class Corpo:
                 while i < len(linee) and linee[i].strip().startswith("|"):
                     righe.append(linee[i])
                     i += 1
-                self.tabella(righe)
+                t, spazio = self.tabella(righe)
+                dopo = next((x.strip() for x in linee[i:] if x.strip()), "")
+                if re.match(r"^Tabella\s+\d+\s*[:\-–]", dopo):
+                    self.lega_didascalia(t, spazio)
                 continue
             m = re.match(r"^!\[(.*?)\]\((.*?)\)$", s)
             if m:
