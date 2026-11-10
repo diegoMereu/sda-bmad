@@ -76,3 +76,7 @@ mancante è infrastrutturale o di verifica in ambiente: verifica di avvio in svi
 1. Deploy con `EURODIS_IN_ABILITATO=false` e verifica di avvio con Mongo e Kafka veri (AS-22).
 2. Abilitare lo scarico e provare con EURODIS TEST (PA-29).
 3. Più avanti: alert Datadog (AS-19), conservazione delle collezioni (AS-21).
+
+## Aggiornamento del 10-11
+
+Mongo non è più la persistenza: `-in` è passato a **PostgreSQL** (`9acdd77`, DDL in `sql/ddl/` e in `ddl-ce-eurodis-api-in.md`, secret `ce-postgres`). AS-4, AS-5 e AS-16 valgono quindi solo per la versione su Mongo (`a53398c`); AS-22 resta aperto con PostgreSQL al posto di Mongo. Nuovo AS-25: al commit `bd33e8a` `develop` non compila (riparato da `9acdd77`), un build agganciato a quel commit fallisce.

@@ -2,7 +2,8 @@
 
 **Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.2 (bozza) · **Data**: 2026-11-10
 **Autrice**: Mary (analyst) · **Destinataria**: Amelia (dev) e team di sviluppo
-**Repository**: https://posteitaliane.ghe.com/SVILUPPO/CORRIERE-ESPRESSO_PREADVISING_ce-eurodis-send-tracking (branch `feature/eurodis-base-implementation`)
+**Repository**: https://posteitaliane.ghe.com/SVILUPPO/CORRIERE-ESPRESSO_PREADVISING_ce-eurodis-send-tracking (branch `develop`, allineato anche `feature/eurodis-base-implementation`)
+**Implementazione** (10-11): client EURODIS `4cba024`, traduzione degli stati IN-BOUND `591767d`; 143 test verdi. Formato della traccia SDA in ingresso (`TracciaSda`) proposto da Amelia in attesa della sorgente (PA-35); `1100` senza `acceptorName` scartato in locale (AC-10).
 **Generato da**: [prompt-ce-eurodis-send-tracking.md](prompt-ce-eurodis-send-tracking.md)
 **Fonte principale**: [eurodis-send-tracking-swagger-v1.json](../eurodis-send-tracking-swagger-v1.json) (scaricato il 05-11)
 

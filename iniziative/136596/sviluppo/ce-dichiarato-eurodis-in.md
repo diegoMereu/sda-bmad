@@ -4,7 +4,7 @@
 **Autore**: Mary (analyst) · **Destinatario**: Amelia (dev) e team di sviluppo
 **Repository**: https://posteitaliane.ghe.com/SVILUPPO/CORRIERE-ESPRESSO_PREADVISING_ce-dichiarato-eurodis-in
 **Generato da**: [prompt-ce-dichiarato-eurodis-in.md](prompt-ce-dichiarato-eurodis-in.md)
-**Implementazione**: branch `feature/eurodis-base-implementation`, commit `a53398c` (04-11, 53 test verdi).
+**Implementazione**: branch `develop`, commit `3c01ba2` e seguenti (10-11, 74 test verdi): PostgreSQL (`9acdd77`, script in `sql/ddl/`), Helm (`bb61d50`), eventi di stato (`3c01ba2`). Scostamento: salvataggio delle spedizioni con `UPDATE` seguito da `INSERT` invece di `INSERT ... ON CONFLICT`, per poterlo provare su H2; stesso risultato. Mai avviato contro PostgreSQL e Kafka veri. Prima implementazione su Mongo: `a53398c` (04-11).
 Assessment: [assessment-ce-dichiarato-eurodis-in-2026-11-04.md](assessment-ce-dichiarato-eurodis-in-2026-11-04.md)
 
 Etichette usate nel documento:

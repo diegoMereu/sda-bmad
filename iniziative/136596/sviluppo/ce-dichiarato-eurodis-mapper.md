@@ -4,6 +4,7 @@
 **Autore**: Mary (analyst) · **Destinatario**: Amelia (dev) e team di sviluppo
 **Repository**: https://posteitaliane.ghe.com/SVILUPPO/CORRIERE-ESPRESSO_PREADVISING_ce-dichiarato-eurodis-mapper
 **Generato da**: [prompt-ce-dichiarato-eurodis-mapper.md](prompt-ce-dichiarato-eurodis-mapper.md)
+**Implementazione** (10-11): branch `develop`, commit `dbb3b59` (tracciato completo, canale, LDV, destinatario) e `474c8ef` (`ce-anagrafica`, header di `-in`, error handler con DLT, metriche e span); 94 test verdi. Scostamenti: `collo.articolo: []` presente e `codici_servizi` ripetuto alla radice, come nell'esempio EUD (AC-14); tolta la bean validation su `dispatchPartnersDomesticShipmentNumber` (bloccano solo JSON, `edReference` e destinatario, RF-06). Spring Boot del repo a 4.1.2 (azzurrazezza), contro la decisione 3.5.14: da chiarire.
 
 Etichette usate nel documento:
 - **[FATTO]**: scritto nella specifica EURODIS, nel codice o verificato in ambiente; la fonte è indicata.
