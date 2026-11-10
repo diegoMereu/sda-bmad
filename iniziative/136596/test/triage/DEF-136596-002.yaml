@@ -4,14 +4,16 @@ campagna: e2e-eurodis-svil
 run: RUN-136596-20261110T170000Z
 tc: [TC-136596-011]
 gravita: bloccante
-stato: proposto
+stato: causa_individuata
 titolo: ce-anagrafica in svil risponde 500 sui codici nazione, il tracciato EURODIS arriva senza ISO3/ISO4
 osservato: >
   GET https://ce-anagrafica-corriere-espresso-preadvising.apps.gen3gpazne.cloudsvil.poste.it/anagrafica/indirizzi/nazione/{codice}
   risponde 500 per IT, ITA, ITA1, NL (10-11, 19:09). /anagrafica/matrice/filiale risponde 200.
   Sul tracciato del mapper codice_nazione e codice_nazione_poste sono vuoti per mittente e destinatario.
 atteso: IT → ITA / ITA1 / IT (IndirizziRepository.getCodNazione: tabelle nazioni_poste e net_delivery_int).
-causa: Da verificare in ce-anagrafica svil (probabile tabella mancante o query in errore sul database di svil). Non è un difetto del mapper, che segue RF-15.
+causa: >
+  Non mancano dati: ce-anagrafica non riesce a connettersi al suo PostgreSQL (ce_cen). Vedi indagine_2026_11_10.
+  Non è un difetto del mapper, che segue RF-15.
 impatto: >
   PDB/BEP richiede il paese ISO4: se a valle nessuno lo risolve, la spedizione può essere rifiutata in fase di sync.
   Riguarda anche gli altri servizi che usano lo stesso endpoint (adapter, validatore).
@@ -20,3 +22,32 @@ triage_2026_11_10: >
   Diventa bloccante: nel validatore, flusso PDB con regole PDB_INVIOSYSTEM, la regola 1039 "Mittente Codice
   Nazione: Campo obbligatorio mancante" controlla mittente.codice_nazione, che il mapper valorizza con l'ISO3
   di ce-anagrafica. Finche' ce-anagrafica svil risponde 500 ogni tracciato EURODIS sara' bloccato.
+indagine_2026_11_10: >
+  Indagine in sola lettura (nessuna query eseguita: il database non è raggiungibile nemmeno dai pod).
+  COLLAUDO (oc sul cluster coll, namespace corriere-espresso-preadvising):
+  - GET /anagrafica/indirizzi/nazione/IT dal pod ce-anagrafica risponde 500 anche in collaudo.
+  - Log del pod: CannotGetJdbcConnectionException "Failed to obtain JDBC Connection"; HikariPool-1
+    "Pool is empty, failed to create/setup connection" ripetuto 10.559 volte, il primo il 26-10 alle 19:07 UTC
+    (il pool si era avviato correttamente alle 14:15 dello stesso giorno).
+  - Dal pod ce-anagrafica la connessione TCP a ttrkevoldb01azwe (10.60.157.85:5432) va in timeout; stesso
+    timeout verso strkevoldb01azwe. Anche ce-db-sync in collaudo ha gli stessi errori di pool (98 nelle ultime 2 ore).
+  - /anagrafica/matrice/filiale risponde 200 perché MatriceRepository è @Cacheable: risponde dalla cache popolata
+    quando il database era raggiungibile. getCodNazione non è in cache e va sempre sul database: per questo
+    "nazione 500, filiale 200" è il segnale di database irraggiungibile, non di tabelle mancanti.
+  SVILUPPO:
+  - Il server API svil (api.gen3gpazne.cloudsvil.poste.it:6443) non è raggiungibile da questa postazione
+    (timeout), quindi niente log né accesso ai pod svil.
+  - Alle 19:09 lo stesso schema (nazione 500, filiale 200); alle 22:15 la route di ce-anagrafica svil risponde
+    503 "Application is not available" (nessun pod che serve).
+  - Causa probabile la stessa (connessione al database), ma da confermare: in svil -in scrive su
+    strkevoldb01azwe (database ce_eud_api_in), quindi la rete verso quel server dai pod svil funziona;
+    se anche ce-anagrafica svil non si connette, la causa può essere specifica del pod (pool rimasto senza
+    connessioni dopo un riavvio o un failover del database) o delle credenziali verso ce_cen.
+  CONFRONTO DATI svil/coll: non eseguibile finché i database non sono raggiungibili.
+soluzione_proposta: >
+  1. Collaudo: rete o firewall tra i pod del namespace e il PostgreSQL ttrkevoldb01azwe (porta 5432 in timeout
+     dal 26-10): da segnalare al team di piattaforma o rete. Non serve uno script di allineamento dati.
+  2. Sviluppo: far ripartire ce-anagrafica e leggere i log all'avvio (HikariPool Start/Added connection o
+     l'errore PSQLException). Se l'errore è di rete, come per collaudo; se è di autenticazione, verificare
+     il secret ce-postgres verso ce_cen. Poi rilanciare GET /anagrafica/indirizzi/nazione/IT.
+  3. Solo dopo, con il database raggiungibile, confrontare nazioni_poste e net_delivery_int tra svil e coll.
