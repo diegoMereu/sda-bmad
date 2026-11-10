@@ -9,6 +9,7 @@ PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ICD_PREADVISING
 D, T, C, G, F1, CE, AV, NA, DD, NV = (
     "DIRETTO", "TRASFORMATO", "COSTANTE", "GENERATO", "F1", "CE-RULES",
     "A VALLE", "N/A", "DA DEFINIRE", "NON VALORIZZATO")
+AN, CF = "CE-ANAGRAFICA", "CONFIGURAZIONE"
 
 S = "spedizione."
 M, DE = S + "mittente.", S + "destinatario."
@@ -225,6 +226,36 @@ R.update({
 # Il ms sync legge il paese BEP da codice_nazione e non risolve l'ISO4 (AnagraficaClient mai chiamato): vedi DF-12 e DF-27
 for p in (M, DE):
     R[p + "codice_nazione"] = (NV, "", f"countryCode va solo in codice_nazione_iso_2 ({K}). Attenzione: il ms sync legge il paese BEP da qui e non risolve ISO4; destinatario = ITA1 ({P})", "DF-12, DF-27")
+
+# Specifica del mapper 0.4 (sviluppo/ce-dichiarato-eurodis-mapper.md): decisioni di Diego del 05-11, 06-11 e 10-11.
+# Prevale su tutte le regole precedenti.
+Q = "specifica mapper 0.4"
+for p, src in ((M, "shipperAddress"), (DE, "consigneeAddress")):
+    R[p + "nazione"] = (D, f"{src}.countryCode", f"ISO2 com'e', come ce-dichiarato-adapter (decisione 06-11, {Q} 6.4)", "")
+    R[p + "codice_nazione_iso_2"] = (AN, f"{src}.countryCode",
+                                     f"countryCode, poi sovrascritto da codNazione2 se ce-anagrafica risponde (GET /anagrafica/indirizzi/nazione/{{ISO2}}, decisione 06-11, {Q} 6.4)", "DF-12, DF-27")
+    R[p + "codice_nazione"] = (AN, f"{src}.countryCode",
+                               f"ISO3 = codNazione da ce-anagrafica; vuoto se ce-anagrafica non risponde (decisione 06-11, {Q} 6.4)", "DF-12, DF-27")
+    R[p + "codice_nazione_poste"] = (AN, f"{src}.countryCode",
+                                     f"ISO4 Poste = codNazionePoste da ce-anagrafica; vuoto se ce-anagrafica non risponde (decisione 06-11, {Q} 6.4)", "DF-12, DF-27")
+R[DE + "cap"] = (D, "consigneeAddress.zipcode", f"Obbligatorio: senza destinatario, o con cap o localita' vuoti, la spedizione non e' mappabile e non si pubblica (RF-14, decisione 06-11, confermata 10-11)", "DF-30")
+R[DE + "localita"] = (D, "consigneeAddress.city", f"Obbligatorio: senza destinatario, o con cap o localita' vuoti, la spedizione non e' mappabile e non si pubblica (RF-14, decisione 06-11, confermata 10-11)", "DF-30")
+R.update({
+    "canale": (C, "", f'"EUD_INVIOSYSTEM", da configurazione mapper.canale (decisione 05-11, {Q} 6.1)', "DF-04"),
+    "progressivo": (C, "", f"1: un messaggio = una spedizione ({Q} 6.1)", "MAP-1"),
+    "id_file": (G, "", f"Header Kafka idFile di -in: id del file fittizio dello scarico, lo stesso degli eventi ST_F0002/ST_F0005 (decisione 06-11, {Q} 6.1)", ""),
+    "upload_time": (G, "", f"Header Kafka ricevutoIl di -in ({Q} 6.1)", ""),
+    "dataInizioFlusso": (G, "", f"Header Kafka ricevutoIl di -in: nessun header porta l'inizio dello scarico ({Q} 6.1)", ""),
+    "instantInizioFlusso": (G, "", f"Header Kafka ricevutoIl di -in ({Q} 6.1)", ""),
+    "link_file_fisico_inviato": (G, "", f"Header Kafka rifGrezzo di -in: riferimento al grezzo salvato ({Q} 6.1)", ""),
+    "cliente.id_cliente": (CF, "", f"Configurazione per ambiente mapper.cliente.codice, niente F1 (decisione 06-11, chiude PA-33). Valori da ricevere", "PA-33"),
+    "cliente.codice_login_cliente": (CF, "", f"Configurazione per ambiente mapper.cliente.codice, niente F1 (decisione 06-11). Valori da ricevere", "PA-33"),
+    "cliente.codice_auc": (CF, "", f"Configurazione per ambiente mapper.cliente.codice, niente F1 (decisione 06-11). Valori da ricevere", "PA-33"),
+    "cliente.codice_contratto": (CF, "", f"Configurazione per ambiente mapper.cliente.codice-contratto, niente F1 (decisione 06-11). Valori da ricevere", "PA-33"),
+    S + "centro_costo": (CF, "", f"Configurazione per ambiente mapper.centro-costo, default vuoto: il ms sync usa la sua config se vuoto ({Q} 6.3)", "DF-11"),
+    S + "rif_prodotto_cliente": (CF, "", f"Configurazione per ambiente mapper.rif-prodotto-cliente, default vuoto: il ms sync usa APT000901 se vuoto ({Q} 6.3)", "DF-11"),
+    S + "internazionale.id_ldv_itz": (D, "collis[].europlateBarcode", f"Primo valorizzato e diverso da \"0\"; \"0\" o vuoto = assente -> \"\" (decisione 22-Oct, confermata 10-11). Barcode internazionale a 24 cifre, ldv_partner_collo nei sistemi SDA", "DF-03"),
+})
 GAP_23 = {
     "shipmentTypeIndicator": ("", "", f"Da ignorare ({K})", ""),
     "lineHaulIndicator": ("", "", f"Da ignorare ({K})", ""),
@@ -343,6 +374,8 @@ for r in [
     [G, "Prodotto dal batch (timestamp, id esecuzione)"],
     [F1, "Dati del cliente EURODIS da F1 (PA-10)"],
     [CE, "Derivato da ce-rules (PA-03)"],
+    [AN, "Risolto dal mapper chiamando ce-anagrafica (codici nazione, decisione 06-11)"],
+    [CF, "Da configurazione del mapper, per ambiente (decisione 06-11)"],
     [AV, "Valorizzato a valle (normalizzazione, arricchimento, validazione): il batch lo lascia vuoto"],
     [NA, "Non pertinente al flusso EURODIS"],
     [DD, "Serve una decisione: vedi punto aperto"],
@@ -578,7 +611,7 @@ for (field, icd), txt in old_comments.items():
             break
 fills_inv = {"NON MAPPATO": "F8CBAD"}
 
-fills = {D: "C6EFCE", T: "DDEBF7", C: "E2EFDA", G: "E2EFDA", F1: "FFF2CC", CE: "FFF2CC",
+fills = {D: "C6EFCE", T: "DDEBF7", C: "E2EFDA", G: "E2EFDA", F1: "FFF2CC", CE: "FFF2CC", AN: "DDEBF7", CF: "E2EFDA",
          AV: "EDEDED", NA: "EDEDED", DD: "F8CBAD", NV: "FFFFFF"}
 for r in wi.iter_rows(min_row=2):
     cat = r[9].value

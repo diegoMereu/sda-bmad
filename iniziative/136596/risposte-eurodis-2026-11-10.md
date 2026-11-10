@@ -5,10 +5,8 @@ Gianluca Chiapponi (Poste) il 09-11 e girate da Diego il 10-11. Il dettaglio
 domanda per domanda, con le assunzioni che ne derivano, è in
 [assunzioni.md](assunzioni.md) (AS-D01…AS-D06).
 
-**Testo originale (inglese)**: non è nel repository. Le risposte sono arrivate
-riassunte in italiano. Il testo inglese di EURODIS va incollato qui quando
-disponibile: non lo ricostruiamo per non attribuire a EURODIS frasi che non
-ha scritto.
+**Testo originale (inglese)**: in fondo al documento, così come l'ha girato
+Diego (domande nostre e risposte di EURODIS, refusi compresi).
 
 Nessun dato personale in questo documento.
 
@@ -37,3 +35,20 @@ La nostra contromisura è già nel disegno di `-in`:
 **Proposta per Diego**: se vuole comunque il log parallelo, va scritto su un
 file o volume dedicato, con accesso ristretto e conservazione limitata, e non
 nei log applicativi raccolti da Datadog.
+
+## Testo originale (inglese)
+
+> receive-pan API behaviour
+>
+> 1. Shipment delivery → Does GET /shipments/v1 return only shipments that have not yet been delivered to the partner, and is there no acknowledgement endpoint? Does EURODIS therefore consider a shipment data delivered as soon as it is returned by the API? If our service fails after receiving the response, how can we recover those shipments?
+>    - You just receive the data for shipments, which you dont receive yet. This doesnt change. If you recognize, that you have issues in transferring this data into your database, you can request always that we are putting all the data again into your next request. I would recommend you (Post AT is doing like this) to write all the data you receive paralelly into a local script/log and then transfer to your database. This supports you, if something going wrong in the process of transferring.
+> 2. Initial call → Does the first call return the entire historical backlog, or only shipments from a specific date onward?
+>    - You just receive the data for shipments, which you dont receive yet.
+> 3. Updates and cancellations → If EURODIS modifies or cancels a shipment that has already been delivered to us, will it be sent again in a subsequent batch? How can we identify it? Will it use the same edReference?
+>    - Modification or cancellation is only possible, if the data is not acitvated and not shared with the respective delivery partner. This topic is not necessary to consider.
+> 4. Call limits → What is the maximum number of shipments returned by a single call? Is pagination supported? Are there any rate limits or timeout constraints that must be respected?
+>    - There is no limit. For now. If this is necessary in future, we can try to find a solution. I would recommend you to request every 15-20min. The number of shipments will be absolutely feasible to process.
+> 5. Individual retrieval → For how long does GET /shipment/{edReference} keep a previously delivered shipment available?
+>    - 60 days.
+> 6. Time zone and access → Which time zone is used for timestamps? How is API key rotation managed?
+>    - API keys are not rotating. Standard timezone which you use today for file exchange based on the FTP environment.
