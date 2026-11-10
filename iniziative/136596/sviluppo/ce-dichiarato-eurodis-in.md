@@ -1,6 +1,6 @@
 # `ce-dichiarato-eurodis-in` — Documento funzionale per lo sviluppo
 
-**Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.5 (eventi di stato del file fittizio, da implementare) · **Data**: 2026-11-06
+**Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.6 (persistenza su PostgreSQL ed eventi di stato, da implementare) · **Data**: 2026-11-10
 **Autore**: Mary (analyst) · **Destinatario**: Amelia (dev) e team di sviluppo
 **Repository**: https://posteitaliane.ghe.com/SVILUPPO/CORRIERE-ESPRESSO_PREADVISING_ce-dichiarato-eurodis-in
 **Generato da**: [prompt-ce-dichiarato-eurodis-in.md](prompt-ce-dichiarato-eurodis-in.md)
@@ -224,46 +224,55 @@ Gli stati finali del file (`ST_F0006` `FILE_ELABORATO_CON_SUCCESSO`, `ST_F0008`
 
 ### 3.4 Persistenza
 
-**[DECISO 04-11]** MongoDB (D1). Tre collezioni.
+**[DECISO 10-11, Diego]** PostgreSQL, database dedicato `ce_eud_api_in`, schema `public`, al posto
+di MongoDB (supera D1 del 04-11). DDL complete, indici, conservazione, ambiente e guida al codice:
+[ddl-ce-eurodis-api-in.md](ddl-ce-eurodis-api-in.md). Accesso con `spring-boot-starter-jdbc`
+come gli altri servizi `ce-`; le tabelle le crea il DBA, il servizio non fa DDL.
 
-**`eurodis_scarichi`**: un documento per ogni run verso EURODIS (scarico o rilettura). Contiene
-il run, l'esito HTTP e il JSON grezzo, e dopo la fase 2 l'esito dell'invio.
+Il grezzo e il JSON di ogni spedizione stanno in colonne `text`, non `jsonb`: il testo resta
+**identico** a quello ricevuto (RF-06, RF-14). Niente più GridFS: `text` regge fino a 1 GB.
 
-| Campo | Note |
+**`eurodis_scarichi`**: una riga per ogni run verso EURODIS (scarico o rilettura). Contiene il run,
+l'esito HTTP e il grezzo, e dopo la fase 2 l'esito dell'invio.
+
+| Colonna | Note |
 |---|---|
-| `_id` | generato da Mongo; è l'`idEsecuzione` negli header |
+| `id` | `uuid` generato dal servizio; è l'`idEsecuzione` negli header e la parte finale di `rifGrezzo` (`eurodis_scarichi/<id>`) |
 | `tipo` | `SCARICO` (`/shipments/v1`) o `RILETTURA` (`/shipment/{edReference}/v1`) |
-| `edReferenceRichiesto` | solo per le riletture |
+| `ed_reference_richiesto` | solo per le riletture |
 | `istanza` | pod che ha eseguito |
-| `avviatoIl`, `ricevutoIl` | inizio del run, istante della risposta |
-| `httpStatus`, `durataMs`, `errore` | esito della chiamata; `errore` senza dati personali, max 300 caratteri |
-| `corpo` | JSON grezzo esattamente come ricevuto |
-| `gridFsId` | al posto di `corpo` se il grezzo supera la soglia (limite Mongo di 16 MB) |
-| `dimensioneByte`, `sha256` | verifica del grezzo |
-| `stato` | vedi sezione 6 |
-| `numeroSpedizioni`, `numeroInviate`, `numeroNonInviate` | esito della fase 2 |
-| `idFile`, `nomeFile` | file fittizio (sezione 3.3), assegnati alla prima presa in carico e mai più cambiati |
-| `eventoPresoInCaricoIl`, `eventoInElaborazioneIl` | invio confermato degli eventi `ST_F0002` e `ST_F0005`: impediscono di rimandarli alla ripresa |
-| `elaborazioneIniziataIl`, `elaborazioneConclusaIl` | fase 2 |
+| `avviato_il`, `ricevuto_il` | inizio del run, istante della risposta |
+| `http_status`, `durata_ms`, `errore` | esito della chiamata; `errore` senza dati personali, max 300 caratteri |
+| `corpo` | grezzo esattamente come ricevuto (`text`) |
+| `dimensione_byte`, `sha256` | verifica del grezzo |
+| `stato` | vedi sezione 6 (`CHECK` sui valori) |
+| `numero_spedizioni`, `numero_inviate`, `numero_non_inviate` | esito della fase 2 |
+| `id_file`, `nome_file` | file fittizio (sezione 3.3), assegnati alla prima presa in carico e mai più cambiati; `id_file` univoco |
+| `evento_preso_in_carico_il`, `evento_in_elaborazione_il` | invio confermato degli eventi `ST_F0002` e `ST_F0005`: impediscono di rimandarli alla ripresa |
+| `elaborazione_iniziata_il`, `elaborazione_conclusa_il` | fase 2 |
 
-**`eurodis_spedizioni`**: un record per spedizione, con il JSON separato.
+**`eurodis_spedizioni`**: una riga per spedizione, con il suo JSON.
 
-| Campo | Note |
+| Colonna | Note |
 |---|---|
-| `_id` | `edReference` normalizzato; per le spedizioni non identificabili `<idScarico>#<posizione>` |
-| `edReference` | |
-| `json` | JSON della singola spedizione, identico al testo ricevuto |
-| `idScarico`, `idFile`, `posizione`, `fonte`, `rifGrezzo`, `ricevutoIl` | provenienza; `idFile` è quello dello scarico dell'ultima ricezione e va nell'header anche nei reinvii |
-| `statoInvio` | `DA_INVIARE`, `INVIATA`, `ERRORE_INVIO`, `NON_IDENTIFICABILE` |
-| `inviataIl` | ora dell'invio confermato dal broker |
-| `tentativiInvio`, `ultimoErrore` | perché non è partita |
-| `numeroRicezioni`, `primaRicezioneIl`, `ultimaRicezioneIl` | quante volte è arrivata |
+| `id` | `edReference` normalizzato; per le spedizioni non identificabili `<idScarico>#<posizione>` |
+| `ed_reference` | |
+| `json` | JSON della singola spedizione, identico al testo ricevuto (`text`) |
+| `id_scarico`, `id_file`, `posizione`, `fonte`, `rif_grezzo`, `ricevuto_il` | provenienza dell'ultima ricezione; `id_file` va nell'header anche nei reinvii |
+| `stato_invio` | `DA_INVIARE`, `INVIATA`, `ERRORE_INVIO`, `NON_IDENTIFICABILE` |
+| `inviata_il` | ora dell'invio confermato dal broker |
+| `tentativi_invio`, `ultimo_errore` | perché non è partita |
+| `numero_ricezioni`, `prima_ricezione_il`, `ultima_ricezione_il` | quante volte è arrivata; una nuova ricezione aggiorna la riga (`INSERT ... ON CONFLICT`) |
 
-**`eurodis_richieste_manuali`**: traccia dei recuperi e reinvii già eseguiti (RF-16, RF-17).
+**`eurodis_richieste_manuali`**: traccia dei recuperi e reinvii già eseguiti (RF-16, RF-17),
+chiave `(tipo, ed_reference)`.
 
-Indici su `stato`, `statoInvio`, `avviatoIl`, `ultimaRicezioneIl` (creati automaticamente).
-Il lock dei job sta nella collezione `shedLock`. **[DA DECIDERE]** La conservazione (TTL): ogni run
-viene salvato, anche i `404` (720 documenti al giorno con il cron a 2 minuti).
+**`shedlock`**: lock dei job (ShedLock JDBC, `usingDbTime()`).
+
+Indici parziali per le query dei job (scarichi `DA_ELABORARE`/`IN_ELABORAZIONE`, spedizioni
+`DA_INVIARE` ferme, spedizioni in attesa) e per periodo (`avviato_il`, `ultima_ricezione_il`).
+**[DA DECIDERE]** La conservazione: ogni run viene salvato, anche i `404` (720 righe al giorno con il
+cron a 2 minuti). Proposta di job di pulizia nel documento DDL, sezione 4.
 
 ## 4. Flusso di elaborazione
 
@@ -309,7 +318,7 @@ sequenceDiagram
 3. chiama `GET /shipments/v1` una volta sola;
 4. `404` → `NESSUNA_SPEDIZIONE`; non-200 → `ERRORE_CHIAMATA` con esito ed errore; eccezione di
    rete → `ERRORE_CHIAMATA` senza esito HTTP;
-5. `200` → salva il corpo grezzo (GridFS sopra soglia) e porta lo scarico a `DA_ELABORARE`.
+5. `200` → salva il corpo grezzo in `corpo` e porta lo scarico a `DA_ELABORARE`.
 
 **Fase 2, elaborazione** (`ElaborazioneService`):
 1. prende gli scarichi `DA_ELABORARE` in ordine di arrivo, più quelli rimasti `IN_ELABORAZIONE`
@@ -334,7 +343,7 @@ sequenceDiagram
 | ID | Regola | Implementazione |
 |---|---|---|
 | RF-01 | Lo scarico gira solo se `eurodis.in.abilitato=true` (default `false`, rilascio incrementale) [DECISO, PA-28]. La rilettura puntuale funziona anche con lo scarico disabilitato. | `ScaricoService.scarica` |
-| RF-02 | Ogni job gira su **un solo pod** anche con più repliche (ShedLock su Mongo, `lockAtMostFor` 15 min). | `EurodisScheduler`, `SchedulingConfig` |
+| RF-02 | Ogni job gira su **un solo pod** anche con più repliche (ShedLock su PostgreSQL, tabella `shedlock`, `lockAtMostFor` 15 min). | `EurodisScheduler`, `SchedulingConfig` |
 | RF-03 | Ogni chiamata invia `X-API-Key` letto dal secret (`api-key`). La chiave non compare mai nei log. | `ReceivePanClient` |
 | RF-04 | `GET /shipments/v1` si chiama **una volta per run e senza retry**: client Apache con `disableAutomaticRetries`, nessun Spring Retry. Il progetto non usa service mesh: nessun retry fuori dal codice. | `AppConfig` |
 | RF-05 | `404` = nessuna spedizione: run regolare, nessun alert. | `ScaricoService` |
@@ -395,12 +404,12 @@ finestra in cui si possono perdere spedizioni (I1).
 | `500` | run `ERRORE_CHIAMATA`, nessun retry | idem | Prossimo run. [IPOTESI] Se EURODIS avesse già segnato le spedizioni come consegnate, servirebbe un recupero (PA-09) |
 | Timeout o connessione caduta | run `ERRORE_CHIAMATA` senza esito HTTP, log CRITICO | idem | **Rischio di perdita** (I1): chiedere a EURODIS gli `edReference` del periodo e recuperarli con RF-16 |
 | Pod caduto durante la chiamata | run rimasto `CHIAMATA_IN_CORSO` | `eurodis_scarichi` | come sopra |
-| Mongo giù al salvataggio del grezzo | log CRITICO con gli `edReference` estratti dal testo | log | RF-16 per gli `edReference` del log |
+| PostgreSQL giù al salvataggio del grezzo | log CRITICO con gli `edReference` estratti dal testo | log | RF-16 per gli `edReference` del log |
 | Pod caduto durante la fase 2 | scarico rimasto `IN_ELABORAZIONE` | `eurodis_scarichi` | Ripreso automaticamente dopo 15 minuti; i record già inviati vengono reinviati (la deduplica è a valle) |
 | Kafka giù | record `DA_INVIARE` con motivo; scarico `INVIO_PARZIALE` o `NESSUN_INVIO` | `eurodis_spedizioni` | Automatico con RF-11, poi RF-17 |
 | Grezzo non JSON | scarico `NON_ELABORABILE` con errore | `eurodis_scarichi` | Analisi del grezzo salvato |
 | Spedizione senza `edReference` valido | record `NON_IDENTIFICABILE`, scarico `INVIO_PARZIALE` | `eurodis_spedizioni` | Analisi con EURODIS |
-| Risposta molto grande | grezzo in GridFS sopra 10 MB; warning e metrica sopra 100 MB | metrica | Limiti da chiarire con EURODIS (PA-27) |
+| Risposta molto grande | grezzo sempre in `corpo` (`text`, fino a 1 GB); warning e metrica sopra 100 MB | metrica | Limiti da chiarire con EURODIS (PA-27) |
 | `preadvising.evensource` non disponibile, o utente senza permesso di scrittura | scarico di nuovo `DA_ELABORARE` con errore, nessuna spedizione inviata (RF-21) | `eurodis_scarichi.errore`, metrica `eurodis_in_evento_total{esito="ko"}`, span in errore | Automatico al ciclo successivo; gli eventi già confermati non si rimandano |
 | Pod caduto tra un evento e le spedizioni | scarico rimasto `IN_ELABORAZIONE` | `eurodis_scarichi` | Ripresa dopo 15 minuti con lo stesso `idFile`: si inviano solo gli eventi mancanti, poi le spedizioni |
 
@@ -419,7 +428,7 @@ Variabili d'ambiente (Helm) → proprietà `eurodis.in.*` in `application.yaml`.
 | `EURODIS_ELABORAZIONE_CRON` | `elaborazione.cron` | `30 */2 * * * *` | invio ogni 2 minuti, 30 s dopo lo scarico [DECISO 04-11] |
 | `EURODIS_TIMEOUT_CONNECT` / `_READ` | `timeout.*` | 10 s / 120 s | |
 | `EURODIS_LOCK_DURATA_MAX` | `lock.durata-max` | `PT15M` | anche soglia di ripresa degli scarichi `IN_ELABORAZIONE` |
-| `EURODIS_GREZZO_SOGLIA_GRIDFS` / `_GUARDIA` | `grezzo.*` | 10 MB / 100 MB | |
+| `EURODIS_GREZZO_SOGLIA_GUARDIA` | `grezzo.soglia-guardia` | 100 MB | warning e metrica; la soglia GridFS non esiste più |
 | `KAFKA_TOPIC_OUTPUT` | `topic` | `preadvising.eud.pre.build` | |
 | `KAFKA_TOPIC_EVENT_STORE` | `kafka.topics.event-store` | `preadvising.evensource` | eventi di stato (sezione 3.3), stesso nome di variabile del builder |
 | `EURODIS_FILE_CODICE_LOGIN_CLIENTE` / `_NOMINATIVO_CLIENTE` / `_PARTITA_IVA` / `_RAGIONE_SOCIALE` | `file.*` | vuoti (campo omesso) | dati del cliente EURODIS negli eventi; valori per ambiente da ricevere |
@@ -429,7 +438,9 @@ Variabili d'ambiente (Helm) → proprietà `eurodis.in.*` in `application.yaml`.
 | `EURODIS_RECUPERO_CRON` | `recupero.cron` | `30 */5 * * * *` | job delle richieste manuali |
 | `EURODIS_RECUPERO_ED_REFERENCES` | `recupero.ed-references` | vuoto | RF-16, separati da virgola |
 | `EURODIS_RIPUBBLICA_ED_REFERENCES` | `ripubblica.ed-references` | vuoto | RF-17 |
-| `MONGO_STRING_CONNECTION` | `spring.data.mongodb.uri` | secret, chiave `mongo-string-connection` | |
+| `DATASOURCE_URL` | `spring.datasource.url` | svil `jdbc:postgresql://strkevoldb01azwe.postgres.database.azure.com:5432/ce_eud_api_in`, coll `ttrkevoldb01azwe` | in `deploy-svil` e `deploy-coll` [DECISO 10-11] |
+| `DATASOURCE_USERNAME` / `DATASOURCE_PASSWORD` | `spring.datasource.*` | secret `ce-postgres`, chiavi `datasource-name` / `data-source-password` | stesso secret di `ce-db-sync` [DECISO 10-11] |
+| `DATASOURCE_HIKARI_MINIMUM_IDLE` / `_MAXIMUM_POOL_SIZE` / `_IDLE_TIMEOUT` | `spring.datasource.hikari.*` | 1 / 5 / 30000 | |
 | `KAFKA_SCRAM_USERNAME` / `_PASSWORD` | SASL | secret | |
 
 ## 9. Osservabilità: metriche e span
@@ -523,13 +534,13 @@ Criteri da verificare anche end-to-end contro `mock-eurodis` (`../mock-eurodis/`
 | AC-07 | Kill del pod durante l'elaborazione | riavvio | lo scarico `IN_ELABORAZIONE` si riprende dopo 15 minuti | ✅ (unit) |
 | AC-08 | Spedizione già inviata riproposta | scarico + elaborazione | stesso record, `numeroRicezioni` = 2, nuovo invio | ✅ |
 | AC-09 | Due spedizioni, una non parte | elaborazione | scarico `INVIO_PARZIALE`, motivo sul record | ✅ |
-| AC-10 | `edReference` `7319003746401.0` | elaborazione | chiave e `_id` `7319003746401`, corpo con `.0` intatto | ✅ |
+| AC-10 | `edReference` `7319003746401.0` | elaborazione | chiave e `id` `7319003746401`, corpo con `.0` intatto | ✅ (da rifare su PostgreSQL) |
 | AC-11 | Spedizione senza `edReference` | elaborazione | record `NON_IDENTIFICABILE` `<idScarico>#<posizione>`, scarico `INVIO_PARZIALE`, le altre inviate | ✅ |
 | AC-12 | Spedizione con campi in più (`routingCode`) | elaborazione | corpo del messaggio identico al ricevuto | ✅ |
 | AC-13 | 2 repliche | cron | una sola chiamata al mock | da provare in ambiente |
 | AC-14 | `edReference` in `eurodis.in.recupero.ed-references` | job richieste manuali | run `RILETTURA` `DA_ELABORARE`, poi invio con `fonte` = rilettura; non si ripete | ✅ |
 | AC-15 | `eurodis.in.abilitato=false` | cron | nessuna chiamata | ✅ |
-| AC-16 | Grezzo oltre 10 MB | scarico | corpo in GridFS, `gridFsId` sul run | ✅ |
+| AC-16 | Grezzo oltre 10 MB | scarico | grezzo intero in `corpo`, `sha256` uguale a quello del testo ricevuto | da rifare su PostgreSQL |
 | AC-17 | 5 spedizioni in coda | scarico + elaborazione | su `preadvising.evensource` 2 eventi, `ST_F0002` poi `ST_F0005`, stesso `idFile`, `numeroRecord` 5, senza chiave; poi 5 messaggi su `preadvising.eud.pre.build` con header `idFile` uguale | da fare |
 | AC-18 | Coda vuota, oppure array vuoto | scarico + elaborazione | nessun evento | da fare |
 | AC-19 | `preadvising.evensource` non disponibile | elaborazione, poi il topic torna | primo ciclo: scarico `DA_ELABORARE` con errore, nessuna spedizione inviata; ciclo dopo: eventi e spedizioni inviati, stesso `idFile` | da fare |
@@ -546,9 +557,9 @@ Criteri da verificare anche end-to-end contro `mock-eurodis` (`../mock-eurodis/`
 
 | Punto | Stato | Rif. |
 |---|---|---|
-| D1. Dove salvare il grezzo | **DECISO 04-11**: MongoDB, GridFS sopra 10 MB | PA-02 |
+| D1. Dove salvare il grezzo | **DECISO 10-11** (supera il 04-11): PostgreSQL `ce_eud_api_in`, colonne `text`, niente GridFS; DDL in [ddl-ce-eurodis-api-in.md](ddl-ce-eurodis-api-in.md) | PA-02 |
 | D2. Contratto del messaggio | **DECISO 04-11**: corpo = spedizione così com'è, chiave `edReference`, metadati negli header | PA-31 |
-| D3. Istanza unica | **IMPLEMENTATO**: ShedLock su Mongo. La call con Tagliente resta utile per conferma | PA-01 |
+| D3. Istanza unica | **IMPLEMENTATO** con ShedLock su Mongo; da portare su ShedLock JDBC (tabella `shedlock`). La call con Tagliente resta utile per conferma | PA-01 |
 | D4. Frequenza | **DECISO 04-11**: scarico e invio ogni 2 minuti | PA-14 |
 | D5. Duplicati | **DECISO 04-11**: nessun filtro in `-in`, si filtra a valle | — |
 | D6. Recupero | **DECISO 04-11**: niente endpoint applicativi (cioè niente API REST esposte dal servizio per comandi dell'operatore); elenchi di `edReference` in configurazione | PA-09 |
@@ -558,7 +569,8 @@ Criteri da verificare anche end-to-end contro `mock-eurodis` (`../mock-eurodis/`
 | Eventi di stato del file fittizio | **DECISO 06-11**: `ST_F0002` e `ST_F0005` su `preadvising.evensource`, `idFile` propagato al mapper (sezione 3.3, RF-19..RF-21) | — |
 | Nome del topic degli eventi | APERTO: default `preadvising.evensource`, il nome in uso | domanda 1 |
 | Stati finali del file (`ST_F0006`, `ST_F0008`) | APERTO: non inviati | domanda 4 |
-| Conservazione (TTL) delle collezioni | APERTO | — |
+| Credenziali del database | **DECISO 10-11**: secret `ce-postgres` di `ce-db-sync` | — |
+| Conservazione dei dati | APERTO: proposta di job di pulizia (DDL, sezione 4) | — |
 | Alert Datadog | APERTO, da fare più avanti (sezione 9) | assessment AS-19 |
 | Ack o riconsegna EURODIS | APERTO: si assume che non esistano (I1) | PA-05, PA-09 |
 | Massimo di spedizioni per chiamata, fuso orario, `consigneeAddress` null | APERTO: nessun impatto su `-in` (non interpreta i dati) | PA-27 |
@@ -575,6 +587,7 @@ Criteri da verificare anche end-to-end contro `mock-eurodis` (`../mock-eurodis/`
 - Stato dell'iniziativa: [../PUNTO.md](../PUNTO.md)
 - Convenzioni tecniche dei microservizi `ce-` (struttura, naming, eccezioni, logging, Helm, CI/CD): [../../../contesto/MICROSERVICE_TECHNICAL_BLUEPRINT.md](../../../contesto/MICROSERVICE_TECHNICAL_BLUEPRINT.md), ricavato da `ce-dichiarato-orchestratore`. **Il codice va scritto secondo queste convenzioni.**
 - Documenti degli altri microservizi: [ce-dichiarato-eurodis-mapper.md](ce-dichiarato-eurodis-mapper.md), [ce-eurodis-send-tracking.md](ce-eurodis-send-tracking.md)
+- DDL e ambiente PostgreSQL: [ddl-ce-eurodis-api-in.md](ddl-ce-eurodis-api-in.md)
 - Eventi di stato: `ce-dichiarato-builder` (`EventSourceMessage`, `MonitoringMessageBuilder`, `EventSourceProducer`, `FilePreadvisingStateId`)
 
 ---
@@ -589,6 +602,8 @@ Criteri da verificare anche end-to-end contro `mock-eurodis` (`../mock-eurodis/`
 - 0.5 (06-11): file fittizio per scarico, eventi `ST_F0002` e `ST_F0005` su `preadvising.evensource`,
   header `idFile` verso il mapper (Diego). Ripristinata la 0.4, sovrascritta per errore il 04-11
   da una copia della 0.2 (commit `c35093d`).
+- 0.6 (10-11): persistenza su PostgreSQL (`ce_eud_api_in`) al posto di MongoDB, niente GridFS,
+  ShedLock JDBC, credenziali del secret `ce-postgres` (Diego; DDL di Winston).
 
 ## Domande per Diego (0.5)
 
