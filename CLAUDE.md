@@ -48,5 +48,10 @@ _bmad-output/          output dei workflow BMAD
 ## Dove trovare cosa
 
 - Glossario dominio (LDV, preadvising, EAD, scarti...): `contesto/glossario-ce.md`
+- Microservizi della catena preadvising, topic, canali, eventi di stato: `contesto/microservizi-preadvising.md`
+- Ambienti svil e collaudo (Kafka, PostgreSQL, cluster, secret per nome, deploy): `contesto/ambienti.md`
+- Linee guida per lo sviluppo (stack, Sonar, osservabilita', lavoro in parallelo): `contesto/linee-guida-sviluppo.md`
+- Test integrati in svil (test manager, artefatti, regole su Kafka): `contesto/test-integrati.md`
+- Come lavora Diego con gli agenti (deleghe, autonomia, quando contattarlo): `contesto/modo-di-lavorare.md`
 - Storico, campagne di test e difetti della configurazione precedente:
   `C:\Users\diego.mereu\testfactory` (solo riferimento, non si lavora lì).

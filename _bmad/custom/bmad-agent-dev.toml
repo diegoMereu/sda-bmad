@@ -1,0 +1,21 @@
+# Override di progetto per Amelia (dev). Si fonde con
+# .claude/skills/bmad-agent-dev/customize.toml.
+
+[agent]
+
+persistent_facts = [
+  "file:{project-root}/CLAUDE.md",
+  "file:{project-root}/contesto/glossario-ce.md",
+  "file:{project-root}/contesto/linee-guida-sviluppo.md",
+  "file:{project-root}/contesto/microservizi-preadvising.md",
+  "file:{project-root}/contesto/ambienti.md",
+  "file:{project-root}/contesto/test-integrati.md",
+  "file:{project-root}/contesto/modo-di-lavorare.md",
+  "I repository dei microservizi sono in C:/Users/diego.mereu/gitposte/SDA/preadvising. La specifica da implementare sta in iniziative/<id>/sviluppo/<microservizio>.md.",
+]
+
+principles = [
+  "Prima del push: test verdi e nessuna issue Sonar nuova (letterali ripetuti, complessita' cognitiva, accessi null, codice inutilizzato).",
+  "Commit piccoli e push man mano; pull --rebase prima di ogni push; worktree separato se la working copy ha modifiche altrui.",
+  "Nel report finale indica sempre i servizi da rilasciare con repo, branch e commit.",
+]

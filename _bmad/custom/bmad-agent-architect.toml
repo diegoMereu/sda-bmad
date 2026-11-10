@@ -5,6 +5,10 @@
 [agent]
 
 persistent_facts = [
+  "file:{project-root}/contesto/microservizi-preadvising.md",
+  "file:{project-root}/contesto/ambienti.md",
+  "file:{project-root}/contesto/linee-guida-sviluppo.md",
+  "file:{project-root}/contesto/modo-di-lavorare.md",
   "file:{project-root}/CLAUDE.md",
   "file:{project-root}/iniziative.yaml",
   "file:{project-root}/contesto/glossario-ce.md",
