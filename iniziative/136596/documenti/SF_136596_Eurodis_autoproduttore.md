@@ -7,12 +7,13 @@ ticket: null
 compilato_da: "GDL ACN"
 verificato_da: ""
 approvato_da: ""
-versione: "0.3"
+versione: "0.4"
 distribuito_a: "DTO/IT/BASSPDCB/IT AS COR ESPR"
 revisioni:
   - {data: "04/11/2026", versione: "0.1", stato: "Bozza", descrizione: "Prima emissione", autore: "ACN"}
   - {data: "05/11/2026", versione: "0.2", stato: "Bozza", descrizione: "Catena a valle tramite validazione, namespace, riferimenti, livello di dettaglio, Open Point per interlocutore", autore: "ACN"}
   - {data: "10/11/2026", versione: "0.3", stato: "Bozza", descrizione: "Allineamento alle decisioni e alle risposte EURODIS del 06-10/11: storico su PostgreSQL con area di appoggio locale, eventi di stato del file, LDV del collo da deliveryPartnerBarcode, codici nazione da ce-anagrafica, dati cliente da configurazione, frequenza dello scarico, codifica degli stati per il tracciamento", autore: "ACN"}
+  - {data: "10/11/2026", versione: "0.4", stato: "Bozza", descrizione: "Catena a valle per il nuovo canale EUD_INVIOSYSTEM: interventi su validatore, orchestratore, smistatore e ce-dichiarato-ldv-pdb; sistemi impattati allineati al Documento di Progettazione", autore: "ACN"}
 ---
 
 # Introduzione
@@ -89,7 +90,7 @@ Il presente documento contiene l'analisi degli impatti funzionali relativi all'I
 | 29 | Open Point | Preavviso: si propone di non mappare i flag di preavviso EURODIS, perché SDA notifica il destinatario in presenza dei contatti. Il preavviso telefonico non ha un campo nell'ICD. | Trasformazione; SDA |
 | 30 | Open Point | Valori per ambiente dei dati del cliente EURODIS (codice login, id cliente, codice AUC, ragione sociale, partita IVA, contratto, `centro_costo`, `rif_prodotto_cliente`): DA DEFINIRE. Deciso: sono parametri di configurazione. | Trasformazione; Poste |
 | 31 | Open Point | Campi EURODIS senza corrispondenza nell'ICD o con semantica diversa: secondo numero di telefono, `region` (testo libero) contro `provincia` (sigla), valore della merce in valuta diversa da EUR. | Trasformazione; SDA |
-| 32 | Open Point | Osservazioni su `ce-dichiarato-ldv-pdb`, oggi in test: canale (`POU` o `WEBSERVICE`), ISO4 non risolto, nome del Punto Poste omesso se vuoto, contrassegno con importo 0 non scartato. | Propagazione verso PDB; responsabile `ce-dichiarato-ldv-pdb` |
+| 32 | Open Point | Osservazioni su `ce-dichiarato-ldv-pdb`, oggi in test: canale (`POU` o `WEBSERVICE`), nome del Punto Poste omesso se vuoto, contrassegno con importo 0 non scartato. È in preparazione una correzione per i canali `EUD_*` e per la LDV autoproduttore. | Propagazione verso PDB; responsabile `ce-dichiarato-ldv-pdb` |
 | 33 | Chiuso | Arricchimento: il ms di trasformazione non consulta F1 (i dati del cliente sono in configurazione, Open Point 30); il prodotto è determinato a valle. | Trasformazione; team ACN |
 | 34 | Open Point | Coda di scarto per i messaggi non trasformabili: creazione del topic dedicato DA DEFINIRE. Deciso: i messaggi non trasformabili non vengono pubblicati e restano visibili con il motivo. | Trasformazione; team ACN |
 | 35 | Open Point | Topic o sorgente da cui `ce-eurodis-send-tracking` legge le tracce SDA: DA DEFINIRE. | Tracciamento; team ACN |
@@ -120,7 +121,7 @@ La soluzione è riportata nella figura successiva e nell'allegato 4.
 
 ![Figura 1: Soluzione architetturale EURODIS Autoproduttore](fig-1-architettura.png)
 
-La figura mostra la sequenza: l'API EURODIS `receive-pan` è interrogata dal ms `ce-dichiarato-eurodis-in`, che salva lo storico su PostgreSQL, pubblica gli eventi di stato della presa in carico sul topic `preadvising.evensource` e una spedizione per messaggio sul topic Kafka `preadvising.eud.pre.build`; il ms `ce-dichiarato-eurodis-mapper` consuma il topic, trasforma la spedizione nel tracciato unico, ricavando i codici nazione dal servizio `ce-anagrafica`, e la pubblica sul topic `preadvising.pre-enrichment`; da qui la catena di preadvising esistente, a partire dalla validazione del ms `ce-dichiarato-validatore`, porta alla creazione della spedizione su PDB tramite il ms `ce-dichiarato-ldv-pdb`. Il ms `ce-eurodis-send-tracking` invia le tracce SDA a EURODIS.
+La figura mostra la sequenza: l'API EURODIS `receive-pan` è interrogata dal ms `ce-dichiarato-eurodis-in`, che salva lo storico su PostgreSQL, pubblica gli eventi di stato della presa in carico sul topic `preadvising.evensource` e una spedizione per messaggio sul topic Kafka `preadvising.eud.pre.build`; il ms `ce-dichiarato-eurodis-mapper` consuma il topic, trasforma la spedizione nel tracciato unico, ricavando i codici nazione dal servizio `ce-anagrafica`, e la pubblica sul topic `preadvising.pre-enrichment`; da qui la catena di preadvising, adeguata al nuovo canale `EUD_INVIOSYSTEM`, valida il tracciato (ms `ce-dichiarato-validatore`), lo normalizza e lo arricchisce (ms `ce-dichiarato-orchestratore`), crea la spedizione su PDB tramite il ms `ce-dichiarato-ldv-pdb` e smista il tracciato completato (ms `ce-dichiarato-smistatore`). Il ms `ce-eurodis-send-tracking` invia le tracce SDA a EURODIS.
 
 Di seguito sono descritti funzionalmente i processi che compongono la soluzione.
 
@@ -339,7 +340,22 @@ Ulteriori dettagli: per l'implementazione delle funzionalità sopra descritte vi
 
 ## Propagazione verso PDB
 
-Il tracciato unico pubblicato su `preadvising.pre-enrichment` segue la catena di preadvising esistente, descritta nei documenti di riferimento ID 4 e ID 5, a partire dalla validazione svolta dal ms `ce-dichiarato-validatore`, e arriva al ms `ce-dichiarato-ldv-pdb`, che lo converte nella richiesta PDB e crea la spedizione con il servizio sincrono `waybillCreate`. Questa iniziativa non prevede sviluppi su questi componenti, ma ne usa le regole.
+Il tracciato unico pubblicato su `preadvising.pre-enrichment` segue la catena di preadvising esistente, descritta nei documenti di riferimento ID 4 e ID 5. I componenti della catena vengono adeguati per riconoscere il nuovo canale `EUD_INVIOSYSTEM`; le regole applicate restano quelle del processo di preadvising.
+
+| Passo | Descrizione |
+|---|---|
+| 1 | Il ms `ce-dichiarato-validatore` consuma il tracciato da `preadvising.pre-enrichment` e lo valida con le regole del canale `EUD_INVIOSYSTEM`, che riprendono quelle del canale `PDB_INVIOSYSTEM`; il tracciato validato è pubblicato sul topic `preadvising.enrichment`. |
+| 2 | Il ms `ce-dichiarato-orchestratore` esegue per il canale `EUD_INVIOSYSTEM` la normalizzazione e l'arricchimento BEP, poi invia il tracciato al ms `ce-dichiarato-ldv-pdb` tramite il topic `preadvising.enrichment.pdb`. |
+| 3 | Il ms `ce-dichiarato-ldv-pdb` converte il tracciato nella richiesta PDB e crea la spedizione con il servizio sincrono `waybillCreate`. |
+| 4 | Il ms `ce-dichiarato-orchestratore` pubblica il tracciato completato sul topic `preadvising.completed`. |
+| 5 | Il ms `ce-dichiarato-smistatore` consuma il tracciato da `preadvising.completed` e lo instrada fra i canali Poste, con l'esclusione dei palmari. |
+
+Gli interventi su questi componenti sono:
+
+- `ce-dichiarato-validatore`: regole di validazione del canale `EUD_INVIOSYSTEM`;
+- `ce-dichiarato-orchestratore`: percorso del canale `EUD_INVIOSYSTEM` (normalizzazione, arricchimento BEP, creazione su PDB);
+- `ce-dichiarato-smistatore`: canale `EUD_INVIOSYSTEM` fra i canali Poste ed esclusione dei palmari;
+- `ce-dichiarato-ldv-pdb`: riconoscimento dei canali `EUD_*` e trattamento della LDV autoproduttore (Open Point 32).
 
 In particolare, la validazione a valle svolge per le spedizioni EURODIS:
 
@@ -349,7 +365,7 @@ In particolare, la validazione a valle svolge per le spedizioni EURODIS:
 
 Il ms `ce-dichiarato-ldv-pdb` legge i servizi da `codici_servizi`, aggiunge il servizio multicollo e applica prodotto, contratto e centro di costo di default se assenti.
 
-N.B. La validazione deve accettare i valori oltre le dimensioni dell'ICD (vincolo 2). Il ms `ce-dichiarato-ldv-pdb` è in fase di test: le osservazioni emerse sono riportate nell'Open Point 32 e le eventuali correzioni sono a carico del suo responsabile.
+N.B. La validazione deve accettare i valori oltre le dimensioni dell'ICD (vincolo 2). Il ms `ce-dichiarato-ldv-pdb` è in fase di test: le osservazioni emerse sono riportate nell'Open Point 32.
 
 ## Tracciamento verso EURODIS
 
@@ -378,9 +394,12 @@ Ulteriori dettagli: per l'implementazione delle funzionalità sopra descritte vi
 | Kafka | Topic `preadvising.eud.pre.build` | Nuovo topic | Nuovo |
 | Kafka | Topic `preadvising.pre-enrichment` | Nuovo produttore | Esistente |
 | Kafka | Topic `preadvising.evensource` | Nuovo produttore (eventi di stato del file) | Esistente |
+| Kafka | Topic `preadvising.enrichment`, `preadvising.enrichment.pdb`, `preadvising.completed` | Nuovo canale `EUD_INVIOSYSTEM` sui topic della catena esistente | Esistente |
 | Preadvising (OpenShift) | `ce-anagrafica` | Consultazione dei codici nazione | Esistente |
-| Preadvising (OpenShift) | `ce-dichiarato-validatore` | Accettazione dei valori oltre le dimensioni ICD (vincolo 2); deduplica, default e adeguamento ai limiti BEP secondo le regole esistenti | Esistente |
-| Preadvising (OpenShift) | `ce-dichiarato-ldv-pdb` | Verifica ed eventuali correzioni (Open Point 32) | Esistente |
+| Preadvising (OpenShift) | `ce-dichiarato-validatore` | Regole di validazione del nuovo canale `EUD_INVIOSYSTEM`; accettazione dei valori oltre le dimensioni ICD (vincolo 2); deduplica, default e adeguamento ai limiti BEP secondo le regole esistenti | Esistente |
+| Preadvising (OpenShift) | `ce-dichiarato-orchestratore` | Percorso del canale `EUD_INVIOSYSTEM`: normalizzazione, arricchimento BEP, creazione su PDB, pubblicazione su `preadvising.completed` | Esistente |
+| Preadvising (OpenShift) | `ce-dichiarato-ldv-pdb` | Riconoscimento dei canali `EUD_*` e della LDV autoproduttore; verifica delle osservazioni (Open Point 32) | Esistente |
+| Preadvising (OpenShift) | `ce-dichiarato-smistatore` | Canale `EUD_INVIOSYSTEM` fra i canali Poste, esclusione dei palmari | Esistente |
 | PDB | Servizio `waybillCreate` | Nessuna modifica prevista | Esistente |
 | BEP | Ricezione della LDV dal tracciato unico | Verifica del canale (Open Point 23) | Esistente |
 | ce-rules | Prodotto e servizi | Consultazione da parte della catena a valle, nessuna modifica | Esistente |
