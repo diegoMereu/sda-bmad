@@ -1,6 +1,6 @@
 # 136596 — Esiti BEP del canale `EUD_INVIOSYSTEM` (adapter e orchestratore)
 
-**Data**: 2026-11-10 · **Autore**: Amelia (dev), analisi con Winston · **Stato**: implementato su `develop`
+**Data**: 2026-11-10 · **Autore**: Amelia (dev), analisi con Winston · **Stato**: implementato su `develop` (routing dell'orchestratore corretto)
 
 ## Richiesta
 
@@ -49,32 +49,40 @@ esiti PDB/BEP da `kafka.consumer.topic.pdb`. Per un esito di fase 2:
 Nell'adapter non c'era più nessuna regola specifica per `EUD_INVIOFILE`: l'esclusione di
 `spedizione_a_valore` è stata ritirata con `5b08e74`.
 
-## Scelta
+## Scelta (corretta il 10-11)
 
-**`EUD_INVIOSYSTEM` segue lo stesso percorso di `EUD_INVIOFILE`**, come chiesto da Diego e come
-preferito nella richiesta ("come il canale che l'orchestratore manda verso il dichiarato BEP sync").
+**Adapter**: gli esiti di `EUD_INVIOSYSTEM` seguono lo stesso percorso di quelli di
+`EUD_INVIOFILE`, come chiesto da Diego. Non serviva cambiare la logica:
+- il rimappaggio `EUD_*` del callback POU copre già `EUD_INVIOSYSTEM`;
+- la ricerca per suffisso del canale lo trova.
 
-- **Orchestratore**: `EUD_INVIOSYSTEM` passa da `ldv-pdb` a `ldv-bep-sync`. La spedizione va a
-  `ce-dichiarato-ldv-pdb-sync`, che è anche quanto chiesto da Diego per l'evento verso ldv-pdb-sync.
-- **Adapter**: nessuna modifica di logica. Il rimappaggio `EUD_*` del callback POU e la ricerca
-  per suffisso coprono già `EUD_INVIOSYSTEM`. Ho aggiunto i test che lo provano e chiarito il commento.
+Ho aggiunto i test che lo provano e chiarito il commento.
 
-Nessuna incompatibilità tecnica emersa nell'adapter. Da verificare a valle, fuori da questo lavoro:
-- che `ce-dichiarato-ldv-pdb-sync` accetti il tracciato del mapper con canale `EUD_INVIOSYSTEM`.
-  È l'analisi in corso in `integrazione-ldv-pdb-sync.md`;
-- che il callback BEP POU per questo canale porti `walletRequestId` = `rif_spedizione`
-  (`edReference`), come per `EUD_INVIOFILE`.
+**Orchestratore**: resta il percorso di azzurrazezza (`23bf1dd`), normalizzazione →
+enrichment_bep → **ldv-pdb**.
+- In un primo momento lo avevo spostato su `ldv-bep-sync` per allinearlo a `EUD_INVIOFILE` (`2d65031`).
+- Diego ha corretto: "sul canale aveva fatto bene azzurrazezza". La modifica è annullata con `14b0dd6`.
+
+**Resta da chiarire**: come arriva l'evento verso `ce-dichiarato-ldv-pdb-sync` con il percorso
+`ldv-pdb`.
+- Con `ldv-pdb` la spedizione va su `preadvising.enrichment.pdb`, cioè a `ce-dichiarato-ldv-pdb`,
+  e non su `preadvising.enrichment.bepsync`, che consuma ldv-pdb-sync.
+- Di conseguenza può cambiare anche la forma del callback di esito che rientra nell'adapter:
+  - percorso PDB: callback con `code_externalId` e `booking_channel` `INVIOSYSTEM`;
+  - percorso BEP POU: `booking_channel=WEB` con `walletRequestId`.
+- Entrambe le forme sono coperte dai test dell'adapter.
+- L'analisi è in corso in `integrazione-ldv-pdb-sync.md`, a cura di un altro agente.
 
 ## Modifiche
 
 | Repo | Commit su `develop` | Contenuto |
 |---|---|---|
-| `ce-dichiarato-orchestratore` | `2d65031` | `EUD_INVIOSYSTEM`: normalizzazione → enrichment_bep → ldv-bep-sync, in `application.yaml` e `application-test.yaml`; test `AzioneRoutingEudTest` sul binding del routing |
-| `ce-dichiarato-adapter` | `95c8f2b` | test per `EUD_INVIOSYSTEM`: callback con `code_externalId` (canale da Mongo); callback POU per `walletRequestId`, con rimappaggio a `INVIOSYSTEM`, con il controllo di parità su `EUD_INVIOFILE` e il caso non trovato a DB; mapper di fase 2 (`canale`, `id_canale`, `enrichment_bep`). Commento aggiornato in `KafkaConsumerPDB` |
+| `ce-dichiarato-adapter` | `95c8f2b` | test per `EUD_INVIOSYSTEM` su quattro casi: callback con `code_externalId` (canale da Mongo); callback POU per `walletRequestId` con rimappaggio a `INVIOSYSTEM`; stesso callback POU su `EUD_INVIOFILE`, come controllo di parità; preadvising non trovato a DB. Più il mapper di fase 2 (`canale`, `id_canale`, `enrichment_bep`). Commento aggiornato in `KafkaConsumerPDB` |
+| `ce-dichiarato-orchestratore` | `2d65031`, poi `14b0dd6` | routing spostato su ldv-bep-sync e poi ripristinato come in `23bf1dd`. Resta solo il test `AzioneRoutingEudTest`, che verifica i due percorsi EURODIS: `EUD_INVIOFILE` → ldv-bep-sync, `EUD_INVIOSYSTEM` → ldv-pdb |
 
 ## Test
 
-- Orchestratore: 58 test, tutti verdi.
+- Orchestratore, dopo il ripristino: 57 test, tutti verdi.
 - Adapter: 56 test, 55 verdi. Fallisce
   `PDBFase2ServiceTest.erroreMapper_contatoreKoIncrementatoEccezioneRilanciata`, che fallisce
   anche su `origin/develop` senza le mie modifiche: è un problema già esistente, da segnalare a
@@ -86,5 +94,6 @@ Nessuna incompatibilità tecnica emersa nell'adapter. Da verificare a valle, fuo
 - Il `develop` locale dell'adapter in `gitposte` ha due commit di Diego del 30-10 mai pushati
   (`c4a26d1`, `1a6202d`) e un Excel modificato. Non li ho toccati: ho lavorato in un worktree
   separato su `origin/develop`.
-- Rilascio: **orchestratore** (cambia il percorso) e **adapter** (solo test e commento: il
-  rilascio non cambia il comportamento).
+- Rilascio:
+  - **orchestratore**: niente da rilasciare rispetto a `9f996a9` di azzurrazezza, in più c'è solo il test;
+  - **adapter**: solo test e commento, il rilascio non cambia il comportamento.
