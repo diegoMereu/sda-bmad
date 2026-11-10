@@ -96,6 +96,13 @@ non c'è. Il DTO lo legge comunque (RF-03, proprietà sconosciute tollerate).
 
 ### 3.2 In uscita: `preadvising.pre-enrichment`
 
+**A valle** (verificato il 10-11, vedi [integrazione-ldv-pdb-sync.md](integrazione-ldv-pdb-sync.md)):
+validatore → `preadvising.enrichment` → orchestratore. Per `EUD_INVIOSYSTEM` l'orchestratore
+esegue normalizzazione, `enrichment_bep` e `ldv-bep-sync`, cioè l'evento verso
+`ce-dichiarato-ldv-pdb-sync` su `preadvising.enrichment.bepsync`. Oggi su `develop` l'orchestratore
+manda il canale a `ldv-pdb`; la correzione è sul branch `feature/eurodis-canale-eud-inviosystem`.
+L'evento verso `ldv-pdb-sync` non lo pubblica il mapper.
+
 - **Chiave**: `rif_spedizione` (= `edReference` normalizzato).
 - **Header**: `traceparent` (span del mapper) e `edReference`.
 - **Corpo**: tracciato unico ICD v11, una spedizione (`spedizione` è un array
@@ -392,6 +399,19 @@ Modello: `ce-dichiarato-adapter` e `ce-dichiarato-eurodis-in` (`TraceUtil`,
 Span: `eurodis.mapper.elabora`, figlio del `traceparent` di `-in`, con
 attributi `edReference`, `idEsecuzione`, `esito`; `traceparent` propagato in
 uscita. MDC: `ed_reference`, `id_esecuzione`, `partition`, `offset`.
+
+**Catena degli span (verificata il 10-11 sul codice).** Tutta la catena usa il contesto W3C
+(`traceparent`) negli header Kafka:
+1. `-in`: lo span PRODUCER inietta il contesto.
+2. Mapper: estrae il contesto (lo span consumer è figlio di `-in`) e lo reinietta sullo span PRODUCER
+   verso `preadvising.pre-enrichment`.
+3. `ce-dichiarato-validatore`: `TraceUtil.extractContext` W3C, reinietta in uscita.
+4. `ce-dichiarato-orchestratore`: estrae; reinietta su ogni passo, compreso `ldv-bep-sync`.
+5. `ce-dichiarato-ldv-pdb-sync`: estrae e reinietta.
+
+La traccia è unica dal mapper al validatore e oltre: non servono modifiche. Da verificare in Datadog
+nei test integrati (un solo `trace_id` per `edReference`). Dettaglio in
+[integrazione-ldv-pdb-sync.md](integrazione-ldv-pdb-sync.md).
 
 Alert Datadog: rimandati come per `-in` (AS-19). Proposta da tenere pronta:
 `non_mappabile` > 0, `errore_tecnico` > 0 per 10 minuti,
