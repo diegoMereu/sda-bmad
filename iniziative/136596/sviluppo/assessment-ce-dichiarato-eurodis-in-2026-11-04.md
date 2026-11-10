@@ -84,3 +84,18 @@ Mongo non è più la persistenza: `-in` è passato a **PostgreSQL** (`9acdd77`, 
 ## Aggiornamento del 10-11 (sera): AS-24 chiuso
 
 AS-24 ✅ **mapper** allineato all'adapter (`5b84993` su `develop`): `ENV password`, `clean package -DskipTests` al posto di `clean verify`, `--no-check-certificate` sull'agent Datadog, aggiornamento dei pacchetti runtime con `USER 185`, jar anche in `/deployments/`; esclusioni Sonar di azzurrazezza mantenute, aggiunto il package reale `configuration`. Test del mapper: 94 verdi. **send-tracking** già allineato (`4cba024`), nessuna modifica; 143 test verdi. Java 17 in pom e Dockerfile per entrambi. Spring Boot: send-tracking 3.5.14, **mapper 4.1.2** (portato da azzurrazezza, contro la decisione 3.5.14 per la catena: da chiarire con lei, non modificato). Nota su AS-23: `ENV password` non era indispensabile, perché un `ARG` è comunque visibile come variabile d'ambiente ai `RUN` dello stesso stage; si tiene per coerenza con l'adapter.
+
+## Aggiornamento del 10-11: values Helm dei tre servizi
+
+Confronto dei values di `-in`, mapper e send-tracking (`.helm`, svil, coll, template di prod) con adapter, orchestratore, validatore e `ce-db-sync`. Sono allineati: immagine `corriere-espresso/preadvising/...`, risorse, probe sulla porta 8091, profilo `prod`, annotation di tracing, bootstrap Kafka svil e coll (porta 9094, `hostAliases` uguali), struttura del template con i segnaposto `_#`. I values svil e coll dei nostri servizi contengono solo gli override; è lo stesso schema di adapter e `ce-db-sync`, che hanno svil vuoto.
+
+Corretto:
+- **`-in`** (`d4420f6`): `EURODIS_IN_ABILITATO` passa dal secret ai values. Vale `'true'` in `.helm`, svil e coll, che usano EURODIS TEST (decisione di Diego), e `'false'` nel template di prod finché non c'è la chiave PROD. Il template ora ha `EURODIS_BASE_URL` ed `EURODIS_AMBIENTE` come segnaposto: senza, certificazione e produzione avrebbero usato l'URL TEST di `.helm`.
+- **send-tracking** (`2d2034f`): stesso problema per `EURODIS_TRACKING_BASE_URL` nel template. L'URL di produzione va confermato con EURODIS.
+
+Lasciato com'era:
+- `codice_iniziativa_goto: "138972"` e il blocco `goto` (`apname`/`pkname` segnaposto): sono così in tutti i servizi `ce-` (AS-10 resta da verificare con Diego).
+- `DD_TAGS`: c'è solo nell'adapter.
+- `route.enabled: '_#ROUTE_ENABLED'`: c'è nei template di riferimento ma non nei nostri. Il chart lo ha già a `false`, e aggiungerlo introdurrebbe un segnaposto nuovo nel processo di promozione.
+- Probe su `/actuator/health/liveness` e `/readiness` invece di `/actuator/health`: scelta della specifica (probe dedicate).
+- Mapper: nessuna differenza.
