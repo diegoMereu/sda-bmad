@@ -3,7 +3,7 @@ iniziativa: "136596"
 campagna: e2e-eurodis-svil
 run: RUN-136596-20261110T170000Z
 tc: [TC-136596-011]
-gravita: alta
+gravita: bloccante
 stato: proposto
 titolo: ce-anagrafica in svil risponde 500 sui codici nazione, il tracciato EURODIS arriva senza ISO3/ISO4
 osservato: >
@@ -16,3 +16,7 @@ impatto: >
   PDB/BEP richiede il paese ISO4: se a valle nessuno lo risolve, la spedizione può essere rifiutata in fase di sync.
   Riguarda anche gli altri servizi che usano lo stesso endpoint (adapter, validatore).
 responsabile: chi gestisce ce-anagrafica e il suo database in svil
+triage_2026_11_10: >
+  Diventa bloccante: nel validatore, flusso PDB con regole PDB_INVIOSYSTEM, la regola 1039 "Mittente Codice
+  Nazione: Campo obbligatorio mancante" controlla mittente.codice_nazione, che il mapper valorizza con l'ISO3
+  di ce-anagrafica. Finche' ce-anagrafica svil risponde 500 ogni tracciato EURODIS sara' bloccato.

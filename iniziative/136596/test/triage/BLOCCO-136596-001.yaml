@@ -1,0 +1,13 @@
+id: BLOCCO-136596-001
+iniziativa: "136596"
+campagna: e2e-eurodis-svil
+tipo: configurazione (non e' un difetto)
+stato: aperto
+titolo: Mancano i dati cliente EURODIS nella configurazione del mapper in svil
+osservato: >
+  Con le regole PDB_INVIOSYSTEM il validatore richiede 1010 "Codice Contratto" (cliente.codice_contratto),
+  1011 "Centro di Costo" (spedizione.centro_costo) e 1012 "Codice Identificativo Cliente" (cliente.codice_auc).
+  Il mapper li prende da configurazione (MAPPER_CLIENTE_CODICE, MAPPER_CLIENTE_CONTRATTO, MAPPER_CENTRO_COSTO,
+  decisione del 06-11), oggi vuota.
+serve: valori del cliente EURODIS per svil (codice cliente/AUC, contratto SFA, centro di costo), poi deploy di configurazione del mapper
+responsabile: Diego
