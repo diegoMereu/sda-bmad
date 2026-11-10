@@ -1,6 +1,6 @@
 # `ce-eurodis-send-tracking` — Documento funzionale per lo sviluppo
 
-**Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.1 (bozza) · **Data**: 2026-11-05
+**Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.2 (bozza) · **Data**: 2026-11-10
 **Autrice**: Mary (analyst) · **Destinataria**: Amelia (dev) e team di sviluppo
 **Repository**: https://posteitaliane.ghe.com/SVILUPPO/CORRIERE-ESPRESSO_PREADVISING_ce-eurodis-send-tracking (branch `feature/eurodis-base-implementation`)
 **Generato da**: [prompt-ce-eurodis-send-tracking.md](prompt-ce-eurodis-send-tracking.md)
@@ -15,7 +15,9 @@ Etichette usate nel documento:
 > **Stato 05-11**: client implementato da Amelia (`4cba024` su `feature/eurodis-base-implementation`, 34 test verdi), conforme a RF-01…RF-12 e AC-01…AC-13.
 >
 > **Cosa si sviluppa adesso** (Diego, 05-11): solo il **client verso EURODIS**, cioè le sezioni 3.1, 5 (RF-01…RF-12), 7.1, 8, 9 e 11.1.
-> Sorgente degli eventi SDA, traduzione nei codici EURODIS, persistenza e job (sezioni 3.2, 3.3, 4 e 6) sono **DA DECIDERE**. Finché non si decidono non si scrivono consumer né scheduler.
+> Sorgente degli eventi SDA, persistenza e job (sezioni 3.2, 3.3, 4 e 6) sono **DA DECIDERE**. Finché non si decidono non si scrivono consumer né scheduler.
+>
+> **10-11**: la **traduzione degli stati SDA nei codici EURODIS è decisa** (Diego): file `Elenco codici status.xlsx`, foglio "Decodifica Eurodis IN-BOUND" (sezione 3.4). Si può implementare subito come tabella, indipendente dalla sorgente.
 
 ---
 
@@ -159,6 +161,116 @@ Proposta, da confermare quando si decide la sorgente:
   - istante di invio.
   - Serve per audit, ripresa e per non reinviare un evento già creato.
 
+### 3.4 Traduzione degli stati SDA nei codici EURODIS [DECISO 10-11]
+
+**[DECISO 10-11, Diego]** Il mapping è nel file
+[Elenco codici status.xlsx](../Elenco%20codici%20status.xlsx), foglio **"Decodifica
+Eurodis IN-BOUND"** (righe 3-78). Gli altri fogli ("Decodifica Eurodis OUT-BOUND",
+"Status Fedex") non sono nel perimetro.
+
+**[FATTO]** Dal foglio:
+- **76 status SDA**, ciascuno compare una volta sola, tradotti in **24 codici EURODIS**:
+  più status SDA vanno sullo stesso codice (per esempio `000`, `CP0`, `CNP`, `083`, `085` →
+  `1100`). La traduzione è quindi a senso unico, da SDA a EURODIS.
+- Tutti i codici EURODIS hanno **4 cifre**: sono codici di **collo**. Gli eventi si inviano con
+  `POST /events/parcel/v1` (o `/parcels/v1` a lotti), non con gli eventi di spedizione a 3 cifre.
+  Questo risolve il livello degli eventi (ST-01, ex domanda 4).
+- Il codice `1100` (consegnata) richiede `acceptorName`, il nome di chi ha ritirato (RF della
+  sezione 3.1): la sorgente SDA deve fornirlo. È un **dato personale**: si invia ma non si logga
+  (RF-12).
+- Le descrizioni EURODIS hanno piccole differenze di testo per lo stesso codice (`1200`, `1306`):
+  conta il codice.
+
+Regole:
+
+| # | Regola |
+|---|---|
+| TR-01 | La traduzione è una tabella `statusSDA → codiceEURODIS` caricata da configurazione (file di risorse versionato nel repository, generato dal foglio), non scritta nel codice: se il foglio cambia si aggiorna la risorsa. |
+| TR-02 | Il confronto sullo status SDA è esatto sul codice (3 caratteri, maiuscolo), senza spazi. |
+| TR-03 | **[DA DECIDERE]** Status SDA non presente nella tabella. Default: **non si invia** nulla a EURODIS; log di warning con status e LDV (mai dati personali) e metrica `eurodis_tracking_stato_non_mappato_total{status}`. |
+| TR-04 | Lo stesso codice EURODIS può arrivare più volte per lo stesso collo da status SDA diversi (per esempio due giacenze): si inviano tutti, la deduplica non spetta a noi (ST-07). |
+
+Tabella del foglio (stessa sequenza del file):
+
+| Status SDA | Descrizione SDA | Codice EURODIS | Descrizione EURODIS |
+|---|---|---|---|
+| `000` | OK | `1100` | The item was delivered completely and accepted by the consignee |
+| `CP0` | CONSEGNATA AL PUNTOPOSTE | `1100` | The item was delivered completely and accepted by the consignee |
+| `CNP` | CONSEGNATA DA UFI AL CLIENTE | `1100` | The item was delivered completely and accepted by the consignee |
+| `083` | CONSEGNATA A KIPOINT | `1100` | The item was delivered completely and accepted by the consignee |
+| `085` | CONSEGNATA UFFICIO POSTALE | `1100` | The item was delivered completely and accepted by the consignee |
+| `009` | Danneggiata | `1105` | Damaged |
+| `018` | Manomessa | `1105` | Damaged |
+| `FTO` | Furto | `1106` | Item Lost |
+| `FTV` | Furto Vettore | `1106` | Item Lost |
+| `SMA` | Smarrimento | `1106` | Item Lost |
+| `SMV` | Smarrimento Vettore | `1106` | Item Lost |
+| `021` | Chiusura Settimanale | `1200` | Special Delivery times - booking in - appointments |
+| `029` | Consegne Particolari | `1200` | Special delivery times - booking in - appointments |
+| `APC` | Appuntamento concordato | `1200` | Special delivery times - booking in - appointments |
+| `APP` | Appuntamento da concordare | `1200` | Special delivery times - booking in - appointments |
+| `CON` | Consegna Concordata | `1200` | Special delivery times - booking in - appointments |
+| `EDO` | Entrata in dogana | `1201` | The item was taken out of the transportation flow, custom clearance process started |
+| `AGT` | Arrivo al Gateway. In attesa di lavorazione | `1203` | Customs clearance documents missing or wrong |
+| `007` | Rifiutata | `1300` | Delivery of the item was refused by the consignee without any reason |
+| `008` | Destinatario Assente | `1304` | First delivery attempt, notification card was left |
+| `010` | Festa Patronale | `1305` | Consignee was closed - holiday |
+| `042` | Ferie fino al | `1305` | Consignee was closed - holiday |
+| `013` | INCOMPLETA PER MANCANZA/DANNEGGIAMENTO | `1306` | Delivery problem |
+| `023` | Fuori Standard | `1306` | Delivery problems caused by customer (i.e. local bank holidays) |
+| `024` | Ispezione Postale | `1306` | Delivery problems caused by customer (i.e. local bank holidays) |
+| `041` | Zona non servita | `1306` | Delivery problems caused by customer (i.e. local bank holidays) |
+| `003` | Indirizzo Errato/Incompleto | `1307` | The address of the consignee is incorrect or incomplete |
+| `017` | FDP Concordato | `1308` | The consignee will pick up the item at the delivery depot himself |
+| `FDB` | Fermo Deposito Punto Blu | `1308` | The consignee will pick up the item at the delivery depot himself |
+| `FDP` | Fermo Deposito Concordato | `1308` | The consignee will pick up the item at the delivery depot himself |
+| `SFP` | Servizio Fermo Deposito | `1308` | The consignee will pick up the item at the delivery depot himself |
+| `ARP` | ARRIVATA UFI | `1308` | The consignee will pick up the item at the delivery depot himself |
+| `AFK` | LA SPEDIZIONE E' IN FERMO DEPOSITO PRESSO KIPOINT | `1308` | The consignee will pick up the item at the delivery depot himself |
+| `006` | Mancanza B.A.M. | `1309` | The delivery documents are missing or wrong |
+| `027` | Mancato Pagamento | `1310` | The payment information:terms of delivery, COD amounts are wrong or incomplete |
+| `093` | Mancato importo contrassegno | `1310` | The payment information:terms of delivery, COD amounts are wrong or incomplete |
+| `095` | Importo contrassegno non leggibile | `1310` | The payment information:terms of delivery, COD amounts are wrong or incomplete |
+| `096` | Importo contrassegno discordante | `1310` | The payment information:terms of delivery, COD amounts are wrong or incomplete |
+| `098` | Mittente contrassegno non leggibile | `1310` | The payment information:terms of delivery, COD amounts are wrong or incomplete |
+| `001` | Mancanza di tempo | `1402` | Delivery problems caused by the haulier (i.e vehicle breakdown) |
+| `012` | Smistamento Errato | `1406` | No delivery - the item was misrouted or missorted |
+| `DID` | Disguido colpa SDA | `1406` | No delivery - the item was misrouted or missorted |
+| `DIL` | Disguido | `1406` | No delivery - the item was misrouted or missorted |
+| `DIS` | Disguido | `1406` | No delivery - the item was misrouted or missorted |
+| `015` | Sciopero | `1408` | Force Majeure |
+| `053` | Causa forza maggiore hub | `1408` | Force Majeure |
+| `084` | Causa forza maggiore | `1408` | Force Majeure |
+| `CAL` | Calamità Naturale | `1408` | Force Majeure |
+| `RAL` | Rallentamenti sindacali | `1408` | Force Majeure |
+| `SIN` | Agitazione Sindacale | `1408` | Force Majeure |
+| `DNR` | Destinatario chiuso causa ordinanza Covid-19 | `1408` | Force Majeure |
+| `ZNR` | Zona non raggiungibile per ordinanza Covid-19 | `1408` | Force Majeure |
+| `090` | Spedizione abbandonata | `1416` | Disposal of goods |
+| `SML` | Smaltita | `1416` | Disposal of goods |
+| `RRR` | Ritorno al mittente | `1600` | Return Item |
+| `STA` | L/V Stampata | `1740` | Inbound Gateway Scan |
+| `PPP` | Partita | `1750` | Delivery Partner Scan |
+| `ARR` | Arrivata in filiale | `1766` | Delivery depot arrival |
+| `GGG` | In consegna al mattino | `1767` | Out for delivery |
+| `POM` | In consegna al pomeriggio | `1767` | Out for delivery |
+| `019` | Ritardo Linea | `1785` | On Hold |
+| `022` | Non uscita | `1785` | On Hold |
+| `035` | Giacenza Problemi linee | `1785` | On Hold |
+| `036` | Giacenza Problemi hub | `1785` | On Hold |
+| `037` | Giacenza Problemi impianto | `1785` | On Hold |
+| `038` | Ritardo linee (partenza) | `1785` | On Hold |
+| `044` | Giacenza esubero spedizioni | `1785` | On Hold |
+| `ANG` | Arrivata non messa a giro | `1785` | On Hold |
+| `ATC` | Attesa partenza colpa Cliente | `1785` | On Hold |
+| `ATP` | Attesa In Partenza | `1785` | On Hold |
+| `GIA` | Giacenza | `1785` | On Hold |
+| `ING` | Entrata in giacenza | `1785` | On Hold |
+| `NGG` | Consegna al mattino annullata | `1785` | On Hold |
+| `NPO` | Consegna al pomeriggio annullata | `1785` | On Hold |
+| `RUS` | Status Precedente | `1785` | On Hold |
+| `UDO` | Uscita: Mag. Temp. Custodia | `1785` | On Hold |
+
 ## 4. Flusso di elaborazione (proposta, quando la sorgente è decisa)
 
 ```mermaid
@@ -169,7 +281,7 @@ sequenceDiagram
     participant E as EURODIS send-tracking
     S->>T: evento SDA (LDV, codice, data, luogo)
     T->>M: correlazione LDV → edReference, barcode
-    T->>T: traduzione nel codice EURODIS (tabella da configurazione)
+    T->>T: traduzione nel codice EURODIS (tabella della sezione 3.4)
     T->>M: salva evento DA_INVIARE
     T->>E: POST /events/{shipment|parcel}/v1 (lotto)
     E-->>T: 201 con errors/warnings per elemento
@@ -231,6 +343,7 @@ Se EURODIS risponde che i doppioni sono un problema, gli esiti incerti vanno a v
 | `timeout.connect` | `EURODIS_TIMEOUT_CONNECT` | `10s` | |
 | `timeout.read` | `EURODIS_TIMEOUT_READ` | `30s` | |
 | `lotto-max` | `EURODIS_TRACKING_LOTTO_MAX` | `100` | massimo EURODIS non dichiarato (ST-06) |
+| `stati.risorsa` | — | `classpath:eurodis/stati-inbound.csv` | tabella della sezione 3.4 (TR-01) |
 
 ## 9. Osservabilità
 
@@ -243,6 +356,7 @@ Metriche (Micrometer/Prometheus, tag comune `service=ce-eurodis-send-tracking`),
 | `eurodis_tracking_eventi_total` | counter | `livello` (spedizione, collo), `esito` (CREATO, RIFIUTATO, ERRORE_CONFIGURAZIONE, ERRORE_TEMPORANEO) |
 | `eurodis_tracking_errori_eurodis_total` | counter | `codice` (codice errore EURODIS, `locale` per RF-06) |
 | `eurodis_tracking_warning_total` | counter | `codice` |
+| `eurodis_tracking_stato_non_mappato_total` | counter | `status` (status SDA) — TR-03 |
 | `eurodis_tracking_lotto_non_correlabile_total` | counter | — |
 | `eurodis_tracking_esito_non_coincidente_total` | counter | — (RF-09) |
 
@@ -283,6 +397,9 @@ Alert (più avanti, come AS-19 di `-in`):
 | AC-11 | `eventTimestamp` è serializzato come `2026-11-05T13:45:00.000Z` |
 | AC-12 | Nei log del client non compaiono `acceptorName` né la chiave API |
 | AC-13 | Le metriche della sezione 9 si incrementano con i tag attesi |
+| AC-14 | Dato lo status SDA `CP0`, la traduzione dà `1100`; dato `GGG` dà `1767`; dato `RRR` dà `1600` |
+| AC-15 | Data la risorsa caricata, contiene 76 status SDA e 24 codici EURODIS distinti, tutti di 4 cifre (controllo di coerenza con il foglio) |
+| AC-16 | Dato uno status SDA non in tabella (es. `XYZ`), non parte nessuna chiamata, c'è un warning e `eurodis_tracking_stato_non_mappato_total{status="XYZ"}` cresce |
 
 ### 11.2 End-to-end (quando la sorgente è decisa)
 
@@ -292,9 +409,9 @@ Da scrivere: evento SDA → evento EURODIS creato in TEST, rifiuto con codice er
 
 | # | Punto | Default per partire | Impatto quando arriva la risposta | Rif. |
 |---|---|---|---|---|
-| ST-01 | Catalogo dei codici evento EURODIS (3 cifre spedizione, 4 collo) e traduzione degli eventi SDA. Lo swagger non li elenca: rimanda al manuale di rete EURODIS | il client accetta qualsiasi codice della lunghezza giusta; la traduzione sarà una tabella da configurazione | si compila la tabella; si decide spedizione o collo | PA-34 (nuovo), PA-07 |
+| ST-01 | Catalogo dei codici evento EURODIS e traduzione degli eventi SDA | **CHIUSO 10-11**: tabella del foglio "Decodifica Eurodis IN-BOUND" (sezione 3.4), codici di collo a 4 cifre | — | PA-34 |
 | ST-02 | Sorgente degli eventi SDA delle LDV EURODIS (topic, archivio T&T, formato) | nessun consumer | si scrivono consumer e storico | PA-35 (nuovo), PA-07 |
-| ST-03 | Correlazione LDV SDA → `edReference` e barcode; quale barcode EURODIS si aspetta da SDA (europlate, delivery partner CLS, alternative) | proposta `edReference` + `europlateBarcode` | indice di correlazione nel mapper o in `-in` | PA-35, PA-11 |
+| ST-03 | Correlazione LDV SDA → `edReference` e barcode del collo (gli eventi sono di collo, sezione 3.4); quale barcode EURODIS si aspetta da SDA. Dal 10-11 la LDV SDA del collo è `deliveryPartnerBarcode` (mapper 0.4) | proposta `edReference` + `europlateBarcode` + `deliveryPartnerBarcode` | indice di correlazione nel mapper o in `-in` | PA-35, PA-11 |
 | ST-04 | Significato di `locationCode` (es. `CN-CC`) e di `countryCode` per gli eventi SDA | campi passati dal chiamante | regola di derivazione (deposito SDA? codice EURODIS?) | PA-36 (nuovo) |
 | ST-05 | SDA riceve transit unit EURODIS? Servono gli eventi transit? | no | eventuali endpoint transit | PA-36 |
 | ST-06 | Massimo di eventi per lotto; ordine e numero degli elementi nella risposta | 100; stesso ordine | `lotto-max`; correlazione diversa se l'ordine non è garantito | PA-36 |
@@ -302,10 +419,13 @@ Da scrivere: evento SDA → evento EURODIS creato in TEST, rifiuto con codice er
 | ST-08 | Chiave API di send-tracking: la stessa di receive-pan? | stesso secret | secret separato | PA-12 |
 | ST-09 | Fuso orario atteso in `eventTimestamp` | UTC con `Z` | formato locale se richiesto | PA-27 |
 | ST-10 | Errori verso EURODIS (spedizioni scartate dal mapper): passano da un evento di eccezione? | fuori dal client | eventuale codice evento di scarto | PA-08 |
+| ST-11 | Status SDA non presente nella tabella (TR-03) | non si invia, warning e metrica | eventuale codice EURODIS di default | — |
+| ST-12 | `acceptorName` per `1100`: la sorgente SDA ha il nome di chi ritira? | evento rifiutato localmente se manca (AC-10) | se manca sempre, va chiesto a EURODIS se accettano un valore convenzionale | PA-35 |
 
 ## 13. Riferimenti
 
 - Swagger: [eurodis-send-tracking-swagger-v1.json](../eurodis-send-tracking-swagger-v1.json); originale https://testapi.eurodis.com/send-tracking/swagger/Release%20v1/swagger.json
+- Traduzione degli stati: [Elenco codici status.xlsx](../Elenco%20codici%20status.xlsx), foglio "Decodifica Eurodis IN-BOUND"
 - [ce-dichiarato-eurodis-in.md](ce-dichiarato-eurodis-in.md): convenzioni, collezione `eurodis_spedizioni`
 - [analisi.md](../analisi.md): PA-07, PA-08, PA-11, PA-12, PA-27, PA-34…PA-36
 - Repository: CORRIERE-ESPRESSO_PREADVISING_ce-eurodis-send-tracking
@@ -314,6 +434,8 @@ Da scrivere: evento SDA → evento EURODIS creato in TEST, rifiuto con codice er
 ## Domande per Diego
 
 1. **Sorgente degli eventi SDA** (ST-02): sai chi possiede le tracce SDA delle LDV EURODIS e su quale topic o archivio passano? Il placeholder `preadvising.eud.send-tracking` di azzurrazezza è un topic che esiste o un'idea?
-2. **Catalogo dei codici evento** (ST-01): lo chiediamo a Chiapponi/EURODIS insieme alla tabella di traduzione? Serve il manuale di rete EURODIS.
+2. ~~Catalogo dei codici evento~~: chiuso il 10-11 con il foglio "Decodifica Eurodis IN-BOUND" (sezione 3.4).
 3. **Retry sugli esiti incerti** (7.2): va bene la proposta "meglio un doppione che un evento perso" finché EURODIS non risponde su ST-07?
-4. **Livello degli eventi**: spedizione, collo o entrambi? Dipende da ST-01, ma se hai già un'indicazione la mettiamo come default.
+4. ~~Livello degli eventi~~: collo, perché i codici del foglio sono tutti di 4 cifre.
+5. **Status SDA non mappati** (TR-03): va bene non inviarli, con warning e metrica?
+6. **`acceptorName`** per `1100` (ST-12): la sorgente SDA delle tracce ha il nome di chi ritira?
