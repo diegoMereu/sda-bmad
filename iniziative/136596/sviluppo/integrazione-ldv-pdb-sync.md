@@ -22,6 +22,32 @@ tracing deve partire dal mapper e ricollegarsi al validatore.
 - **Tracing**: la catena è già coerente, tutta in W3C `traceparent` da `-in` fino a `ldv-pdb-sync`. Non
   servono modifiche al codice; resta da verificare in Datadog durante i test integrati.
 
+## Aggiornamento del 10-11 sera: percorso deciso `ldv-pdb` (Diego)
+
+**[DECISO 10-11, Diego]** Per `EUD_INVIOSYSTEM` l'orchestratore resta come l'ha configurato
+azzurrazezza (`23bf1dd`): normalizzazione → enrichment_bep → **`ldv-pdb`**, cioè
+`ce-dichiarato-ldv-pdb`. La proposta qui sotto di passare a `ldv-bep-sync` è **superata**:
+- il branch dell'orchestratore `feature/eurodis-canale-eud-inviosystem` (`a1a3732`, verso
+  `ldv-bep-sync`) **non va mergiato**; anche il commit `2d65031` su `develop` è stato annullato;
+- `ce-dichiarato-ldv-pdb` è un progetto distinto da `ldv-pdb-sync` (repo
+  `CORRIERE-ESPRESSO_PREADVISING_ce-dichiarato-ldv-pdb`, immagine `ce-dichiarato-ldv`; `ldv-pdb-sync` ha
+  immagine e chart propri). Le correzioni per EURODIS sono sul branch
+  **`feature/eurodis-canale-eud-inviosystem`** di `ce-dichiarato-ldv-pdb`, commit **`07c13d0`**, partito
+  da `develop`:
+  - `BepChannel.fromCanale` toglie anche il prefisso `EUD_`: `EUD_INVIOSYSTEM` → `INVIOSYSTEM`,
+    `EUD_INVIOFILE` → `INVIOFILE` (prima andava in eccezione). Con `INVIOSYSTEM` la LDV del collo
+    (`collo.id_ldv`, da `deliveryPartnerBarcode`) passa a BEP come `code`, come per `PDB_INVIOSYSTEM`;
+  - `BepResponseMapper`: con `flag_autoproduttore = S` la LDV già presente sul collo non si sovrascrive
+    con quella della response (stessa logica di `10726dd` su `ldv-pdb-sync`); negli altri casi il
+    comportamento non cambia;
+  - test: `BepChannelTest`, `BepResponseMapperAutoproduttoreTest`, `BepRequestMapperTest` (caso
+    `EUD_INVIOSYSTEM`); suite completa 386 verdi.
+- È un repository di un altro team: va in merge request su `develop` e poi rilasciato in svil.
+- Il branch `feature/eurodis-autoproduttore-ldv` di `ldv-pdb-sync` (`10726dd`) resta utile solo se
+  `EUD_INVIOSYSTEM` passasse un giorno da `ldv-bep-sync`.
+- Restano validi i punti di configurazione (codice contratto e centro di costo EURODIS, in corso dal
+  builder → mapper) e la verifica in svil della codifica del paese.
+
 ## 1. Chi riceve cosa
 
 | Servizio | Topic in ingresso | Ruolo |
