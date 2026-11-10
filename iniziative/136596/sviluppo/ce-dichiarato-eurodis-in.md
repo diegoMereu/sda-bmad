@@ -441,11 +441,11 @@ sequenceDiagram
 | RF-19 | **File fittizio** [DECISO 06-11]: ogni scarico (o rilettura) con almeno una spedizione ha un `idFile` (UUID) e un `nomeFile`, assegnati una volta sola e salvati sullo scarico. L'`idFile` va nell'header `idFile` di ogni spedizione inviata, anche nei reinvii (RF-11, RF-17). | da implementare |
 | RF-20 | Prima delle spedizioni si pubblicano su `preadvising.evensource`, in quest'ordine, `ST_F0002` `FILE_PRESO_IN_CARICO` e `ST_F0005` `FILE_IN_ELABORAZIONE` (sezione 3.3), con invio sincrono e `acks=all`. Ogni evento si invia **una volta sola** per scarico: l'invio confermato si scrive sullo scarico (`eventoPresoInCaricoIl`, `eventoInElaborazioneIl`) e alla ripresa non si ripete. | da implementare |
 | RF-21 | Se un evento non parte, lo scarico torna `DA_ELABORARE` con l'errore, nessuna spedizione viene inviata e si riprova al ciclo successivo: un tracciato non arriva mai a valle prima del suo file. | da implementare |
-| RF-22 | **Buffer locale** [DECISO 10-11]: con `200`, prima di salvare il corpo si scrive il file `<idScarico>_<ts>.grezzo` (metadati + corpo identico) in modo atomico (`.tmp`, `fsync`, rename) nella cartella `eurodis.in.buffer.dir`. Vale per scarico e rilettura. | da implementare |
-| RF-23 | Il file si cancella solo dopo il salvataggio del corpo confermato dal database. Se il salvataggio fallisce il file resta. Un errore di cancellazione non fa fallire lo scarico. | da implementare |
-| RF-24 | Il job di recupero (ogni 2 minuti, file più vecchi di `eta-minima`, senza ShedLock: ogni pod il suo volume) ricarica i file pendenti in modo idempotente: corpo già salvato → cancella; scarico senza corpo → salva e porta a `DA_ELABORARE`; scarico assente → inserisce `DA_ELABORARE` con lo stesso id; poi cancella. Database giù → riprova. | da implementare |
-| RF-25 | Un file illeggibile o con `sha256` diverso dai metadati si sposta in `scartati/`, mai cancellato, con log e metrica. | da implementare |
-| RF-26 | Il buffer non blocca: se la scrittura del file fallisce lo scarico prosegue con il salvataggio a database (log ERROR, metrica). Il contenuto dei file non va mai nei log. | da implementare |
+| RF-22 | **Buffer locale** [DECISO 10-11]: con `200`, prima di salvare il corpo si scrive il file `<idScarico>_<ts>.grezzo` (metadati + corpo identico) in modo atomico (`.tmp`, `fsync`, rename) nella cartella `eurodis.in.buffer.dir`. Vale per scarico e rilettura. | `BufferGrezzo`, `ScaricoService` (`6d50b70`) |
+| RF-23 | Il file si cancella solo dopo il salvataggio del corpo confermato dal database. Se il salvataggio fallisce il file resta. Un errore di cancellazione non fa fallire lo scarico. | `ScaricoService` (`cc5d01a`) |
+| RF-24 | Il job di recupero (ogni 2 minuti, file più vecchi di `eta-minima`, senza ShedLock: ogni pod il suo volume) ricarica i file pendenti in modo idempotente: corpo già salvato → cancella; scarico senza corpo → salva e porta a `DA_ELABORARE`; scarico assente → inserisce `DA_ELABORARE` con lo stesso id; poi cancella. Database giù → riprova. | `RecuperoBufferService`, `EurodisScheduler` (`5be0d21`) |
+| RF-25 | Un file illeggibile o con `sha256` diverso dai metadati si sposta in `scartati/`, mai cancellato, con log e metrica. | `BufferGrezzo.scarta` (`5be0d21`) |
+| RF-26 | Il buffer non blocca: se la scrittura del file fallisce lo scarico prosegue con il salvataggio a database (log ERROR, metrica). Il contenuto dei file non va mai nei log. | `BufferGrezzo` (`6d50b70`) |
 
 ## 6. Stati
 
@@ -649,13 +649,13 @@ Criteri da verificare anche end-to-end contro `mock-eurodis` (`../mock-eurodis/`
 | AC-19 | `preadvising.evensource` non disponibile | elaborazione, poi il topic torna | primo ciclo: scarico `DA_ELABORARE` con errore, nessuna spedizione inviata; ciclo dopo: eventi e spedizioni inviati, stesso `idFile` | da fare |
 | AC-20 | Kill del pod dopo `ST_F0002` | ripresa dopo 15 minuti | `ST_F0002` non ripetuto, `ST_F0005` e spedizioni inviati con lo stesso `idFile` | da fare |
 | AC-21 | Spedizione in `eurodis.in.ripubblica.ed-references` | job richieste manuali | messaggio con l'header `idFile` dello scarico d'origine, nessun nuovo evento | da fare |
-| AC-22 | 3 spedizioni in coda | scarico | file `.grezzo` scritto prima del salvataggio e cancellato dopo; buffer vuoto | da fare |
-| AC-23 | Database giù al salvataggio del corpo | scarico, poi il database torna, poi il job di recupero | primo giro: file pendente, scarico `CHIAMATA_IN_CORSO`; dopo: corpo salvato identico (`sha256` uguale), scarico `DA_ELABORARE`, file cancellato, spedizioni poi inviate dall'elaborazione | da fare |
-| AC-24 | File pendente il cui scarico ha già il corpo | job di recupero | file cancellato, nessuna modifica allo scarico | da fare |
-| AC-25 | File pendente senza riga in `eurodis_scarichi` | job di recupero | scarico inserito con lo stesso id, `DA_ELABORARE`, file cancellato | da fare |
-| AC-26 | File troncato o con hash diverso | job di recupero | file spostato in `scartati/`, metrica, scarico invariato | da fare |
-| AC-27 | Volume non scrivibile | scarico | corpo salvato comunque a database, metrica `eurodis_in_buffer_scrittura_total{esito="ko"}` | da fare |
-| AC-28 | File più giovane di `eta-minima` | job di recupero | non toccato | da fare |
+| AC-22 | 3 spedizioni in coda | scarico | file `.grezzo` scritto prima del salvataggio e cancellato dopo; buffer vuoto | unitario ✅, in ambiente da provare |
+| AC-23 | Database giù al salvataggio del corpo | scarico, poi il database torna, poi il job di recupero | primo giro: file pendente, scarico `CHIAMATA_IN_CORSO`; dopo: corpo salvato identico (`sha256` uguale), scarico `DA_ELABORARE`, file cancellato, spedizioni poi inviate dall'elaborazione | unitario ✅, in ambiente da provare |
+| AC-24 | File pendente il cui scarico ha già il corpo | job di recupero | file cancellato, nessuna modifica allo scarico | unitario ✅, in ambiente da provare |
+| AC-25 | File pendente senza riga in `eurodis_scarichi` | job di recupero | scarico inserito con lo stesso id, `DA_ELABORARE`, file cancellato | unitario ✅, in ambiente da provare |
+| AC-26 | File troncato o con hash diverso | job di recupero | file spostato in `scartati/`, metrica, scarico invariato | unitario ✅, in ambiente da provare |
+| AC-27 | Volume non scrivibile | scarico | corpo salvato comunque a database, metrica `eurodis_in_buffer_scrittura_total{esito="ko"}` | unitario ✅, in ambiente da provare |
+| AC-28 | File più giovane di `eta-minima` | job di recupero | non toccato | unitario ✅, in ambiente da provare |
 
 **Il mock va esteso** per gli end-to-end di AC-04, AC-05, AC-10, AC-11 e AC-12:
 - `500` e timeout configurabili;
@@ -719,7 +719,8 @@ Criteri da verificare anche end-to-end contro `mock-eurodis` (`../mock-eurodis/`
   60 giorni, nessun limite, nessun arretrato) e frequenza: produzione 10 minuti, svil e coll 2 (Mary).
 - 0.7 (10-11): buffer locale del grezzo su `emptyDir`, scrittura atomica prima del salvataggio,
   cancellazione a salvataggio riuscito, job di recupero idempotente senza ShedLock, file corrotti in
-  `scartati/` (Diego, su consiglio di EURODIS; disegno di Winston).
+  `scartati/` (Diego, su consiglio di EURODIS; disegno di Winston). Implementata su `develop`
+  (`6d50b70`..`b169912`, 99 test verdi; Amelia).
 
 ## Domande per Diego (0.5)
 
