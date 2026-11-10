@@ -1,0 +1,18 @@
+id: DEF-136596-002
+iniziativa: "136596"
+campagna: e2e-eurodis-svil
+run: RUN-136596-20261110T170000Z
+tc: [TC-136596-011]
+gravita: alta
+stato: proposto
+titolo: ce-anagrafica in svil risponde 500 sui codici nazione, il tracciato EURODIS arriva senza ISO3/ISO4
+osservato: >
+  GET https://ce-anagrafica-corriere-espresso-preadvising.apps.gen3gpazne.cloudsvil.poste.it/anagrafica/indirizzi/nazione/{codice}
+  risponde 500 per IT, ITA, ITA1, NL (10-11, 19:09). /anagrafica/matrice/filiale risponde 200.
+  Sul tracciato del mapper codice_nazione e codice_nazione_poste sono vuoti per mittente e destinatario.
+atteso: IT → ITA / ITA1 / IT (IndirizziRepository.getCodNazione: tabelle nazioni_poste e net_delivery_int).
+causa: Da verificare in ce-anagrafica svil (probabile tabella mancante o query in errore sul database di svil). Non è un difetto del mapper, che segue RF-15.
+impatto: >
+  PDB/BEP richiede il paese ISO4: se a valle nessuno lo risolve, la spedizione può essere rifiutata in fase di sync.
+  Riguarda anche gli altri servizi che usano lo stesso endpoint (adapter, validatore).
+responsabile: chi gestisce ce-anagrafica e il suo database in svil

@@ -1,0 +1,36 @@
+id: DEF-136596-001
+iniziativa: "136596"
+campagna: e2e-eurodis-svil
+run: RUN-136596-20261110T170000Z
+tc: [TC-136596-020, TC-136596-021, TC-136596-022]
+gravita: bloccante
+stato: proposto
+titolo: Il canale EUD_INVIOSYSTEM non è riconosciuto a valle del mapper: i tracciati EURODIS finiscono nel flusso SDA e si bloccano
+osservato: >
+  Il validatore (ce-dichiarato-validatore, CanaleFlussoResolver) instrada sul flusso PDB solo i canali
+  di PdbChannel.SUPPORTED (PDB_INVIOSYSTEM, PDB_INVIOFILE, PDB_INVIOEASY, PDB_STAMPAMASSIVA,
+  EUD_INVIOFILE). EUD_INVIOSYSTEM cade nell'handler di default SdaFlussoHandler, che cerca la
+  configurazione postazione del cliente e blocca con 143 "Cliente non configurato o non attivo"
+  (eventi ST_R0002 + ST_R0006 sui 9 tracciati dello scarico 78533218-... del 10-11 17:16).
+atteso: Il tracciato EURODIS passa dal flusso PDB, arriva su preadvising.enrichment e poi su preadvising.completed.
+causa: >
+  Tutta la catena a valle è stata costruita per il canale EURODIS EUD_INVIOFILE (mario.reda, set-ott
+  2026), che ha già una pipeline dedicata. Il 05-11 Diego ha scelto EUD_INVIOSYSTEM, e mapper e -in lo
+  usano, ma il canale non è mai stato aggiunto a valle. Dove EUD_INVIOFILE è cablato:
+  - ce-dichiarato-validatore: PdbChannel (instradamento) e regole Drools rules/pdb/generated/ce-pdb-rules.drl
+    (le regole citano EUD_INVIOFILE, non EUD_INVIOSYSTEM; PdbChannel.canaleRegole esiste ma non è usato nel flusso);
+  - ce-dichiarato-orchestratore: application.yaml (azioni per canale: EUD_INVIOFILE = normalizzazione,
+    enrichment_bep, ldv-bep-sync) e OrchestratoreService.CANALI_PDB;
+  - ce-dichiarato-state-machine-handler: liste dei canali PDB;
+  - ce-dichiarato-smistatore: canali Poste (CANALI_POSTE) e canali esclusi dai palmari (CANALI_ESCLUSI_PALMARI).
+opzioni:
+  A: >
+    Si resta su EUD_INVIOSYSTEM e lo si aggiunge a validatore, orchestratore, state-machine-handler e
+    smistatore: codice in 4 servizi, 4 rilasci; nel validatore va deciso con quale set di regole lo si
+    valida (PDB_INVIOSYSTEM o quello di EUD_INVIOFILE).
+  B: >
+    Si usa EUD_INVIOFILE, il canale per cui la catena è già pronta (era la scelta di azzurrazezza del 05-11):
+    nessuna modifica di codice, solo configurazione MAPPER_CANALE e EURODIS_FILE_CANALE in Helm di
+    mapper e -in, 2 rilasci di sola configurazione. La pipeline EUD_INVIOFILE dell'orchestratore
+    comprende già ldv-bep-sync (LDV fornita dal mittente, come per l'autoproduttore).
+responsabile: Diego (scelta del canale); poi Amelia (configurazione) o i team dei servizi a valle (opzione A)
