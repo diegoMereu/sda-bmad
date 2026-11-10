@@ -4,9 +4,10 @@
 **Owner cliente**: Piergentili · **PRJ**: non ancora assegnato
 
 ## In una riga
-I tre microservizi sono implementati su `develop` (`-in` su PostgreSQL con eventi di stato, mapper con il tracciato completo, send-tracking con la traduzione degli stati), ma nessuno è stato ancora avviato in svil: servono gli script DDL del DBA e il deploy. Restano da chiarire con EURODIS errori e rifiuti, rimando dei dati e `deliveryPartnerBarcode`. Go-live atteso a fine gennaio 2027.
+I tre microservizi sono implementati su `develop` (`-in` su PostgreSQL con eventi di stato, mapper con il tracciato completo, send-tracking con la traduzione degli stati), ma nessuno è stato ancora avviato in svil: le DDL di PostgreSQL sono state eseguite, manca il deploy. Restano da chiarire con EURODIS errori e rifiuti, rimando dei dati e `deliveryPartnerBarcode`. Go-live atteso a fine gennaio 2027.
 
 ## Fatto dall'ultimo punto
+- 2026-11-10 — **DDL PostgreSQL eseguite dal DBA** (database `ce_eud_api_in`, script di `sql/ddl/` di `-in`), secondo Diego.
 - 2026-11-10 — **Sviluppo completato sui tre repository** (`develop`, push con bypass della regola "solo pull request"):
   - `-in`: persistenza da Mongo a **PostgreSQL** (JDBC, script DDL in `sql/ddl/`, secret `ce-postgres` di `ce-db-sync`), file fittizio per scarico con eventi `ST_F0002`/`ST_F0005` su `preadvising.evensource` e header `idFile`, cron 10 min in prod e 2 altrove; 74 test verdi (`1c1e79b`…`b012d89`). Al commit `bd33e8a` `develop` non compila (riparato in `9acdd77`).
   - mapper: tracciato completo nella forma EUD, `EUD_INVIOSYSTEM`, LDV da `deliveryPartnerBarcode`, destinatario obbligatorio, codici nazione da `ce-anagrafica`, header di `-in`, error handler con DLT, metriche e span; 94 test verdi (`dbb3b59`, `474c8ef`).
@@ -20,12 +21,12 @@ I tre microservizi sono implementati su `develop` (`-in` su PostgreSQL con event
 - 2026-11-04 — `ce-dichiarato-eurodis-in` implementato (53 test verdi, `a53398c` su `feature/eurodis-base-implementation`); Dockerfile allineato.
 
 ## Prossimi passi
+- **Deploy di `-in`, mapper e send-tracking in svil** (scarico disabilitato), poi prima verifica con PostgreSQL e Kafka veri e prova end-to-end con EURODIS TEST — Diego / Amelia — prossimo passo
 - Fissare la call con Chiapponi/EURODIS: errori e rifiuti (A03.2), come si chiede il rimando dei dati, rollout ibrido, `consigneeAddress` e LDV in produzione — Paolo — da fissare
 - Verificare il fuso orario sui dati EURODIS del flusso FTP — Paolo — da definire
 - Ricavare i volumi giornalieri dal flusso FTP — da assegnare — da definire
-- Far eseguire al DBA gli script DDL 1-5 (`sql/ddl/` di `-in`) su svil (`strkevoldb01azwe`) e collaudo (`ttrkevoldb01azwe`); confermare che l'utente del secret `ce-postgres` è `ce_user` — Diego / DBA — da definire
+- Confermare che l'utente del secret `ce-postgres` è `ce_user`, proprietario di `ce_eud_api_in` — Diego / DBA — da definire
 - Dare all'utente SCRAM di `-in` il permesso di scrittura su `preadvising.evensource` — piattaforma — da definire
-- Deploy di `-in`, mapper e send-tracking in svil (scarico disabilitato), poi verifica con PostgreSQL e Kafka veri e prova end-to-end con EURODIS TEST — Diego / Amelia — da definire
 - Chiarire con azzurrazezza Spring Boot: il mapper è a 4.1.2, la decisione è 3.5.14 per tutta la catena — Diego — da definire
 - Decidere se su `develop` si passa da pull request (oggi i push scavalcano la regola) — Diego — da definire
 - Togliere `mongo-string-connection` dal secret di `-in` dopo il rilascio — piattaforma — dopo il deploy
@@ -39,7 +40,7 @@ I tre microservizi sono implementati su `develop` (`-in` su PostgreSQL con event
 ## Blocchi e rischi
 - 🟡 Errori e rifiuti: EURODIS dice di non rifiutare, ma non è chiaro cosa significhi «riprendere» il loro sistema; senza chiarimento non si chiude PA-32 né la mail di scarto.
 - 🟡 Perdita di un lotto tra la risposta HTTP e il salvataggio su PostgreSQL: il recupero è un rimando totale su richiesta a EURODIS, ma il modo di chiederlo è da concordare.
-- 🟡 Nessuno dei tre servizi è mai stato avviato con PostgreSQL e Kafka veri; i repository di `-in` sono provati su H2 (CHECK e indici parziali non coperti). Prima verifica reale: il deploy in svil, dopo gli script del DBA.
+- 🟡 Nessuno dei tre servizi è mai stato avviato con PostgreSQL e Kafka veri; i repository di `-in` sono provati su H2 (CHECK e indici parziali non coperti). Prima verifica reale: il deploy in svil (DDL già eseguite).
 - 🟡 Send-tracking: la consegna (`1100`) richiede il nome di chi ritira (`acceptorName`); se la sorgente SDA non lo ha, l'evento viene scartato.
 - 🟡 Il destinatario (`consigneeAddress`) è `null` in TEST e LDV del collo vuota: EURODIS non ha detto se in produzione sono valorizzati.
 - 🟡 Fuso orario dei timestamp non noto; sintassi LDV non nota (il mock genera LDV inventate).

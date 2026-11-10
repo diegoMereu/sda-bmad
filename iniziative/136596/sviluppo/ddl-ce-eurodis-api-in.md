@@ -371,6 +371,8 @@ da una ripresa concorrente.
 
 ## 7. Cosa serve dal DBA e dalla piattaforma
 
+**Script DDL eseguiti dal DBA** (secondo Diego, 10-11; ambiente non specificato). Restano i punti 3 e 4.
+
 1. Script 1 sul server svil (`strkevoldb01azwe`) e su quello di collaudo (`ttrkevoldb01azwe`),
    con il `GRANT ... ON SCHEMA public` eseguito connessi a `ce_eud_api_in`.
 2. Script 2, 3, 4 e 5 come `ce_user` su `ce_eud_api_in`, in entrambi gli ambienti (lo script 6
