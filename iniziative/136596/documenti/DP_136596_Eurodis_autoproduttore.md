@@ -25,7 +25,7 @@ L'iniziativa ha lo scopo di prendere in carico le spedizioni del consorzio EUROD
 | Preadvising | Validazione del tracciato unico | CE (AP-00988) / `ce-dichiarato-validatore` (PK DA DEFINIRE) | Consuma il tracciato unico da `preadvising.pre-enrichment` e lo valida come per gli altri canali; deve accettare i valori oltre le dimensioni ICD (vincolo 2 della SF) | DA DEFINIRE | Esistente |
 | Preadvising | Arricchimento | F1 (AP DA DEFINIRE) | Fornisce contratto, codice cliente e AUC; componente che lo interroga DA DEFINIRE | N | Esistente |
 | Preadvising | Arricchimento | CE (AP-00988) / ce-rules (PK DA DEFINIRE) | Determinazione di prodotto e servizi; componente che lo interroga DA DEFINIRE | N | Esistente |
-| Preadvising | Propagazione verso PDB | CE (AP-00988) / `ce-dichiarato-ldv-pdb-sync` (PK DA DEFINIRE) | Converte il tracciato unico nella richiesta PDB e crea la spedizione con `waybillCreate`. Nessuno sviluppo previsto: verifica delle osservazioni della SF, eventuali correzioni a carico del responsabile | N | Esistente |
+| Preadvising | Propagazione verso PDB | CE (AP-00988) / `ce-dichiarato-ldv-pdb` (PK DA DEFINIRE) | Converte il tracciato unico nella richiesta PDB e crea la spedizione con `waybillCreate`. Nessuno sviluppo previsto: verifica delle osservazioni della SF, eventuali correzioni a carico del responsabile | N | Esistente |
 | Preadvising | Creazione spedizione | PDB (AP DA DEFINIRE) / servizio `waybillCreate` | Crea la spedizione con la LDV assegnata da EURODIS | N | Esistente |
 | Preadvising | Ricezione LDV | BEP (AP DA DEFINIRE) | Riceve la LDV dal tracciato unico; da verificare il valore del canale | N | Esistente |
 | Tracciamento | Invio tracce al partner | CE (AP-00988) / `ce-eurodis-send-tracking` (PK DA DEFINIRE) | Invia a EURODIS le tracce SDA delle spedizioni prese in carico | S | Nuovo |
@@ -35,7 +35,7 @@ Tabella 1: Business Architecture – Preadvising EURODIS autoproduttore
 
 ## Information System Architecture
 
-Il dato nasce sulla piattaforma EURODIS e viene letto da `ce-dichiarato-eurodis-in`, che lo storicizza su MongoDB e lo pubblica, una spedizione per messaggio, sul topic `preadvising.eud.pre.build`. `ce-dichiarato-eurodis-mapper` lo converte nel tracciato unico e lo pubblica su `preadvising.pre-enrichment`, da cui la catena di preadvising esistente lo valida (`ce-dichiarato-validatore`) e lo porta fino a `ce-dichiarato-ldv-pdb-sync` e a PDB. Le tracce SDA tornano a EURODIS tramite `ce-eurodis-send-tracking`.
+Il dato nasce sulla piattaforma EURODIS e viene letto da `ce-dichiarato-eurodis-in`, che lo storicizza su MongoDB e lo pubblica, una spedizione per messaggio, sul topic `preadvising.eud.pre.build`. `ce-dichiarato-eurodis-mapper` lo converte nel tracciato unico e lo pubblica su `preadvising.pre-enrichment`, da cui la catena di preadvising esistente lo valida (`ce-dichiarato-validatore`) e lo porta fino a `ce-dichiarato-ldv-pdb` e a PDB. Le tracce SDA tornano a EURODIS tramite `ce-eurodis-send-tracking`.
 
 ![Figura 2: Information System Architecture – Preadvising EURODIS autoproduttore](fig-2-flussi-dati.png)
 
@@ -48,8 +48,8 @@ Il dato nasce sulla piattaforma EURODIS e viene letto da `ce-dichiarato-eurodis-
 | Flusso dati 5 | `ce-dichiarato-eurodis-mapper` consuma la spedizione dal topic `preadvising.eud.pre.build`. |
 | Flusso dati 6 | `ce-dichiarato-eurodis-mapper` pubblica il tracciato unico (ICD v11) sul topic `preadvising.pre-enrichment`. |
 | Flusso dati 7 | `ce-dichiarato-validatore` consuma il tracciato unico dal topic `preadvising.pre-enrichment` e lo valida, come per gli altri canali del preadvising. |
-| Flusso dati 8 | Il tracciato validato prosegue nella catena di preadvising esistente fino a `ce-dichiarato-ldv-pdb-sync`. |
-| Flusso dati 9 | `ce-dichiarato-ldv-pdb-sync` crea la spedizione su PDB invocando il servizio sincrono `waybillCreate`. |
+| Flusso dati 8 | Il tracciato validato prosegue nella catena di preadvising esistente fino a `ce-dichiarato-ldv-pdb`. |
+| Flusso dati 9 | `ce-dichiarato-ldv-pdb` crea la spedizione su PDB invocando il servizio sincrono `waybillCreate`. |
 | Flusso dati 10 | Un componente DA DEFINIRE consulta F1 (contratto, codice cliente, AUC) e ce-rules (prodotto e servizi) per arricchire il tracciato. |
 | Flusso dati 11 | `ce-eurodis-send-tracking` acquisisce le tracce SDA delle spedizioni EURODIS da una sorgente DA DEFINIRE. |
 | Flusso dati 12 | `ce-eurodis-send-tracking` invia le tracce a EURODIS tramite l'API `send-tracking` (`POST /event/shipment/v1`, `/event/parcel/v1` e le varianti a lotti), con la stessa chiave API del partner. Eventi SDA da trasmettere e loro codifica sono DA DEFINIRE. |
@@ -71,7 +71,7 @@ I nuovi microservizi seguono lo stack standard dei microservizi `ce-` del preadv
 | `preadvising.pre-enrichment` | Topic Kafka | Non applicabile | Integration | Esistente (nuovo produttore) |
 | `eurodis_scarichi`, `eurodis_spedizioni` (con GridFS e collezione di lock `shedLock`) | MongoDB | Non applicabile | Data | Nuovo (collezioni) |
 | `ce-dichiarato-validatore` | Microservizio | DA DEFINIRE | Application | Esistente |
-| `ce-dichiarato-ldv-pdb-sync` | Microservizio | DA DEFINIRE | Application | Esistente |
+| `ce-dichiarato-ldv-pdb` | Microservizio | DA DEFINIRE | Application | Esistente |
 | PDB `waybillCreate` | Servizio applicativo | Non applicabile | Application | Esistente |
 | EURODIS `receive-pan` | API REST esterna (Release v1) | v1 | Integration | Esistente (esterno) |
 | EURODIS `send-tracking` | API REST esterna (Release v1) | v1 | Integration | Esistente (esterno) |
@@ -87,8 +87,8 @@ Tabella 3: Preadvising EURODIS autoproduttore – dettaglio applicativi
 | Flusso 5 | Kafka | Topic `preadvising.eud.pre.build` | `ce-dichiarato-eurodis-mapper` | Asincrona | A evento | DA DEFINIRE (volumi) | stima: circa 3 KB | DA DEFINIRE | Nuovo |
 | Flusso 6 | Kafka | `ce-dichiarato-eurodis-mapper` | Topic `preadvising.pre-enrichment` | Asincrona | A evento, un tracciato per spedizione | DA DEFINIRE (volumi) | stima: 3-4 KB (tracciato unico del flusso `EUD_INVIOFILE`) | DA DEFINIRE | Nuovo |
 | Flusso 7 | Kafka | Topic `preadvising.pre-enrichment` | `ce-dichiarato-validatore` | Asincrona | A evento | DA DEFINIRE (volumi) | stima: 3-4 KB | DA DEFINIRE | Esistente |
-| Flusso 8 | Kafka | `ce-dichiarato-validatore` | `ce-dichiarato-ldv-pdb-sync`, tramite la catena di preadvising esistente | Asincrona | A evento | DA DEFINIRE (volumi) | DA DEFINIRE | DA DEFINIRE | Esistente |
-| Flusso 9 | DA DEFINIRE | `ce-dichiarato-ldv-pdb-sync` | PDB `waybillCreate` | Sincrona | A evento, una chiamata per spedizione | DA DEFINIRE (volumi) | DA DEFINIRE | DA DEFINIRE | Esistente |
+| Flusso 8 | Kafka | `ce-dichiarato-validatore` | `ce-dichiarato-ldv-pdb`, tramite la catena di preadvising esistente | Asincrona | A evento | DA DEFINIRE (volumi) | DA DEFINIRE | DA DEFINIRE | Esistente |
+| Flusso 9 | DA DEFINIRE | `ce-dichiarato-ldv-pdb` | PDB `waybillCreate` | Sincrona | A evento, una chiamata per spedizione | DA DEFINIRE (volumi) | DA DEFINIRE | DA DEFINIRE | Esistente |
 | Flusso 10 | DA DEFINIRE | DA DEFINIRE | F1, ce-rules | DA DEFINIRE | DA DEFINIRE | DA DEFINIRE | DA DEFINIRE | DA DEFINIRE | Esistente |
 | Flusso 11 | DA DEFINIRE | Sorgente delle tracce SDA (DA DEFINIRE) | `ce-eurodis-send-tracking` | DA DEFINIRE | DA DEFINIRE | DA DEFINIRE | DA DEFINIRE | DA DEFINIRE | Nuovo |
 | Flusso 12 | https | `ce-eurodis-send-tracking` | EURODIS `send-tracking` | Sincrona | DA DEFINIRE | DA DEFINIRE | DA DEFINIRE | DA DEFINIRE | Nuovo |

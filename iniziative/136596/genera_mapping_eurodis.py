@@ -196,7 +196,7 @@ R["progressivo"] = (G, "", "Progressivo 1..n della spedizione nell'esecuzione ba
 
 # Servizi accessori EURODIS -> formato PDB (proposta del 29-Oct, accessori-eurodis-pdb-proposta.md).
 # Fonti: riscontro SDA/Chiapponi 11-set (flusso via file: ipotesi per l'API), FlussiPreadvisingInfo.csv,
-# ce-dichiarato-ldv-pdb-sync. Il ms sync legge i codici APT da codici_servizi e le sottochiavi dai campi ICD.
+# ce-dichiarato-ldv-pdb. Il ms sync legge i codici APT da codici_servizi e le sottochiavi dai campi ICD.
 P = "proposta 29-Oct"
 R.update({
     S + "codici_servizi": (T, "deliveryService.deliveryService, cashOnDeliveryService, consigneeAddress.pudoID",

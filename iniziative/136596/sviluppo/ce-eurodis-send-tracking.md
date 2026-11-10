@@ -165,7 +165,7 @@ Proposta, da confermare quando si decide la sorgente:
 ### 3.4 Traduzione degli stati SDA nei codici EURODIS [DECISO 10-11]
 
 **[DECISO 10-11, Diego]** Il mapping è nel file
-[Elenco codici status.xlsx](../Elenco%20codici%20status.xlsx), foglio **"Decodifica
+[Elenco codici status.xlsx](../documenti/eurodis/Elenco%20codici%20status.xlsx), foglio **"Decodifica
 Eurodis IN-BOUND"** (righe 3-78). Gli altri fogli ("Decodifica Eurodis OUT-BOUND",
 "Status Fedex") non sono nel perimetro.
 
@@ -426,7 +426,7 @@ Da scrivere: evento SDA → evento EURODIS creato in TEST, rifiuto con codice er
 ## 13. Riferimenti
 
 - Swagger: [eurodis-send-tracking-swagger-v1.json](../eurodis-send-tracking-swagger-v1.json); originale https://testapi.eurodis.com/send-tracking/swagger/Release%20v1/swagger.json
-- Traduzione degli stati: [Elenco codici status.xlsx](../Elenco%20codici%20status.xlsx), foglio "Decodifica Eurodis IN-BOUND"
+- Traduzione degli stati: [Elenco codici status.xlsx](../documenti/eurodis/Elenco%20codici%20status.xlsx), foglio "Decodifica Eurodis IN-BOUND"
 - [ce-dichiarato-eurodis-in.md](ce-dichiarato-eurodis-in.md): convenzioni, collezione `eurodis_spedizioni`
 - [analisi.md](../analisi.md): PA-07, PA-08, PA-11, PA-12, PA-27, PA-34…PA-36
 - Repository: CORRIERE-ESPRESSO_PREADVISING_ce-eurodis-send-tracking

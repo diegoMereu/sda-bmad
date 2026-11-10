@@ -16,7 +16,7 @@ sviluppatore** del microservizio `ce-dichiarato-eurodis-mapper`, nell'iniziativa
 
 Catena: `receive-pan` → `ce-dichiarato-eurodis-in` → `preadvising.eud.pre.build`
 → **`ce-dichiarato-eurodis-mapper`** → `preadvising.pre-enrichment` →
-`ce-dichiarato-ldv-pdb-sync` → PDB `waybillCreate`.
+`ce-dichiarato-ldv-pdb` → PDB `waybillCreate`.
 
 Il mapper riceve **una spedizione EURODIS per messaggio**, così come EURODIS
 l'ha restituita, e la converte nel tracciato unico ICD v11. È l'unico punto

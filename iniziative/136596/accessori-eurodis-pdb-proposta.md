@@ -12,7 +12,7 @@ punti aperti.
 ```
 receive-pan (API EURODIS)
   -> [NOSTRO] mapping verso ICD v11: codici_servizi + campi delle sottochiavi
-  -> ce-dichiarato-ldv-pdb-sync (esistente, in test)  ->  PDB waybillCreate (sincrono)
+  -> ce-dichiarato-ldv-pdb (esistente, in test)  ->  PDB waybillCreate (sincrono)
 ```
 
 Il nostro compito è consegnare al ms sync un TracciatoUnicoDTO corretto. Per
@@ -26,7 +26,7 @@ Fonti:
   descrive il flusso via file: i valori sono ipotesi per l'API finché non
   confermati.
 - `APT_analysis.md` (catena JSON PDB → tracciato unico → BEP).
-- `PdbRequestMapper.java` di `ce-dichiarato-ldv-pdb-sync`.
+- `PdbRequestMapper.java` di `ce-dichiarato-ldv-pdb`.
 
 ## 1. Mapping accessori: EURODIS → APT → ICD
 
@@ -72,7 +72,7 @@ Per EURODIS "reso" è il rientro al mittente di una spedizione non consegnata
 (indirizzo RT_30 tipo R, `returnAddress` in API). Non si mappa finché non si
 decide se serve `APT000930` (sottochiave `return`: `A` o `R` secondo il CSV).
 
-## 2. ms sync `ce-dichiarato-ldv-pdb-sync`: osservazioni (da segnalare al responsabile)
+## 2. ms sync `ce-dichiarato-ldv-pdb`: osservazioni (da segnalare al responsabile)
 
 Il ms è in test. Rilevanti per EURODIS:
 

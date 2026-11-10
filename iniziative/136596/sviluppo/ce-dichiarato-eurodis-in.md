@@ -51,7 +51,7 @@ flowchart LR
     IN -->|grezzo + stato| DB[(Storage<br/>D1)]
     IN -->|1 msg per spedizione<br/>topic D2| MAP[ce-dichiarato-eurodis-mapper]
     MAP -->|tracciato unico ICD v11| PE[[preadvising.pre-enrichment]]
-    PE --> SYNC[ce-dichiarato-ldv-pdb-sync]
+    PE --> SYNC[ce-dichiarato-ldv-pdb]
     SYNC --> PDB[PDB waybillCreate]
 ```
 

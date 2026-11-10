@@ -30,7 +30,7 @@ il suo documento funzionale:
 
 Catena completa (decisione del 29-10):
 `receive-pan` → **`ce-dichiarato-eurodis-in`** → `ce-dichiarato-eurodis-mapper`
-→ `preadvising.pre-enrichment` → `ce-dichiarato-ldv-pdb-sync` (esistente) →
+→ `preadvising.pre-enrichment` → `ce-dichiarato-ldv-pdb` (esistente) →
 PDB `waybillCreate`.
 
 **Questo microservizio non trasforma e non valida il contenuto di business.**

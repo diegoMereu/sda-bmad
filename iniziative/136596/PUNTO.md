@@ -44,7 +44,7 @@ I tre microservizi sono implementati su `develop` (`-in` su PostgreSQL con event
 - 🟡 Il destinatario (`consigneeAddress`) è `null` in TEST e LDV del collo vuota: EURODIS non ha detto se in produzione sono valorizzati.
 - 🟡 Fuso orario dei timestamp non noto; sintassi LDV non nota (il mock genera LDV inventate).
 - 🟡 Perimetro e PRJ non definiti: non si può stimare né pianificare. Go-live a fine gennaio 2027.
-- 🟡 Il ms `ce-dichiarato-ldv-pdb-sync` è ancora in test e alcune osservazioni toccano i nostri dati.
+- 🟡 Il ms `ce-dichiarato-ldv-pdb` è ancora in test e alcune osservazioni toccano i nostri dati.
 
 ## Serve dal cliente
 - Codice PRJ.

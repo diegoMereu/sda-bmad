@@ -3,8 +3,10 @@
 Assunzioni sulle 13 domande girate a Gianluca Chiapponi (mail del 26-10).
 Il 09-11 sono arrivate le risposte di EURODIS (via Chiapponi) e il documento
 **A03.2 «API – Data interchange & standard interfaces»** (versione 0.01 del
-12-03-2026, in `documenti/A032 API Data interchange.pdf`). Ogni sezione riporta
-la risposta e dice se l'assunzione è confermata, cambiata o ancora aperta.
+12-03-2026, in `documenti/eurodis/A032 API Data interchange.pdf`). Il 10-11
+Chiapponi ha risposto in linea ai quattro punti sul payload di produzione e ha
+girato `documenti/eurodis/Elenco codici status.xlsx`. Ogni sezione riporta la
+risposta e dice se l'assunzione è confermata, cambiata o ancora aperta.
 
 Per ognuna: cosa assumiamo, cosa succede se è falsa, cosa resta da chiedere.
 
@@ -22,16 +24,16 @@ Legenda stato: `proposta` · `concordata` · `confermata da EURODIS` ·
 | AS-D05 | Rilettura puntuale | confermata da EURODIS | 60 giorni (assunti 30) |
 | AS-D06 | Fuso orario e accesso | chiave chiusa, fuso da verificare | chiavi senza rotazione; il fuso non è UTC per forza |
 | AS-D07 | Errori e scarti | **riaperta** | EURODIS: non rifiutare; da discutere in call |
-| AS-D08 | Tracking | confermata da EURODIS | `send-tracking` e `send-pod` già disponibili |
+| AS-D08 | Tracking | confermata, codici da verificare | `send-tracking` e `send-pod` già disponibili; mappatura dei codici stato girata il 10-11, equivalenza con Poste da verificare |
 | AS-D09 | Produzione | confermata da EURODIS | si cambia endpoint e chiave |
-| AS-D10 | Payload di produzione | non risolta | nessun esempio; rimandano alla documentazione |
+| AS-D10 | Payload di produzione | **cambiata** il 10-11 | la LDV è in `deliveryPartnerBarcode`, non in `consignorsColloBarcode`; `entranceTimestamp` e `consigneeAddress` in verifica con EURODIS |
 | AS-D11 | Volumi e frequenza | da verificare | i volumi li ricaviamo noi dal flusso FTP |
 | AS-D12 | Dogana e ADR | risposta di EURODIS | nel perimetro dell'interfaccia |
 | AS-D13 | Rollout incrementale | risposta di EURODIS | ibrido, passo per passo; call da fare |
 
 **Temi per la call proposta da Chiapponi**: come si chiede il rimando dei dati
-(AS-D01), errori e rifiuti (AS-D07), rollout ibrido (AS-D13), `consigneeAddress`
-e LDV in produzione (AS-D10).
+(AS-D01), errori e rifiuti (AS-D07), rollout ibrido (AS-D13), sessione sui codici
+stato (AS-D08), `entranceTimestamp` e `consigneeAddress` in produzione (AS-D10).
 
 ---
 
@@ -299,10 +301,18 @@ Rifiutare con una logica propria non sarebbe fruttuoso.
 3. Codici evento, sorgente delle tracce SDA, correlazione LDV ↔ `edReference` e
    comportamenti non scritti nello swagger restano nei punti aperti PA-34, PA-35
    e PA-36.
+4. **Codici stato** (10-11): Chiapponi ha girato la mappatura EURODIS ↔ SDA della
+   gestione attuale (`documenti/eurodis/Elenco codici status.xlsx`: fogli
+   OUT-BOUND EURODIS → SDA e IN-BOUND SDA → EURODIS, più Status Fedex). Non sa se
+   i codici siano gli stessi lato Poste. **L'equivalenza non è assunta: è da
+   verificare**, con una sessione dedicata che li spunti uno per uno se non
+   coincidono.
 
 **Se è falsa**
 - Se `send-pod` non è riusabile per `EUD_INVIOSYSTEM`, serve un'integrazione
   nostra, non prevista oggi nel perimetro.
+- Se i codici stato Poste differiscono da quelli della mappatura girata, la
+  tabella di traduzione va rifatta con EURODIS.
 
 ---
 
@@ -339,39 +349,72 @@ compatibile con il go-live.
 
 ## AS-D10 — Payload di esempio di produzione (domanda 10; PA-24, DF-02, DF-30)
 
-**Stato**: non risolta da EURODIS; l'assunzione resta
+**Stato**: **cambiata il 10-11** (risposta in linea di Chiapponi); la
+verifica su un payload di produzione resta aperta
 
-**Risposta EURODIS**: nessun esempio di produzione. I campi obbligatori,
+**Risposta EURODIS** (09-11): nessun esempio di produzione. I campi obbligatori,
 condizionali e opzionali sono descritti nella documentazione (asterisco rosso =
 obbligatorio, i condizionali sono spiegati nel testo). Rimandano inoltre al
 documento A03.2.
 
+**Risposta di Chiapponi** (10-11), punto per punto:
+1. `entranceTimestamp`: in verifica con EURODIS.
+2. `consignorsColloBarcode`: **non è la LDV**. È un riferimento del mittente per
+   identificare il collo, senza corrispondenza nei sistemi SDA e non
+   significativo per la lavorazione. Può arrivare valorizzato o vuoto e non deve
+   influire sull'elaborazione.
+3. `europlateBarcode`: barcode internazionale a 24 cifre sul collo, in SDA mappato
+   su `ldv_partner_collo`. In API è opzionale, perché il collo ha già la LDV SDA,
+   trasmessa in `deliveryPartnerBarcode` (EURODIS vi indica il numero di lettera
+   di vettura PDB Express). Il valore `0` è «assente», ma il campo può anche
+   mancare.
+4. `consigneeAddress`: in verifica con EURODIS. Il TEST non è rappresentativo: in
+   produzione il destinatario sarà in `consigneeAddress`. `returnAddress` è
+   l'indirizzo di rientro di una spedizione non consegnabile, **non** l'indirizzo
+   di consegna.
+
 **Fatti**
-- In TEST `consignorsColloBarcode` arriva vuoto e `consigneeAddress` e
-  `shipperAddress` sono `null`: c'è solo `returnAddress`.
-- Decisione provvisoria su DF-30: si pubblica con campi vuoti e una metrica;
-  `returnAddress` non si usa.
-- La risposta **non dice** se in produzione `consigneeAddress` e
-  `consignorsColloBarcode` sono sempre valorizzati.
+- In TEST `consigneeAddress` e `shipperAddress` sono `null` e c'è solo
+  `returnAddress`; `consignorsColloBarcode` è vuoto.
+- Nell'esempio TEST (`esempio-eurodis-spedizione.json`) **`deliveryPartnerBarcode`
+  non compare**. Lo swagger lo descrive come «barcode del partner di consegna dal
+  Central Label Service, compilato solo se il partner di consegna usa il
+  servizio»: non dice che contenga la LDV PDB Express. È un'informazione di
+  Chiapponi, non verificata su un payload.
+- Decisione di Diego del 06-11 su DF-30: senza `consigneeAddress`, cap o località
+  la spedizione non è mappabile e non si pubblica (supera la regola provvisoria
+  del 05-11 «si pubblica con campi vuoti e una metrica»).
+- L'ICD v11 non ha un campo `ldv_partner_collo` (ha `id_ldv_itz`, `id_ldv_itz2`,
+  `id_ldv_partner_master`).
 
 **Assunzione**
-1. In produzione la LDV è valorizzata in `consignorsColloBarcode`
-   (→ `collo.id_ldv`, decisione del 22-10 confermata il 06-11). Non abbiamo
-   evidenza: è ciò che il design richiede.
-2. Per il destinatario vale la decisione provvisoria di DF-30.
-3. I campi opzionali (per esempio `entranceTimestamp`) restano non verificati e il
-   mapper li tratta come facoltativi.
-4. Un eventuale payload di produzione, con dati sensibili oscurati, si usa per
+1. La LDV SDA di ogni collo sta in `collis[].deliveryPartnerBarcode` e va in
+   `collo.id_ldv`. È la decisione del 22-10 (confermata il 06-11) con la sorgente
+   cambiata. Va verificata sul primo payload reale: se il campo è vuoto in
+   produzione, il collo non ha LDV.
+2. `consignorsColloBarcode` non si mappa e non influisce sull'elaborazione, anche
+   se valorizzato.
+3. `europlateBarcode` è opzionale: assente, vuoto o `0` equivalgono ad «assente»,
+   senza errore. A quale campo dell'ICD vada (SDA lo mappa su `ldv_partner_collo`)
+   è **da verificare** (DF-31); fino ad allora resta in `internazionale.id_ldv_itz`.
+4. In produzione il destinatario è in `consigneeAddress`, sempre valorizzato con
+   cap e località; senza di essi la spedizione non è mappabile (06-11).
+   `returnAddress` non si usa.
+5. `entranceTimestamp` è facoltativo: finché EURODIS non risponde resta il
+   fallback della specifica (`clearanceTimestamp`), segnalato con una metrica.
+6. Un eventuale payload di produzione, con dati sensibili oscurati, si usa per
    verificare questi campi prima del go-live e non si versiona.
 
 **Se è falsa**
-- Se `consignorsColloBarcode` è vuoto anche in produzione, la spedizione non ha
-  LDV del collo.
+- Se `deliveryPartnerBarcode` è vuoto o non contiene la LDV in produzione, le
+  spedizioni non hanno LDV del collo e BEP non ha cosa trasmettere.
 - Se `consigneeAddress` è `null` anche in produzione, cap e località del
-  destinatario mancano e le spedizioni non sono utilizzabili a valle.
+  destinatario mancano e le spedizioni non sono pubblicate.
+- Se `entranceTimestamp` manca spesso, la data di spedizione dipende dal fallback.
 
-**Da chiarire in call**: `consigneeAddress` e `consignorsColloBarcode` sono sempre
-valorizzati in produzione? I dati di TEST sono rappresentativi?
+**In verifica con EURODIS / da chiarire in call**: `entranceTimestamp` e
+`consigneeAddress` in produzione (Chiapponi); `deliveryPartnerBarcode`
+valorizzato in produzione; dove va `europlateBarcode` nell'ICD (Diego, Marzilli).
 
 ---
 

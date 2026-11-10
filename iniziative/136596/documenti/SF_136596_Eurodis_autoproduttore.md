@@ -80,13 +80,13 @@ Il presente documento contiene l'analisi degli impatti funzionali relativi all'I
 | 23 | Chiuso | Valore del `canale`: confermato `EUD_INVIOSYSTEM`, coerente con il mapping verso BEP che trasmette `collo.id_ldv` solo per il canale INVIOSYSTEM. Da verificare che BEP riconosca il valore; dal canale dipende anche il criterio della verifica di duplicato. | Trasformazione; SDA |
 | 24 | Open Point | Valorizzazione di `id_canale`, `id_file` e `id_partner`. | Trasformazione; SDA |
 | 25 | Open Point | Campo sorgente della data di spedizione (`entranceTimestamp` oppure `clearanceTimestamp`, come nel riscontro SDA) e regola se il campo è assente. | Trasformazione; SDA, EURODIS |
-| 26 | Open Point | Codice nazione: campo ICD in cui scrivere l'ISO2 (`codice_nazione` come nel flusso `EUD_INVIOFILE`, oppure solo `codice_nazione_iso_2`) e componente che produce l'ISO4 richiesto da PDB. | Trasformazione; SDA, responsabile `ce-dichiarato-ldv-pdb-sync` |
+| 26 | Open Point | Codice nazione: campo ICD in cui scrivere l'ISO2 (`codice_nazione` come nel flusso `EUD_INVIOFILE`, oppure solo `codice_nazione_iso_2`) e componente che produce l'ISO4 richiesto da PDB. | Trasformazione; SDA, responsabile `ce-dichiarato-ldv-pdb` |
 | 27 | Open Point | Assicurazione: si propone di considerarla fuori perimetro e di non valorizzarla anche se EURODIS invia il valore della merce. | Servizi accessori; SDA |
 | 28 | Open Point | Reso (rientro al mittente): necessità del servizio `APT000930` e semantica dei valori; riconoscimento di resi e rettifiche. | Servizi accessori; SDA |
 | 29 | Open Point | Preavviso: si propone di non mappare i flag di preavviso EURODIS, perché SDA notifica il destinatario in presenza dei contatti. Il preavviso telefonico non ha un campo nell'ICD. | Trasformazione; SDA |
 | 30 | Open Point | `rif_prodotto_cliente` e `centro_costo` (obbligatorio per BEP): costanti di contratto o valori da derivare. | Trasformazione; SDA |
 | 31 | Open Point | Campi EURODIS senza corrispondenza nell'ICD o con semantica diversa: secondo numero di telefono, `region` (testo libero) contro `provincia` (sigla), valore della merce in valuta diversa da EUR. | Trasformazione; SDA |
-| 32 | Open Point | Osservazioni su `ce-dichiarato-ldv-pdb-sync`, oggi in test: canale (`POU` o `WEBSERVICE`), ISO4 non risolto, nome del Punto Poste omesso se vuoto, contrassegno con importo 0 non scartato. | Propagazione verso PDB; responsabile `ce-dichiarato-ldv-pdb-sync` |
+| 32 | Open Point | Osservazioni su `ce-dichiarato-ldv-pdb`, oggi in test: canale (`POU` o `WEBSERVICE`), ISO4 non risolto, nome del Punto Poste omesso se vuoto, contrassegno con importo 0 non scartato. | Propagazione verso PDB; responsabile `ce-dichiarato-ldv-pdb` |
 | 33 | Open Point | Componente che esegue l'arricchimento da F1 (contratto, codice cliente, AUC) e la determinazione del prodotto con ce-rules: il ms di trasformazione o la catena a valle. | Trasformazione; team ACN |
 | 34 | Open Point | Trattamento dei messaggi non trasformabili o non validi (scarto, coda di errore o altro), cause di scarto e visibilità dell'esito. | Trasformazione; team ACN |
 | 35 | Open Point | Topic letti e scritti da `ce-eurodis-send-tracking`: DA DEFINIRE. | Tracciamento; team ACN |
@@ -117,7 +117,7 @@ La soluzione è riportata nella figura successiva e nell'allegato 4.
 
 ![Figura 1: Soluzione architetturale EURODIS Autoproduttore](fig-1-architettura.png)
 
-La figura mostra la sequenza: l'API EURODIS `receive-pan` è interrogata dal ms `ce-dichiarato-eurodis-in`, che salva lo storico su MongoDB e pubblica una spedizione per messaggio sul topic Kafka `preadvising.eud.pre.build`; il ms `ce-dichiarato-eurodis-mapper` consuma il topic, trasforma la spedizione nel tracciato unico e la pubblica sul topic `preadvising.pre-enrichment`; da qui la catena di preadvising esistente, a partire dalla validazione del ms `ce-dichiarato-validatore`, porta alla creazione della spedizione su PDB tramite il ms `ce-dichiarato-ldv-pdb-sync`. Il ms `ce-eurodis-send-tracking` invia le tracce SDA a EURODIS.
+La figura mostra la sequenza: l'API EURODIS `receive-pan` è interrogata dal ms `ce-dichiarato-eurodis-in`, che salva lo storico su MongoDB e pubblica una spedizione per messaggio sul topic Kafka `preadvising.eud.pre.build`; il ms `ce-dichiarato-eurodis-mapper` consuma il topic, trasforma la spedizione nel tracciato unico e la pubblica sul topic `preadvising.pre-enrichment`; da qui la catena di preadvising esistente, a partire dalla validazione del ms `ce-dichiarato-validatore`, porta alla creazione della spedizione su PDB tramite il ms `ce-dichiarato-ldv-pdb`. Il ms `ce-eurodis-send-tracking` invia le tracce SDA a EURODIS.
 
 Di seguito sono descritti funzionalmente i processi che compongono la soluzione.
 
@@ -303,7 +303,7 @@ Si propone la seguente traduzione, ricavata dal riscontro SDA sul flusso via fil
 | Consegna su appuntamento | `deliveryService` = `B` (e `W`, da confermare) | `APT000908` | nessuno; richiede il telefono del destinatario |
 | Punto Poste | `deliveryService` = `Z` e `consigneeAddress.pudoID` | `APT000947` | `consegna.codice_frazionario` = PUDO ID; `consegna.denominazione_frazionario` = nome del punto (Open Point 16) |
 | Contrassegno | presenza di `cashOnDeliveryService` | `APT000918` | `contrassegno.flag` = `S`; `contrassegno.importo_contrassegno` = importo (> 0, max 999999.99); `contrassegno.tipo_pagamento_contrassegno`: 3 → `CON`, 5 → `ABM` (Open Point 17) |
-| Multicollo | più elementi in `collis[]` | nessuno | aggiunto da `ce-dichiarato-ldv-pdb-sync` (`APT000945`) |
+| Multicollo | più elementi in `collis[]` | nessuno | aggiunto da `ce-dichiarato-ldv-pdb` (`APT000945`) |
 | Consegna pomeriggio | `deliveryService` = `A` | nessuno | spedizione ordinaria |
 
 Una spedizione ha al massimo un servizio di consegna, combinabile con contrassegno e multicollo. Il contrassegno non è ammesso con la consegna a Punto Poste.
@@ -312,7 +312,7 @@ I valori `D` (giorno), `7` (domenica) e `T` (giorno e orario definito, senza cod
 
 ### Cliente, prodotto e arricchimento
 
-Del cliente si valorizzano solo codice login, id cliente e codice AUC (uguali al codice cliente EURODIS) e il contratto, reperiti da F1; la ragione sociale del cliente coincide con quella del mittente. In assenza di `rif_prodotto_cliente`, il prodotto viene determinato a valle (in `ce-dichiarato-ldv-pdb-sync` il prodotto di default è `APT000901`). Restano DA DEFINIRE il componente che esegue l'arricchimento da F1 e la determinazione del prodotto con ce-rules (Open Point 33), e la valorizzazione di `rif_prodotto_cliente` e `centro_costo` (Open Point 30).
+Del cliente si valorizzano solo codice login, id cliente e codice AUC (uguali al codice cliente EURODIS) e il contratto, reperiti da F1; la ragione sociale del cliente coincide con quella del mittente. In assenza di `rif_prodotto_cliente`, il prodotto viene determinato a valle (in `ce-dichiarato-ldv-pdb` il prodotto di default è `APT000901`). Restano DA DEFINIRE il componente che esegue l'arricchimento da F1 e la determinazione del prodotto con ce-rules (Open Point 33), e la valorizzazione di `rif_prodotto_cliente` e `centro_costo` (Open Point 30).
 
 ### Messaggi non trasformabili
 
@@ -322,7 +322,7 @@ Ulteriori dettagli: per l'implementazione delle funzionalità sopra descritte vi
 
 ## Propagazione verso PDB
 
-Il tracciato unico pubblicato su `preadvising.pre-enrichment` segue la catena di preadvising esistente, descritta nei documenti di riferimento ID 4 e ID 5, a partire dalla validazione svolta dal ms `ce-dichiarato-validatore`, e arriva al ms `ce-dichiarato-ldv-pdb-sync`, che lo converte nella richiesta PDB e crea la spedizione con il servizio sincrono `waybillCreate`. Questa iniziativa non prevede sviluppi su questi componenti, ma ne usa le regole.
+Il tracciato unico pubblicato su `preadvising.pre-enrichment` segue la catena di preadvising esistente, descritta nei documenti di riferimento ID 4 e ID 5, a partire dalla validazione svolta dal ms `ce-dichiarato-validatore`, e arriva al ms `ce-dichiarato-ldv-pdb`, che lo converte nella richiesta PDB e crea la spedizione con il servizio sincrono `waybillCreate`. Questa iniziativa non prevede sviluppi su questi componenti, ma ne usa le regole.
 
 In particolare, la validazione a valle svolge per le spedizioni EURODIS:
 
@@ -330,9 +330,9 @@ In particolare, la validazione a valle svolge per le spedizioni EURODIS:
 - l'applicazione dei default di peso e dimensioni quando EURODIS li invia a 0;
 - l'adeguamento dei valori che eccedono i limiti di BEP (città 30, nome 35, indirizzo 40, civico 4, telefono 15).
 
-Il ms `ce-dichiarato-ldv-pdb-sync` legge i servizi da `codici_servizi`, aggiunge il servizio multicollo e applica prodotto, contratto e centro di costo di default se assenti.
+Il ms `ce-dichiarato-ldv-pdb` legge i servizi da `codici_servizi`, aggiunge il servizio multicollo e applica prodotto, contratto e centro di costo di default se assenti.
 
-N.B. La validazione deve accettare i valori oltre le dimensioni dell'ICD (vincolo 2). Il ms `ce-dichiarato-ldv-pdb-sync` è in fase di test: le osservazioni emerse sono riportate nell'Open Point 32 e le eventuali correzioni sono a carico del suo responsabile.
+N.B. La validazione deve accettare i valori oltre le dimensioni dell'ICD (vincolo 2). Il ms `ce-dichiarato-ldv-pdb` è in fase di test: le osservazioni emerse sono riportate nell'Open Point 32 e le eventuali correzioni sono a carico del suo responsabile.
 
 ## Tracciamento verso EURODIS
 
@@ -357,7 +357,7 @@ Ulteriori dettagli: per l'implementazione delle funzionalità sopra descritte vi
 | Kafka | Topic `preadvising.eud.pre.build` | Nuovo topic | Nuovo |
 | Kafka | Topic `preadvising.pre-enrichment` | Nuovo produttore | Esistente |
 | Preadvising (OpenShift) | `ce-dichiarato-validatore` | Accettazione dei valori oltre le dimensioni ICD (vincolo 2); deduplica, default e adeguamento ai limiti BEP secondo le regole esistenti | Esistente |
-| Preadvising (OpenShift) | `ce-dichiarato-ldv-pdb-sync` | Verifica ed eventuali correzioni (Open Point 32) | Esistente |
+| Preadvising (OpenShift) | `ce-dichiarato-ldv-pdb` | Verifica ed eventuali correzioni (Open Point 32) | Esistente |
 | PDB | Servizio `waybillCreate` | Nessuna modifica prevista | Esistente |
 | BEP | Ricezione della LDV dal tracciato unico | Verifica del canale (Open Point 23) | Esistente |
 | F1 | Contratto, codice cliente, AUC | Consultazione (Open Point 33) | Esistente |

@@ -46,11 +46,11 @@ niente; il ms sync a valle non conosce EURODIS.
 flowchart LR
   A[EURODIS receive-pan] --> B[ce-dichiarato-eurodis-in]
   B -- "preadvising.eud.pre.build<br/>1 spedizione EURODIS<br/>chiave edReference" --> C[ce-dichiarato-eurodis-mapper]
-  C -- "preadvising.pre-enrichment<br/>tracciato unico ICD v11" --> D[ce-dichiarato-ldv-pdb-sync]
+  C -- "preadvising.pre-enrichment<br/>tracciato unico ICD v11" --> D[ce-dichiarato-ldv-pdb]
   D --> E[PDB waybillCreate]
 ```
 
-**[FATTO]** Il ms sync (`ce-dichiarato-ldv-pdb-sync`) è in test e ha
+**[FATTO]** Il ms sync (`ce-dichiarato-ldv-pdb`) è in test e ha
 osservazioni aperte che toccano i nostri dati: paese ISO4 non risolto, nessun
 default per peso e dimensioni, nessun troncamento (PA-30, DF-26, DF-27). L'ISO4
 glielo passiamo già risolto noi (sezione 6.4).

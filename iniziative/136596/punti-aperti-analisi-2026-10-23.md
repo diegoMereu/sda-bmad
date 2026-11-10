@@ -80,7 +80,7 @@ e restano lì a ogni rigenerazione.
 ## Aggiornamento del 29-10: servizi accessori nel formato PDB (proposta)
 
 Fonti: riscontro SDA/Chiapponi del 11-09 (flusso via file: ipotesi per l'API),
-`FlussiPreadvisingInfo.csv` e `ce-dichiarato-ldv-pdb-sync`. Il dettaglio è in
+`FlussiPreadvisingInfo.csv` e `ce-dichiarato-ldv-pdb`. Il dettaglio è in
 [accessori-eurodis-pdb-proposta.md](accessori-eurodis-pdb-proposta.md). La
 colonna "Stato" della tabella sopra non è stata toccata: qui sotto cosa cambia.
 
