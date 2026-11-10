@@ -59,7 +59,7 @@ mancante è infrastrutturale o di verifica in ambiente: verifica di avvio in svi
 | AS-15 | Utente SCRAM del secret e scrittura su `preadvising.eud.pre.build` | ✅ confermato che funziona (Diego, 04-11) | — |
 | AS-16 | Stringa Mongo | ✅ il servizio la legge dal secret (`mongo-string-connection`); il valore giusto è impostato per ambiente (Diego, 04-11) | — |
 | AS-18 | Uscita di rete verso `testapi.eurodis.com` | ✅ aperta (Diego, 04-11) | — |
-| AS-19 | **Alert Datadog** (sezione 9 della specifica) | **da fare più avanti** (Diego, 04-11): resta come punto aperto | team / Datadog |
+| AS-19 | **Alert Datadog** (sezione 9 della specifica) | **da fare più avanti** (Diego, 04-11). 10-11: proposta dei monitor per tutta la catena (`-in` con buffer locale, mapper, send-tracking) in [alert-datadog-eurodis.md](alert-datadog-eurodis.md), nomi delle metriche verificati nel codice; resta da configurarli in Datadog | team / Datadog |
 | AS-20 | Estensione del mock per gli end-to-end | va bene così per ora (Diego, 04-11): i casi sono coperti dai test unitari | — |
 | AS-21 | Conservazione (TTL) delle collezioni: ogni run viene salvato, anche i `404` (720 al giorno) | bassa | Diego |
 | AS-22 | Non verificato: avvio dell'applicazione con Mongo e Kafka veri (i test sono unitari) e test con 2 repliche (AC-13) | media | in svil |
