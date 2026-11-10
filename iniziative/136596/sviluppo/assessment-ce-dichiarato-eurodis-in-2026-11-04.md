@@ -80,3 +80,7 @@ mancante è infrastrutturale o di verifica in ambiente: verifica di avvio in svi
 ## Aggiornamento del 10-11
 
 Mongo non è più la persistenza: `-in` è passato a **PostgreSQL** (`9acdd77`, DDL in `sql/ddl/` e in `ddl-ce-eurodis-api-in.md`, secret `ce-postgres`). AS-4, AS-5 e AS-16 valgono quindi solo per la versione su Mongo (`a53398c`); AS-22 resta aperto con PostgreSQL al posto di Mongo. Nuovo AS-25: al commit `bd33e8a` `develop` non compila (riparato da `9acdd77`), un build agganciato a quel commit fallisce.
+
+## Aggiornamento del 10-11 (sera): AS-24 chiuso
+
+AS-24 ✅ **mapper** allineato all'adapter (`5b84993` su `develop`): `ENV password`, `clean package -DskipTests` al posto di `clean verify`, `--no-check-certificate` sull'agent Datadog, aggiornamento dei pacchetti runtime con `USER 185`, jar anche in `/deployments/`; esclusioni Sonar di azzurrazezza mantenute, aggiunto il package reale `configuration`. Test del mapper: 94 verdi. **send-tracking** già allineato (`4cba024`), nessuna modifica; 143 test verdi. Java 17 in pom e Dockerfile per entrambi. Spring Boot: send-tracking 3.5.14, **mapper 4.1.2** (portato da azzurrazezza, contro la decisione 3.5.14 per la catena: da chiarire con lei, non modificato). Nota su AS-23: `ENV password` non era indispensabile, perché un `ARG` è comunque visibile come variabile d'ambiente ai `RUN` dello stesso stage; si tiene per coerenza con l'adapter.
