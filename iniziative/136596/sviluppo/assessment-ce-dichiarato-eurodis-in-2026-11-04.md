@@ -52,7 +52,7 @@ mancante è infrastrutturale o di verifica in ambiente: verifica di avvio in svi
 |---|---|---|---|
 | AS-17 | Versione di Spring Boot | ✅ **deciso 04-11 (Diego)**: si resta su **3.5.14**, come blueprint e mapper. Da comunicare ad azzurrazezza (il suo `5da28fc` portava a 4.1.2) | — |
 | AS-7 | `application-prod.yaml`: `ssl.endpoint.identification.algorithm: ""` disattiva la verifica dell'hostname di Kafka. Non l'ho toccato: con gli `hostAliases` di svil potrebbe servire. Da verificare | media (sicurezza) | team piattaforma |
-| AS-9 | Profilo `svil`: log in console non JSON (`logback-svil.xml`), quindi in svil Datadog non vede l'MDC | bassa | — |
+| AS-9 | Profilo `svil`: log in console non JSON (`logback-svil.xml`), quindi in svil Datadog non vede l'MDC | ✅ chiuso 12-11: non applicabile in ambiente. In svil e coll Helm imposta `SPRING_PROFILES_ACTIVE: 'prod'`, quindi i log sono JSON con MDC (`id_scarico`, `id_file`, `ed_reference`), nello stesso formato di orchestratore e mapper; `logback-svil.xml` vale solo in locale. Regola in `contesto/linee-guida-sviluppo.md` | — |
 | AS-10 | `codice_iniziativa_goto: "138972"` in `deploy-svil` e `deploy-coll` | da verificare | Diego |
 | AS-11 | Helm `application.properties` ancora il placeholder del template | bassa | — |
 | AS-14 | Retry del service mesh | ✅ non applicabile: il progetto non usa service mesh (Diego, 04-11) | — |

@@ -30,6 +30,15 @@
 - Metriche Micrometer e span OpenTelemetry su ogni job, chiamata esterna e invio Kafka, sul modello
   di `TraceUtil` e `MetricheEurodisIn` (`ce-dichiarato-eurodis-in`): l'instrumentation non deve mai
   far fallire la lavorazione. Pensare le metriche per gli alert Datadog.
+- **Log nel formato standard dei ms, per tutti i servizi** (Diego, 12-11), per poterli analizzare in
+  Datadog. JSON su console con `LoggingEventCompositeJsonEncoder` di logstash in `logback-spring.xml`
+  (provider timestamp, level, threadName, loggerName, message, mdc, stackTrace), come
+  `ce-dichiarato-orchestratore` e i servizi EURODIS; l'adapter usa la variante con pattern esplicito.
+  In ambiente il profilo è sempre `prod` (`SPRING_PROFILES_ACTIVE` in Helm), quindi JSON anche in svil
+  e coll; `logback-svil.xml` (console in chiaro) serve solo per l'esecuzione in locale. MDC con gli
+  identificativi di correlazione, con gli stessi nomi dei servizi a valle: `partition`, `offset`,
+  `id_preadvising`, `id_file`, più quelli di dominio (es. `ed_reference`, `id_scarico`,
+  `id_esecuzione`); `MDC.clear()` a fine messaggio o job. Il contesto di trace lo aggiunge l'agent.
 - Mai dati personali nei log, nelle metriche o negli attributi degli span; mai chiavi o password.
 - Test con dati inventati, mai di produzione. I test su H2 in modalità PostgreSQL non coprono
   CHECK, indici parziali e comportamenti specifici del driver: dirlo nel report.
