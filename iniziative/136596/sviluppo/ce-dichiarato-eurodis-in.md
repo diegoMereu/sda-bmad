@@ -1,6 +1,6 @@
 # `ce-dichiarato-eurodis-in` — Documento funzionale per lo sviluppo
 
-**Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.7 (buffer locale del grezzo con recupero automatico) · **Data**: 2026-11-10
+**Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.7.1 (nome dello scarico negli eventi, senza link al file) · **Data**: 2026-11-12
 **Autore**: Mary (analyst) · **Destinatario**: Amelia (dev) e team di sviluppo
 **Repository**: https://posteitaliane.ghe.com/SVILUPPO/CORRIERE-ESPRESSO_PREADVISING_ce-dichiarato-eurodis-in
 **Generato da**: [prompt-ce-dichiarato-eurodis-in.md](prompt-ce-dichiarato-eurodis-in.md)
@@ -177,7 +177,7 @@ poi le spedizioni.
   "aggregateType": "file",
   "eventData": {
     "idFile": "3f2b8c1e-5a7d-4c1b-9e2f-0a1b2c3d4e5f",
-    "nomeFile": "eurodis.20261106091402123.json",
+    "nomeFile": "SCARICO_EURODIS_20261106091402123",
     "idStato": "ST_F0002",
     "stato": "FILE_PRESO_IN_CARICO",
     "dataStato": "2026-11-06T09:14:32.456+01:00",
@@ -187,8 +187,7 @@ poi le spedizioni.
     "ragioneSociale": "<da configurazione>",
     "canale": "EUD_INVIOSYSTEM",
     "numeroRecord": 5,
-    "esito": "OK",
-    "linkFileFisicoInviato": "eurodis_scarichi/6720f1a2b3c4d5e6f7a8b9c0"
+    "esito": "OK"
   },
   "metadata": {
     "timestamp": "2026-11-06T09:14:32.456108111+01:00",
@@ -207,7 +206,7 @@ Il secondo evento è identico, tranne `idStato`/`eventType` `ST_F0005`, `stato`
 | Campo | Valore | Rif. |
 |---|---|---|
 | `id`, `aggregateId`, `metadata.correlationId`, `eventData.idFile` | `idFile`, UUID generato quando lo scarico entra in fase 2 con almeno una spedizione, salvato sullo scarico; lo stesso per i due eventi | come il builder |
-| `eventData.nomeFile` | `eurodis.<yyyyMMddHHmmssSSS>.json`, timestamp = `ricevutoIl` dello scarico in Europe/Rome; salvato sullo scarico | [DA DECIDERE] formato del nome: domanda 2 |
+| `eventData.nomeFile` | `SCARICO_EURODIS_<yyyyMMddHHmmssSSS>` per lo scarico, `RILETTURA_EURODIS_<yyyyMMddHHmmssSSS>_<edReference>` per la rilettura; timestamp = `ricevutoIl` in Europe/Rome, nessuna estensione; prefissi configurabili (`eurodis.in.file.prefisso-scarico`, `prefisso-rilettura`); salvato sullo scarico | **[DECISO 12-11, Diego]** dal nome deve essere chiaro che è uno scarico, non un file |
 | `idStato`, `stato`, `eventType` | `ST_F0002` / `FILE_PRESO_IN_CARICO`, poi `ST_F0005` / `FILE_IN_ELABORAZIONE` | |
 | `dataStato`, `timestamp` | istante dell'evento, Europe/Rome, `yyyy-MM-dd'T'HH:mm:ss.SSSXXX` | come il builder |
 | `metadata.timestamp` | stesso istante, precisione piena (serializzazione standard di `ZonedDateTime`) | come il builder |
@@ -215,7 +214,7 @@ Il secondo evento è identico, tranne `idStato`/`eventType` `ST_F0005`, `stato`
 | `canale` | `EUD_INVIOSYSTEM` (configurabile) | DF-04 |
 | `numeroRecord` | numero di spedizioni del grezzo | come `addPdbMetadata` del builder |
 | `esito` | `OK` | |
-| `linkFileFisicoInviato` | `rifGrezzo` (`eurodis_scarichi/<idScarico>`) | |
+| `linkFileFisicoInviato` | non valorizzato (campo omesso) | **[DECISO 12-11, Diego]** non esiste un file vero. Il riferimento interno al grezzo resta nell'header `rifGrezzo` verso il mapper |
 | `metadata.source` | `spring.application.name` | |
 | `metadata.replay` | `false` | |
 
@@ -721,13 +720,16 @@ Criteri da verificare anche end-to-end contro `mock-eurodis` (`../mock-eurodis/`
   cancellazione a salvataggio riuscito, job di recupero idempotente senza ShedLock, file corrotti in
   `scartati/` (Diego, su consiglio di EURODIS; disegno di Winston). Implementata su `develop`
   (`6d50b70`..`b169912`, 99 test verdi; Amelia).
+- 0.7.1 (12-11): negli eventi di stato `nomeFile` dichiara lo scarico (`SCARICO_EURODIS_<ts>`,
+  `RILETTURA_EURODIS_<ts>_<edReference>`) e `linkFileFisicoInviato` non si valorizza (Diego).
+  Implementata su `develop` (`b6158be`; Amelia).
 
 ## Domande per Diego (0.5)
 
 1. **Topic degli eventi.** Hai scritto `preadvising.eventsource`, ma builder, `ce-dichiarato-ldv`
    e Helm svil e coll usano `preadvising.evensource`. Il default è quello in uso: confermi?
    Inoltre l'utente SCRAM di `-in` deve avere il permesso di scrittura sul topic.
-2. **Nome del file fittizio.** Proposta: `eurodis.<yyyyMMddHHmmssSSS>.json`, dall'istante di
+2. ✅ **Nome del file fittizio** (deciso 12-11: `SCARICO_EURODIS_<ts>`, vedi 3.3). Proposta originaria: `eurodis.<yyyyMMddHHmmssSSS>.json`, dall'istante di
    ricezione. Va bene, o serve un formato riconoscibile dal monitoraggio?
 3. **Dati del cliente negli eventi** (`codiceLoginCliente`, `ragioneSociale`, `partitaIVA`,
    `nominativoCliente`): sono gli stessi del mapper. Me li passi per svil?
