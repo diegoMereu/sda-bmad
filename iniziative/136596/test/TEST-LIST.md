@@ -37,6 +37,35 @@ Esito: vedi [STORICO.md](STORICO.md). Dati: inventati; `edReference` di test `99
 | TC-136596-025 | A | Copertura dei campi su `completed` (e ai salti intermedi) rispetto ai canali `PDB`/`PDB_INVIOSYSTEM` ed `EUD_INVIOFILE` | per canale, insieme dei campi valorizzati (non vuoti, non 0); tabella campo × canale con i campi pieni negli altri canali e vuoti in `EUD_INVIOSYSTEM` e la causa (dato assente in EURODIS, regola di mapping mancante, arricchimento a valle che non scatta per il canale). Nel repo solo nomi di campo e percentuali |
 | TC-136596-024 | A | Spedizione scartata dal validatore | evento di record con errore (`ST_R0006`), nessun messaggio su `completed` |
 
+## Send-tracking (`ce-eurodis-send-tracking`, da `PACCHI.TRACKING`)
+
+Si parte quando il servizio è rilasciato in svil (develop `ec2f65b`). `PACCHI.TRACKING` in svil è
+**condiviso** con altri consumer: pochi eventi, chiaramente di test (LDV `99…`, `idFrazionarioEvento`
+`99999`), elencati nello STORICO; mai su collaudo o produzione. Nessun topic di uscita: si verifica da
+log JSON (MDC `ldv` mascherata, `status_sda`, `codice_eurodis`, `esito`) e metriche `eurodis_tracking_*`
+(`lette`, `tracce_total{esito}`, `scartati_total{filtro}`, `retry`, `cache_ldv`, `mongo`), più l'esito
+della chiamata a EURODIS TEST.
+
+LDV del giro precedente (canale `EUD_INVIOSYSTEM`, arrivate al validatore e quindi in `dichiarato_events`;
+Mongo non è raggiungibile da qui, la presenza si deduce dai topic): `9900000000001001`, `9900000000003001`,
+`9900000000005001`, `9900000000006001`.
+
+Evento da produrre (struttura reale di `PACCHI.TRACKING`, sezione 3.2 della specifica; nessuna chiave Kafka):
+`{"header":{"applicativo":"CE","timestamp":"<ora> "},"payload":{"canale":"PDT","status":"<status>","ldv":"<LDV>","dataTrack":"<yyyy-MM-dd HH:mm:ss>","idFrazionarioEvento":"99999","numTentativiDiConsegna":"1"}}`
+
+| ID | P | Caso (esempio della specifica) | Evento | Verifica |
+|---|---|---|---|---|
+| TC-136596-030 | C | `GGG` → `1767` (E2) | status `GGG`, LDV `9900000000003001` | `tracce_total{esito=inviata}` +1, log `codice_eurodis=1767`, EURODIS TEST risponde 201 senza errori sull'elemento |
+| TC-136596-031 | A | `GIA` → `1785` (E3) | status `GIA`, LDV `9900000000003001` | come 030 con `1785` |
+| TC-136596-032 | A | `ARR` → `1766` (E4) | status `ARR`, canale `HUB`, LDV `9900000000001001` | come 030 con `1766` |
+| TC-136596-033 | A | `000` → `1100` senza nome di chi ritira (E1) | status `000`, LDV `9900000000005001` | scartata, `scartati_total{filtro=acceptor_name}` +1, nessuna chiamata (con `EURODIS_TRACKING_ACCEPTOR_NAME_DEFAULT` vuoto) |
+| TC-136596-034 | M | `000` → `1100` con nome di default | come 033 con `EURODIS_TRACKING_ACCEPTOR_NAME_DEFAULT` impostato in svil | inviata `1100`, il valore non compare nei log |
+| TC-136596-035 | A | status non abilitato (E5) | status `THE`, LDV `9900000000006001` | scartata al filtro status, Mongo non interrogato |
+| TC-136596-036 | A | LDV non EURODIS (E7) | status `GGG`, LDV nuova `9900000000099001` (mai vista, fuori dalla cache) | scartata al filtro LDV, `mongo` +1; secondo evento sulla stessa LDV entro 10 min: nessuna nuova query (cache) |
+| TC-136596-037 | M | doppione (E8) | stesso evento di 030 prodotto due volte | comportamento atteso da 14.4 (niente storico: verificare se parte un secondo invio e che EURODIS non dia errore) |
+| TC-136596-038 | M | override da ConfigMap (E9) | `EURODIS_TRACKING_STATI_OVERRIDE=THE=1767` in svil, poi evento di 035 | inviato `1767` |
+| TC-136596-039 | M | applicativo diverso (E6) | `applicativo` `TT`, status `000` | con filtro applicativo spento (default) passa ai filtri successivi; con `EURODIS_TRACKING_APPLICATIVI=CE` scartato al filtro 1 |
+
 ## Dati usati
 
 | edReference | Variante | Note |
