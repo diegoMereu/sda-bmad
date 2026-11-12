@@ -9,7 +9,7 @@
 - I nomi delle metriche e dei tag sono **verificati nel codice** su `develop`, il 10-11:
   - `-in` al commit `c60e508`, classe `MetricheEurodisIn`;
   - mapper al commit `5b84993`, classe `MetricheMapper`;
-  - send-tracking al commit `591767d`, classe `MetricheSendTracking`.
+  - send-tracking al commit `ec2f65b` (12-11), classe `MetricheSendTracking`.
 - Ogni metrica ha il tag comune `service`, uguale al nome del servizio (`MetricsConfig`).
 - Le metriche sono esposte su `/actuator/prometheus` (porta 8091) e raccolte dalla componente di piattaforma `otel-for-metrics-app` (`observability.metrics` del chart).
 - **Il nome esatto in Datadog dipende da quella pipeline.** Un counter Prometheus `x_total` può comparire come `x_total` oppure come `x.count`. Prima di creare i monitor va verificato in Metrics Explorer, con `eurodis_in_chiamata_total` come esempio. Le query qui sotto usano il nome Prometheus.
@@ -62,19 +62,52 @@ Filtro comune: `{service:ce-dichiarato-eurodis-mapper,env:<env>}`.
 
 Filtro comune: `{service:ce-eurodis-send-tracking,env:<env>}`.
 
-**Da attivare quando la sorgente delle tracce è decisa (PA-35).** Oggi il servizio non invia niente, quindi questi monitor non hanno dati.
+Flusso dal 12-11 (Diego): consumer di `PACCHI.TRACKING` → filtro sullo status abilitato → filtro
+applicativo (opzionale, default spento) → LDV di una spedizione `EUD_INVIOSYSTEM` su Mongo
+`dichiarato_events` con cache → invio diretto a EURODIS. **Nessuno storico**: un errore temporaneo o
+di configurazione non conferma l'offset e il consumer riprova con backoff; oltre la durata massima
+(default 24 ore) l'evento si abbandona. Quindi un consumer fermo sui retry si vede come **lag** e come
+`retry_total` in crescita.
+
+**Metriche** (verificate nel codice, `ec2f65b`):
+
+| Metrica | Tipo | Tag | Significato |
+|---|---|---|---|
+| `eurodis_tracking_tracce_lette_total` | counter | — | eventi letti da `PACCHI.TRACKING` |
+| `eurodis_tracking_tracce_total` | counter | `esito` | esito per evento: `evento_non_valido`, `status_non_abilitato`, `applicativo`, `ldv_non_eurodis`, `acceptor_name_mancante`, `invio_disabilitato`, `inviato`, `rifiutato` |
+| `eurodis_tracking_scartati_total` | counter | `filtro` | solo gli scarti, stessi valori di `esito` esclusi `inviato` e `rifiutato` |
+| `eurodis_tracking_stato_non_mappato_total` | counter | `status` | status SDA non presente in tabella (in `PACCHI.TRACKING` sono la maggioranza, per esempio `THE`): **informativa, non da alert** |
+| `eurodis_tracking_cache_ldv_total` | counter | `esito` (`hit_trovata`, `hit_non_trovata`, `miss`) | cache del filtro 3 |
+| `eurodis_tracking_mongo_ricerca_durata` | timer | `esito` (`trovata`, `non_trovata`, `errore`) | durata della ricerca su Mongo (solo i miss di cache) |
+| `eurodis_tracking_mongo_errori_total` | counter | — | ricerche Mongo fallite (il consumer riprova) |
+| `eurodis_tracking_retry_total` | counter | `esito` (`errore_temporaneo`, `errore_configurazione`) | invii a EURODIS da ripetere |
+| `eurodis_tracking_tracce_abbandonate_total` | counter | — | eventi abbandonati dopo la durata massima dei tentativi |
+| `eurodis_tracking_chiamata_total` / `_durata` | counter / timer | `endpoint`, `esito` (codice HTTP o `io`) | chiamate a EURODIS (client) |
+| `eurodis_tracking_eventi_total` | counter | `livello`, `esito` (`CREATO`, `RIFIUTATO`, `ERRORE_CONFIGURAZIONE`, `ERRORE_TEMPORANEO`) | esiti degli eventi inviati (client) |
+| `eurodis_tracking_errori_eurodis_total`, `_warning_total` | counter | `codice` | codici di errore e warning EURODIS |
+| `eurodis_tracking_acceptor_name_mancante_total` | counter | `codice` | `1100` senza nome di chi ritira |
+| `kafka_consumer_fetch_manager_records_lag_max` | gauge | `client_id`, `topic` | lag del consumer (metriche Kafka collegate da Spring Boot a Micrometer): da verificare il nome in Datadog |
+
+**Span**: `eurodis.tracking.traccia` (CONSUMER, uno per evento, figlio del `traceparent` se presente;
+attributi `status_sda`, `ldv` mascherata, `codice_eurodis`, `esito`, partizione e offset),
+`eurodis.tracking.lookup_ldv` (CLIENT, solo i miss di cache; attributi `esito`, `cache`),
+`eurodis.send-tracking parcel` (CLIENT, chiamata EURODIS; `http.status_code`, numero di eventi, creati,
+rifiutati). Nei log JSON gli stessi identificativi sono nell'MDC (`traceId`, `spanId`, `ldv`,
+`status_sda`, `codice_eurodis`, `esito`).
 
 | ID | Nome | Query | Soglia / finestra | Gravità | Runbook |
 |---|---|---|---|---|---|
-| TRK-01 | EURODIS: chiave o partner non validi | `sum(last_10m):sum:eurodis_tracking_chiamata_total{…,esito:401 OR esito:424 OR esito:451}.as_count()` | > 0 | alto | Verificare la chiave API di send-tracking e la configurazione del partner presso EURODIS |
-| TRK-02 | Errori di configurazione | `sum(last_10m):sum:eurodis_tracking_eventi_total{…,esito:ERRORE_CONFIGURAZIONE}.as_count()` | > 0 | alto | Gli eventi non partono per un problema di configurazione (URL, chiave): non si risolve riprovando |
-| TRK-03 | Errori temporanei frequenti | `sum(last_30m):sum:eurodis_tracking_eventi_total{…,esito:ERRORE_TEMPORANEO}.as_count()` | ≥ 10 | medio | Timeout o `5xx` di EURODIS: gli eventi vengono ritentati. Se continua, avvisare EURODIS |
-| TRK-04 | Eventi rifiutati da EURODIS | `sum(last_1h):sum:eurodis_tracking_eventi_total{…,esito:RIFIUTATO}.as_count()` | > 0 | medio | EURODIS ha rifiutato eventi: il codice è in `eurodis_tracking_errori_eurodis_total{codice}`. Analizzare i dati (barcode, codice evento) |
-| TRK-05 | Status SDA senza traduzione | `sum(last_1h):sum:eurodis_tracking_stato_non_mappato_total{…}.as_count()` | > 0 | medio | Uno status SDA non è nella tabella IN-BOUND e non è stato inviato (TR-03). Valutare se aggiungerlo alla tabella |
-| TRK-06 | Consegne senza nome di chi ritira | `sum(last_1h):sum:eurodis_tracking_acceptor_name_mancante_total{…}.as_count()` | > 0 | medio | Evento `1100` scartato in locale per `acceptorName` mancante (AC-10). Verificare la sorgente (ST-12) |
-| TRK-07 | Risposta di lotto incoerente | `sum(last_1h):sum:eurodis_tracking_lotto_non_correlabile_total{…}.as_count() + sum:eurodis_tracking_esito_non_coincidente_total{…}.as_count()` | > 0 | medio | La risposta EURODIS a un lotto non si correla agli eventi inviati (PA-36): esito incerto, rischio di doppioni |
-
-Quando ci saranno lo storico e il job di invio (3.5 della specifica di send-tracking), si aggiunge un monitor sugli eventi in `ERRORE_INVIO`, con la metrica da definire allora.
+| TRK-01 | EURODIS: chiave o partner non validi | `sum(last_10m):sum:eurodis_tracking_chiamata_total{…,esito:401 OR esito:424 OR esito:451}.as_count()` | > 0 | alto | Verificare la chiave API di send-tracking e la configurazione del partner presso EURODIS. Il consumer resta fermo sull'evento e riprova |
+| TRK-02 | Invii fermi per errore di configurazione | `sum(last_10m):sum:eurodis_tracking_retry_total{…,esito:errore_configurazione}.as_count()` | > 0 | alto | Gli eventi non partono per URL o chiave: non si risolve riprovando, serve l'intervento |
+| TRK-03 | Errori temporanei frequenti | `sum(last_30m):sum:eurodis_tracking_retry_total{…,esito:errore_temporaneo}.as_count()` | ≥ 10 | medio | Timeout o `5xx` di EURODIS: il consumer riprova con backoff. Se continua, avvisare EURODIS |
+| TRK-04 | Eventi rifiutati da EURODIS | `sum(last_1h):sum:eurodis_tracking_eventi_total{…,esito:RIFIUTATO}.as_count()` | > 0 | medio | Il codice è in `eurodis_tracking_errori_eurodis_total{codice}`. Analizzare barcode e codice evento |
+| TRK-05 | Eventi abbandonati | `sum(last_1h):sum:eurodis_tracking_tracce_abbandonate_total{…}.as_count()` | > 0 | alto | Un evento è stato abbandonato dopo 24 ore di tentativi: la traccia non è arrivata a EURODIS. Recuperarla dai log (topic, partizione, offset) |
+| TRK-06 | Consegne senza nome di chi ritira | `sum(last_1h):sum:eurodis_tracking_acceptor_name_mancante_total{…}.as_count()` | > 0 | medio | Evento `1100` scartato: manca `acceptorName` nella sorgente (V-02) e non c'è un valore di default |
+| TRK-07 | Risposta di lotto incoerente | `sum(last_1h):sum:eurodis_tracking_lotto_non_correlabile_total{…}.as_count() + sum:eurodis_tracking_esito_non_coincidente_total{…}.as_count()` | > 0 | medio | Esito incerto, rischio di doppioni (PA-36) |
+| TRK-08 | Mongo non disponibile per il filtro 3 | `sum(last_10m):sum:eurodis_tracking_mongo_errori_total{…}.as_count()` | > 0 | alto | La ricerca delle LDV su `dichiarato_events` fallisce: il consumer è fermo e riprova. Verificare Mongo e il secret `ce-dichiarato-validatore-secret` |
+| TRK-09 | Consumer in ritardo | `max(last_15m):max:kafka_consumer_fetch_manager_records_lag_max{…,topic:PACCHI.TRACKING}` | > 50.000 (P), da tarare | alto | Il consumer non tiene il passo o è fermo sui retry (TRK-02, TRK-03, TRK-08) |
+| TRK-10 | Nessuna traccia letta | `sum(last_30m):sum:eurodis_tracking_tracce_lette_total{…}.as_count()` | = 0 (solo dove il consumer è abilitato) | alto | Il consumer è spento, non ha l'ACL di lettura su `PACCHI.TRACKING` o il pod non gira |
+| TRK-11 | Ricerche Mongo lente | `avg(last_15m):avg:eurodis_tracking_mongo_ricerca_durata.avg{…}` | > 200 ms | medio | Probabile indice mancante su `dichiarato_events` (`spedizione.collo.id_ldv`, `canale`; V-06) |
 
 ## 5. Monitor di piattaforma consigliati (non sono metriche applicative)
 
