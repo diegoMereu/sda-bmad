@@ -27,7 +27,8 @@ preadvising.pre-enrichment -> ce-dichiarato-validatore -> preadvising.enrichment
 | `ce-dichiarato-smistatore` | Instrada `preadvising.completed` verso Poste, SDA e palmari secondo `CANALI_POSTE`, `smistatore.canali.sda`, `CANALI_ESCLUSI_PALMARI` |
 | `ce-dichiarato-state-machine-handler`, `ce-event-handler-*` | Stati e storico degli eventi |
 | `ce-anagrafica` | REST: `GET /anagrafica/indirizzi/nazione/{codice}` (codice di 2, 3 o 4 caratteri; risponde ISO3 `codNazione`, ISO4 Poste `codNazionePoste`, ISO2 `codNazione2`), `GET /anagrafica/matrice/filiale?cap=&localita=` (in cache) |
-| `ce-db-sync` | Sincronizzazioni su PostgreSQL `ce_cen`. Modello per l'accesso a PostgreSQL (JDBC, secret `ce-postgres`) |
+| `ce-db-sync` | Allinea PostgreSQL `ce_cen` con l'anagrafica clienti di Informix: CRUD REST generico (Spring Data REST, `POST /api/<tabella>` = upsert, una entity per tabella, JWT), caricamento CSV manuale (`CsvProductionSync`), batch orario `PostazioneMongoSyncJob` che riporta su Mongo `dichiarato_ldv_history` i cambi di `id_postazione`. Copia delle procedure Informix in `sql/procedure/` (documentazione). Secret `ce-postgres`, Mongo dal secret del validatore. Dettagli nel suo `CLAUDE.md` |
+| `ce-vendite` | REST di lettura su `ce_cen` per anagrafica e configurazione cliente (`/vendite/...`, con cache): fra gli altri `id-postazione-da-seme` e `configurazione-postazione-da-seme` (seme LDV → postazione da `cen_postazioni.id_seme_ldv`; per i clienti PDB anche da `sfa_postazioni_ou`), `id-tipo-seme`, `postazione-mysda` |
 | `ce-dichiarato-eurodis-in`, `-mapper`, `ce-eurodis-send-tracking` | Flusso EURODIS autoproduttore: vedi `iniziative/136596/sviluppo/` |
 
 ## Aggiungere un canale nuovo
