@@ -1,0 +1,40 @@
+# Anagrafica del generatore: luoghi pubblici (piazze, vie note), nessun dato di cliente.
+# Strade, CAP, citta' e province sono coerenti tra loro; nomi e ragioni sociali sono inventati.
+# Per aggiungere un paese: nuova voce in "paesi" con cap_formato, prefisso_tel e almeno un indirizzo.
+
+nomi: [Anna, Marco, Giulia, Luca, Sara, Paolo, Elena, Davide, Chiara, Matteo, Lena, Jonas, Sophie, Noah]
+cognomi: [Rossi, Bianchi, Verdi, Ferrari, Conti, Esposito, Mayer, Gruber, Huber, Keller, Meier, Brunner]
+ragioni_sociali:
+  - Esempio Logistica Srl
+  - Prova Commerce SpA
+  - Test Spedizioni Srl
+  - Beispiel Handel GmbH
+  - Muster Versand AG
+  - Demo Trading Srl
+
+paesi:
+  IT:
+    cap_formato: '^\d{5}$'
+    prefisso_tel: '+39'
+    indirizzi:
+      - {street: Piazza del Duomo, streetNumber: '1', region: MI, city: Milano, zipcode: '20122'}
+      - {street: Viale Europa, streetNumber: '190', region: RM, city: Roma, zipcode: '00144'}
+      - {street: Piazza San Marco, streetNumber: '1', region: VE, city: Venezia, zipcode: '30124'}
+      - {street: Piazza del Plebiscito, streetNumber: '1', region: NA, city: Napoli, zipcode: '80132'}
+      - {street: Piazza della Signoria, streetNumber: '1', region: FI, city: Firenze, zipcode: '50122'}
+  AT:
+    cap_formato: '^\d{4}$'
+    prefisso_tel: '+43'
+    indirizzi:
+      - {street: Stephansplatz, streetNumber: '3', region: Wien, city: Wien, zipcode: '1010'}
+      - {street: Mozartplatz, streetNumber: '1', region: Salzburg, city: Salzburg, zipcode: '5020'}
+      - {street: Maria-Theresien-Strasse, streetNumber: '18', region: Tirol, city: Innsbruck, zipcode: '6020'}
+      - {street: Hauptplatz, streetNumber: '1', region: Steiermark, city: Graz, zipcode: '8010'}
+  CH:
+    cap_formato: '^\d{4}$'
+    prefisso_tel: '+41'
+    indirizzi:
+      - {street: Bundesplatz, streetNumber: '3', region: BE, city: Bern, zipcode: '3003'}
+      - {street: Bahnhofstrasse, streetNumber: '1', region: ZH, city: Zuerich, zipcode: '8001'}
+      - {street: Rue du Rhone, streetNumber: '1', region: GE, city: Geneve, zipcode: '1204'}
+      - {street: Piazza Riforma, streetNumber: '1', region: TI, city: Lugano, zipcode: '6900'}

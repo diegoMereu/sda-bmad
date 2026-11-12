@@ -14,7 +14,7 @@ from .store import Store
 
 RADICE = Path(__file__).resolve().parent.parent
 CONFIG = Path(os.environ.get("MOCK_CONFIG", RADICE / "config" / "prodotti.yaml"))
-ANAGRAFICA = Path(os.environ.get("MOCK_INDIRIZZI", RADICE / "data" / "indirizzi.yaml"))
+ANAGRAFICA = Path(os.environ.get("MOCK_INDIRIZZI", RADICE / "config" / "indirizzi.yaml"))
 STATO = os.environ.get("MOCK_STATO", str(RADICE / "stato.json"))
 PARTNER_DEFAULT = "SDA"
 

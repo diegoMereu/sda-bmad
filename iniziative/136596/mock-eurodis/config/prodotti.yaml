@@ -21,7 +21,7 @@ ldv_default:
 default:
   shipmentTypeIndicator: N
   lineHaulIndicator: L
-  mittente_paese: AT          # chiave in data/indirizzi.yaml
+  mittente_paese: AT          # chiave in config/indirizzi.yaml
   destinatari_paesi: [IT]
   colli: [1, 1]               # min, max colli per spedizione
   peso_collo_kg: [1, 20]

@@ -42,7 +42,7 @@ Si può dare una sintassi diversa a un singolo prodotto con un blocco `ldv:` nel
 
 ## Dati
 
-- **Reali**: strade, CAP, città, province e nazioni in `data/indirizzi.yaml`, coerenti tra loro
+- **Reali**: strade, CAP, città, province e nazioni in `config/indirizzi.yaml`, coerenti tra loro
   (il test verifica il formato del CAP per paese). Luoghi pubblici, nessuna anagrafica di cliente.
 - **Generati**: nomi, ragioni sociali, telefoni, email (`@example.com`), pesi, dimensioni,
   numeri spedizione, barcode EURODIS (24 cifre), IBAN di prova.

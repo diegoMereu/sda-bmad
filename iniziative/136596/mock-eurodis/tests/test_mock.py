@@ -56,7 +56,7 @@ def test_multicollo_coerente(client):
 
 
 def test_indirizzi_reali_coerenti(client):
-    anag = yaml.safe_load((RADICE / "data" / "indirizzi.yaml").read_text(encoding="utf-8"))["paesi"]
+    anag = yaml.safe_load((RADICE / "config" / "indirizzi.yaml").read_text(encoding="utf-8"))["paesi"]
     for s in client.get(SHIPMENTS, headers=KEY).json():
         for k in ("consigneeAddress", "shipperAddress"):
             a = s[k]
