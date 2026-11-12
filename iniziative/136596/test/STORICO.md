@@ -78,3 +78,34 @@ Smistatore e TC-025: non verificabili finché un tracciato EURODIS non arriva su
 
 Nessun evento prodotto su `PACCHI.TRACKING`: con il consumer fermo e `auto-offset-reset` a `latest` verrebbero
 saltati all'avvio e resterebbero sul topic condiviso. → [BLOCCO-136596-003](triage/BLOCCO-136596-003.yaml)
+
+## RUN-136596-20261112T160800Z — send-tracking, eventi di test su PACCHI.TRACKING (svil)
+
+**Pre-condizione**: gruppo `ce-eurodis-send-tracking-group` Stable, 3 membri (dopo la release Helm v8 delle 15:20).
+**Eventi prodotti** (svil, senza chiave, `idFrazionarioEvento` `99999`, `header.timestamp` 12-11 17:08):
+
+| Offset | TC | applicativo | status | LDV |
+|---|---|---|---|---|
+| 257653 | TC-030 | CE | GGG | 9900000000003001 |
+| 257654 | TC-031 | CE | GIA | 9900000000003001 |
+| 257655 | TC-032 | CE (canale HUB) | ARR | 9900000000001001 |
+| 257656 | TC-033 | CE | 000 | 9900000000005001 |
+| 257657 | TC-035 | CE | THE | 9900000000006001 |
+| 257658 | TC-036a | CE | GGG | 9900000000099001 (mai vista) |
+| 257659 | TC-036b | CE | GGG | 9900000000099001 |
+| 257660 | TC-037 | CE | GGG | 9900000000003001 (doppione di 030) |
+| 257661 | TC-039 | TT | GGG | 9900000000006001 |
+
+**Esito**: ⛔ bloccato sul primo evento. Verifiche da log JSON del pod e da `/actuator/prometheus` (sola lettura).
+
+| Verifica | Esito | Evidenza |
+|---|---|---|
+| Lettura e filtri | ✅ | evento 257653 letto; LDV `****3001` trovata su Mongo `dichiarato_events` (`mongo_ricerca{esito=trovata}`), correlata a `edReference` 9900000000003; poi cache (`cache_ldv{esito=hit_trovata}`) |
+| Traduzione | ✅ | `GGG` → `1767`, endpoint `parcel` |
+| Invio a EURODIS TEST | ❌ | **HTTP 401** a ogni tentativo (`chiamata_total{esito=401}`, `eventi_total{esito=ERRORE_CONFIGURAZIONE}`). Il secret `ce-eurodis-send-tracking-secret` non ha la chiave `api-key` (solo `kafka-scram-*`); nel Helm il riferimento è `optional: true`, quindi `EURODIS_API_KEY` è vuota → [BLOCCO-136596-004](triage/BLOCCO-136596-004.yaml) |
+| Retry | ✅ come da progetto | stesso offset ritentato con backoff 2 s, 4 s, 8 s, 16 s, 33 s… (`retry_total{esito=errore_configurazione}`); massimo 5 min tra i tentativi, abbandono dopo 24 h (RF-17, RF-23). Effetto: `PACCHI.TRACKING` (1 partizione in svil) resta fermo dietro l'evento, quindi TC-031…039 sono in coda |
+| Log | ✅ | JSON con MDC `ldv` mascherata (`****3001`), `status_sda`, `codice_eurodis`; nessun dato personale |
+
+TC-034 e TC-038 richiedono di cambiare la configurazione in svil (`EURODIS_TRACKING_ACCEPTOR_NAME_DEFAULT`,
+`EURODIS_TRACKING_STATI_OVERRIDE`): non eseguiti, il cluster si usa in sola lettura. Quando la chiave sarà nel
+secret e il pod riavviato, il consumer riprende dall'offset committato 257653 e i TC in coda si eseguono da soli.

@@ -1,0 +1,19 @@
+id: BLOCCO-136596-004
+iniziativa: "136596"
+campagna: e2e-eurodis-svil
+tipo: configurazione / secret
+stato: aperto
+titolo: Manca la chiave EURODIS nel secret di send-tracking, EURODIS TEST risponde 401
+osservato: >
+  12-11 16:08: ogni invio a https://testapi.eurodis.com/send-tracking/events/parcel/v1 risponde 401.
+  Il secret ce-eurodis-send-tracking-secret contiene solo kafka-scram-username e kafka-scram-password, non
+  api-key; il Helm lo referenzia con optional: true, quindi EURODIS_API_KEY e' vuota. Il secret di -in
+  (ce-dichiarato-eurodis-in-secret) ha api-key e receive-pan risponde 200.
+serve: >
+  Aggiungere la chiave api-key a ce-eurodis-send-tracking-secret in svil (la chiave API del partner SDA presso
+  EURODIS TEST; da verificare con EURODIS se e' la stessa di receive-pan) e riavviare il pod. Nessuna modifica
+  di codice.
+impatto: >
+  Con il retry previsto (RF-17, RF-23) il consumer resta fermo sul primo evento fino a 24 h; in svil
+  PACCHI.TRACKING ha una partizione, quindi anche gli altri eventi di test sono in attesa.
+responsabile: Diego / piattaforma
