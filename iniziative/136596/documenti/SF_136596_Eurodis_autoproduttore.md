@@ -7,13 +7,14 @@ ticket: null
 compilato_da: "GDL ACN"
 verificato_da: ""
 approvato_da: ""
-versione: "0.4"
+versione: "0.5"
 distribuito_a: "DTO/IT/BASSPDCB/IT AS COR ESPR"
 revisioni:
   - {data: "04/11/2026", versione: "0.1", stato: "Bozza", descrizione: "Prima emissione", autore: "ACN"}
   - {data: "05/11/2026", versione: "0.2", stato: "Bozza", descrizione: "Catena a valle tramite validazione, namespace, riferimenti, livello di dettaglio, Open Point per interlocutore", autore: "ACN"}
   - {data: "10/11/2026", versione: "0.3", stato: "Bozza", descrizione: "Allineamento alle decisioni e alle risposte EURODIS del 06-10/11: storico su PostgreSQL con area di appoggio locale, eventi di stato del file, LDV del collo da deliveryPartnerBarcode, codici nazione da ce-anagrafica, dati cliente da configurazione, frequenza dello scarico, codifica degli stati per il tracciamento", autore: "ACN"}
   - {data: "10/11/2026", versione: "0.4", stato: "Bozza", descrizione: "Catena a valle per il nuovo canale EUD_INVIOSYSTEM: interventi su validatore, orchestratore, smistatore e ce-dichiarato-ldv-pdb; sistemi impattati allineati al Documento di Progettazione", autore: "ACN"}
+  - {data: "12/11/2026", versione: "0.5", stato: "Bozza", descrizione: "Merci pericolose (ADR) escluse dal perimetro; dati di dogana non trasformati; dati del cliente come il flusso EURODIS via file; codici nazione con codifiche italiane in caso di errore di ce-anagrafica", autore: "ACN"}
 ---
 
 # Introduzione
@@ -76,7 +77,7 @@ Il presente documento contiene l'analisi degli impatti funzionali relativi all'I
 | 15 | Open Point | Conferma della traduzione proposta dei servizi accessori EURODIS nei codici PDB, e trattamento dei valori non coperti (`D`, `7`, `T`; `W` come appuntamento) o fuori perimetro (`A`, Locker, assicurazione, tipo P): servizio, spedizione ordinaria o scarto. | Servizi accessori; EURODIS (Chiapponi), SDA |
 | 16 | Open Point | Punto Poste: sorgente del nome del punto, obbligatorio per PDB e non garantito da EURODIS, e comportamento se assente. | Servizi accessori; EURODIS (Chiapponi) |
 | 17 | Open Point | Contrassegno: formato e valuta dell'importo e codifica del tipo di incasso (3 → `CON`, 5 → `ABM`). | Servizi accessori; EURODIS (Chiapponi) |
-| 18 | Open Point | Spedizioni con dogana e con merci pericolose (ADR): rientrano nel perimetro? | Trasformazione; EURODIS (Chiapponi) |
+| 18 | Esclusione | Spedizioni con merci pericolose (ADR): non sono gestite da SDA (confermato da EURODIS, 12/11/2026). I dati `hazardousADRServices` e `hazardousCollis` non vengono trasformati. | Trasformazione; EURODIS (Chiapponi) |
 | 19 | Open Point | Tracciamento verso EURODIS: sorgente delle tracce SDA e frequenza di invio; disponibilità del nome di chi ritira, richiesto da EURODIS per la consegna (codice `1100`). Deciso: API `send-tracking` e codifica degli stati secondo il foglio "Decodifica Eurodis IN-BOUND" (allegato 6). | Tracciamento; SDA, team ACN |
 | 20 | Open Point | Codice PRJ dell'iniziativa: DA DEFINIRE. | Introduzione; Poste |
 | 21 | Open Point | Durata di conservazione dello storico delle chiamate e delle spedizioni: DA DEFINIRE. Si propongono 30 giorni per le chiamate senza spedizioni e 180 giorni per le altre. | Acquisizione; Poste |
@@ -88,12 +89,13 @@ Il presente documento contiene l'analisi degli impatti funzionali relativi all'I
 | 27 | Open Point | Assicurazione: si propone di considerarla fuori perimetro e di non valorizzarla anche se EURODIS invia il valore della merce. | Servizi accessori; SDA |
 | 28 | Open Point | Reso (rientro al mittente): necessità del servizio `APT000930` e semantica dei valori; riconoscimento di resi e rettifiche. | Servizi accessori; SDA |
 | 29 | Open Point | Preavviso: si propone di non mappare i flag di preavviso EURODIS, perché SDA notifica il destinatario in presenza dei contatti. Il preavviso telefonico non ha un campo nell'ICD. | Trasformazione; SDA |
-| 30 | Open Point | Valori per ambiente dei dati del cliente EURODIS (codice login, id cliente, codice AUC, ragione sociale, partita IVA, contratto, `centro_costo`, `rif_prodotto_cliente`): DA DEFINIRE. Deciso: sono parametri di configurazione. | Trasformazione; Poste |
+| 30 | Open Point | Dati del cliente EURODIS in produzione: si usano gli stessi del flusso EURODIS via file (canale `EUD_INVIOFILE`), che sono uguali in tutti gli ambienti; da confermare che valgano anche per il flusso via API in produzione. Ragione sociale, partita IVA e nominativo del cliente negli eventi di stato restano vuoti. | Trasformazione; Poste |
 | 31 | Open Point | Campi EURODIS senza corrispondenza nell'ICD o con semantica diversa: secondo numero di telefono, `region` (testo libero) contro `provincia` (sigla), valore della merce in valuta diversa da EUR. | Trasformazione; SDA |
 | 32 | Open Point | Osservazioni su `ce-dichiarato-ldv-pdb`, oggi in test: canale (`POU` o `WEBSERVICE`), nome del Punto Poste omesso se vuoto, contrassegno con importo 0 non scartato. È in preparazione una correzione per i canali `EUD_*` e per la LDV autoproduttore. | Propagazione verso PDB; responsabile `ce-dichiarato-ldv-pdb` |
 | 33 | Chiuso | Arricchimento: il ms di trasformazione non consulta F1 (i dati del cliente sono in configurazione, Open Point 30); il prodotto è determinato a valle. | Trasformazione; team ACN |
 | 34 | Open Point | Coda di scarto per i messaggi non trasformabili: creazione del topic dedicato DA DEFINIRE. Deciso: i messaggi non trasformabili non vengono pubblicati e restano visibili con il motivo. | Trasformazione; team ACN |
 | 35 | Open Point | Topic o sorgente da cui `ce-eurodis-send-tracking` legge le tracce SDA: DA DEFINIRE. | Tracciamento; team ACN |
+| 36 | Open Point | Dati di dogana (`customsService`) e spedizioni ricevute con dati ADR nonostante l'esclusione 18. Si propone di non trasformare i dati di dogana, perché valorizzare la sezione internazionale del tracciato farebbe trattare la spedizione come internazionale. Una spedizione con dati ADR oggi prosegue come spedizione ordinaria, senza i dati ADR: da confermare se va invece scartata o segnalata. | Trasformazione; SDA, EURODIS (Chiapponi) |
 
 # Obiettivo dell'iniziativa
 
@@ -283,7 +285,7 @@ Il mapping campo per campo, con la categoria di ogni campo (diretto, trasformato
 - Il tracciato è contrassegnato come autoproduttore (`flag_autoproduttore` = `"S"`), con `versione_tracciato` = `1`. Poiché ogni messaggio contiene una sola spedizione, `progressivo` vale `1`.
 - Mittente e destinatario sono riportati dagli indirizzi EURODIS (`shipperAddress`, `consigneeAddress`); il cellulare deriva dal contatto SMS. Il destinatario è obbligatorio: una spedizione senza `consigneeAddress`, o senza CAP o località, non viene trasformata (vedi "Messaggi non trasformabili"). `returnAddress` non è mai usato come destinatario.
 - Data e ora di spedizione derivano da `entranceTimestamp`; se manca si usa `clearanceTimestamp` (Open Point 25).
-- Il codice paese EURODIS (ISO2) è riportato in `nazione` e `codice_nazione_iso_2`; ISO3 e ISO4 (`codice_nazione`, `codice_nazione_poste`) sono ricavati dal servizio `ce-anagrafica`, come nella catena esistente. Se `ce-anagrafica` non risponde il tracciato viene pubblicato con il solo ISO2.
+- Il codice paese EURODIS (ISO2) è riportato in `nazione` e `codice_nazione_iso_2`; ISO3 e ISO4 (`codice_nazione`, `codice_nazione_poste`) sono ricavati dal servizio `ce-anagrafica`, come nella catena esistente. Le risposte di `ce-anagrafica` sono riutilizzate per lo stesso codice paese per un periodo limitato. Se `ce-anagrafica` non risponde il tracciato viene pubblicato comunque: per l'Italia con le codifiche italiane (`ITA`, `ITA1`), per gli altri paesi con il solo ISO2. In quest'ultimo caso la validazione a valle rifiuta il mittente estero per codice nazione mancante.
 - La consegna senza firma deriva dal tipo di consegna EURODIS (`deliveryType` `S` → `no_firma` `"N"`, `N` → `"S"`).
 - Le note di consegna sono la concatenazione delle note del destinatario e del mittente.
 - Sono costanti: `flag_stampa_ldv` = `"N"`, `flag_attivazione_ritiro` = `"N"`, `internazionale.vettore` = `"EURODIS"`.
@@ -328,9 +330,11 @@ Una spedizione ha al massimo un servizio di consegna, combinabile con contrasseg
 
 I valori `D` (giorno), `7` (domenica) e `T` (giorno e orario definito, senza codice APT) non hanno una traduzione: il loro trattamento è DA DEFINIRE (Open Point 15). Si propone di non valorizzare l'assicurazione (Open Point 27), il reso (Open Point 28) e i flag di preavviso (Open Point 29).
 
+Le spedizioni con merci pericolose (ADR) sono escluse dal perimetro (esclusione 18): i dati `hazardousADRServices` e `hazardousCollis` non vengono trasformati. Anche i dati di dogana (`customsService`) non vengono riportati nel tracciato (Open Point 36).
+
 ### Cliente, prodotto e arricchimento
 
-Del cliente si valorizzano codice login, id cliente e codice AUC (uguali al codice cliente EURODIS), contratto, `centro_costo` e `rif_prodotto_cliente`, presi dalla configurazione del microservizio per ambiente, senza consultare F1; la ragione sociale del cliente coincide con quella del mittente. I valori sono DA DEFINIRE (Open Point 30). In assenza di `rif_prodotto_cliente`, il prodotto viene determinato a valle (in `ce-dichiarato-ldv-pdb` il prodotto di default è `APT000901`).
+Del cliente si valorizzano codice login, id cliente e codice AUC (uguali al codice cliente EURODIS), contratto, `centro_costo` e `rif_prodotto_cliente`, presi dalla configurazione del microservizio per ambiente, senza consultare F1; la ragione sociale del cliente coincide con quella del mittente. I valori sono gli stessi che la catena esistente usa per il flusso EURODIS via file (canale `EUD_INVIOFILE`); resta da confermare che valgano anche in produzione (Open Point 30). In assenza di `rif_prodotto_cliente`, il prodotto viene determinato a valle (in `ce-dichiarato-ldv-pdb` il prodotto di default è `APT000901`).
 
 ### Messaggi non trasformabili
 

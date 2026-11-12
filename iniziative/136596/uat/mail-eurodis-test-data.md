@@ -4,7 +4,7 @@ Hi,
 
 in order to run our acceptance tests on `GET /shipments/v1`, could you generate on the TEST environment one shipment for each scenario below? Please send us the mapping *scenario ID → `edReference`* (and the parcel barcodes for multi-parcel scenarios).
 
-Common rules: fictitious data only; `consigneeAddress` always complete with `countryCode` = IT; `shipperAddress` complete; `deliveryPartnerBarcode` filled on every parcel; `numberOfHandlingUnits` = number of `collis`; `entranceTimestamp` filled; `deliveryType` = `S`; unless the scenario says otherwise.
+Common rules: fictitious data only; `consigneeAddress` always complete with `countryCode` = IT; `shipperAddress` complete; `deliveryPartnerBarcode` filled on every parcel; `numberOfHandlingUnits` = number of `collis`; `entranceTimestamp` filled; `deliveryType` = `S`; no hazardous goods data (`hazardousADRServices`, `hazardousCollis` empty); unless the scenario says otherwise.
 
 | ID | Scenario | What the payload must contain | Qty |
 |---|---|---|---|
@@ -50,15 +50,11 @@ Common rules: fictitious data only; `consigneeAddress` always complete with `cou
 | S43 | Multi-parcel, first europlate missing | 3 parcels, first europlate empty | 1 |
 | S44 | Multi-parcel, no barcodes | 3 parcels, consignor and europlate barcodes empty | 1 |
 | S45 | No `entranceTimestamp` | `entranceTimestamp` absent, `clearanceTimestamp` filled | 1 |
-| **G – Customs and hazardous goods** | | | |
+| **G – Customs** | | | |
 | S60 | Customs data | `customsService` filled, 500.00 EUR, shipper outside the EU, consignee in Italy | 1 |
 | S61 | Customs, other currency | as S60 with CHF | 1 |
-| S62 | Hazardous goods, single parcel | `hazardousADRServices` (1 element) and `hazardousCollis` (1 element) filled | 1 |
-| S63 | Hazardous goods, multi-parcel | 3 parcels, 2 ADR elements, 3 `hazardousCollis` | 1 |
-| S64 | Hazardous goods + customs | S62 + `customsService` | 1 |
-| S65 | Hazardous goods + COD | S62 + COD | 1 |
 
-**Total: 48 shipments.**
+**Total: 44 shipments.**
 
 **Optional – anomalous data** (we can simulate them on our side; please generate only if the TEST environment allows it):
 
@@ -81,7 +77,7 @@ Common rules: fictitious data only; `consigneeAddress` always complete with `cou
 
 1. Are `deliveryService` `W`, `D`, `7`, `T` sent in production, and with which meaning? (S15, S17)
 2. Is delivery to a pick-up point (`Z` + `pudoID`) in scope, and which field carries the name of the point? (S19, S37)
-3. For customs and hazardous goods (section G): which fields are always filled for shipments to Italy, and which values are admitted?
+3. For customs (section G): which fields are always filled for shipments to Italy?
 4. `GET /shipments/v1` on TEST always returns the same data: can the set above be consumed once and regenerated on request?
 5. Please confirm that the re-read `GET /shipment/{edReference}/v1` works on TEST for these shipments.
 6. Please confirm that the timestamps use the same time zone as the existing file exchange.

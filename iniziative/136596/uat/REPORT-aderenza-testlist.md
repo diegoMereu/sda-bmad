@@ -47,7 +47,7 @@ del validatore (le specifiche non la dicono).
 ### 3.3 Scenari su perimetro dubbio (superato: vedi 4ter)
 - Dipendono da dati non presenti o non mappati: C002, C003 (shipment type), C008 (preavviso RT_65, non
   mappato per l'Open Point 29 della SF).
-- ADR, non mappato dal mapper (SF Open Point 18): C017, C039, C042, C046.
+- ADR, non mappato dal mapper (SF Open Point 18): C017, C039, C042, C046 (eliminati; ADR fuori perimetro dal 12-11, vedi 4quater).
 - Punto Poste, fuori fase 1 nel mapper: C010, C021.
 - Sono già marcati nel testo "DA DECIDERE se tenere la catena": da spostare in una sezione "fuori
   perimetro / in attesa di decisione".
@@ -100,9 +100,16 @@ Il giro md → xlsx → md è ancora identico; il file Excel non è stato rigene
 
 ## 4bis. Scenari aggiunti (2026-11-11)
 
-C086-C091: dogana (`customsService`, EUR e CHF) e merci pericolose ADR (monocollo, multicollo, con dogana, con contrassegno),
-catena completa come C001. Sono test di osservazione: mapper e ICD non coprono questi dati (PA-13), l'atteso
-va riconfermato dopo la decisione sul mapping. I dati li genera EURODIS (`eurodis-test-scenarios-en.md`, sezione G, S60-S65).
+C086-C087: dogana (`customsService`, EUR e CHF), catena completa come C001. Sono test di osservazione: mapper e ICD non coprono
+questi dati (PA-13), l'atteso va riconfermato dopo la decisione sul mapping. I dati li genera EURODIS
+(`eurodis-test-scenarios-en.md`, sezione G, S60-S61).
+
+## 4quater. ADR fuori perimetro (2026-11-12)
+
+Chiapponi conferma che le merci pericolose (ADR) non sono gestite. Eliminati C088-C091 (ADR monocollo, multicollo,
+con dogana, con contrassegno; gli ID non sono riusati) e, nella richiesta dati a EURODIS, S62-S65 (totale da 48 a 44
+spedizioni; `hazardousADRServices` e `hazardousCollis` sempre vuoti). Dogana (C086-C087) e contrassegno restano coperti.
+Excel rigenerato con `md2xlsx.py` (614 casi, 88 scenari; giro md → xlsx → md identico): le tendine vanno ricontrollate in Excel.
 
 ## 4ter. Revisione del 2026-11-11 (regole VR-xx, scenari non mappati)
 
@@ -141,7 +148,7 @@ di `PDB_INVIOSYSTEM`). Catena a 5 fasi come i vecchi KO; atteso: `PREAD_EMESSO` 
 - C007: marcato "DA CONFERMARE", perché la SF prevede l'adeguamento ai limiti BEP mentre le regole rifiutano civico > 4 e località > 30.
 - Corretto `ST_R000?` in `ST_R0003` e la nota su Mongo (il validatore scrive `dichiarato_events` e `preadvising_history`).
 
-**Non mappato = osservazione** (stesso razionale di ADR): C002, C003 (`shipmentTypeIndicator` C e X), C008 (`consigneePreAdvice`),
+**Non mappato = osservazione** (stesso razionale usato per ADR, poi uscito dal perimetro): C002, C003 (`shipmentTypeIndicator` C e X), C008 (`consigneePreAdvice`),
 C010, C021 (Punto Poste) diventano test di osservazione: atteso "dato non mappato, spedizione ordinaria", da riconfermare dopo la decisione sul mapping.
 Nota di correzione: `shipmentTypeIndicator` è nel payload API (C = B2C, X = AUX-Pan); il testo precedente lo dava per assente.
 

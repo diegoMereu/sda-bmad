@@ -7,6 +7,7 @@
 I tre microservizi sono implementati su `develop` (`-in` su PostgreSQL con eventi di stato, mapper con il tracciato completo, send-tracking con la traduzione degli stati), ma nessuno è stato ancora avviato in svil: le DDL di PostgreSQL sono state eseguite, manca il deploy. Restano da chiarire con EURODIS errori e rifiuti, rimando dei dati e `deliveryPartnerBarcode`. Go-live atteso a fine gennaio 2027.
 
 ## Fatto dall'ultimo punto
+- 2026-11-12 — **ADR non gestiti** (conferma di Chiapponi): tolti dalla test list UAT (C088-C091) e dalla richiesta dati a EURODIS (S62-S65, ora 44 spedizioni); Excel della test list rigenerato. Registrato in `assunzioni.md` (AS-D12), PA-13 e SF 0.5 (esclusione 18, Open Point 36 sulla dogana); la SF recepisce anche i dati cliente e i codici nazione del mapper 0.5.
 - 2026-11-10 — **DDL PostgreSQL eseguite dal DBA** (database `ce_eud_api_in`, script di `sql/ddl/` di `-in`), secondo Diego.
 - 2026-11-10 — **Sviluppo completato sui tre repository** (`develop`, push con bypass della regola "solo pull request"):
   - `-in`: persistenza da Mongo a **PostgreSQL** (JDBC, script DDL in `sql/ddl/`, secret `ce-postgres` di `ce-db-sync`), file fittizio per scarico con eventi `ST_F0002`/`ST_F0005` su `preadvising.evensource` e header `idFile`, cron 10 min in prod e 2 altrove; 74 test verdi (`1c1e79b`…`b012d89`). Al commit `bd33e8a` `develop` non compila (riparato in `9acdd77`).

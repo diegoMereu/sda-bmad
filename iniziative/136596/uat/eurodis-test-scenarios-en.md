@@ -1,6 +1,6 @@
 # SDA – EURODIS Autoproduttore: test data request
 
-**Status**: DRAFT for review before sending · **Version**: 0.3 · **Date**: 2026-11-11
+**Status**: DRAFT for review before sending · **Version**: 0.4 · **Date**: 2026-11-12
 **Audience**: EURODIS (test data generation on the `receive-pan` TEST environment)
 **Scope**: shipments returned by `GET /shipments/v1` (`GetShipmentResponse2`)
 
@@ -29,7 +29,8 @@ All data must be **fictitious**: no real names, addresses, phone numbers, e-mail
 | `entranceTimestamp` | Filled, unless the scenario says otherwise. |
 | `deliveryService.deliveryType` | `S`, unless the scenario says otherwise. |
 | `shipmentTypeIndicator`, `lineHaulIndicator` | `N` / `N`, unless the scenario says otherwise. |
-| `customsService`, `hazardousADRServices`, `hazardousCollis` | Empty, except in section G. |
+| `customsService` | Empty, except in section G. |
+| `hazardousADRServices`, `hazardousCollis` | Always empty: hazardous goods (ADR) are not handled by SDA. |
 | Not used in these tests | Insurance, return shipments. Please leave them empty. |
 
 ## 3. Scenarios
@@ -96,16 +97,12 @@ All data must be **fictitious**: no real names, addresses, phone numbers, e-mail
 | S44 | Multi-parcel, no consignor/europlate barcodes | 3 parcels with both `consignorsColloBarcode` and `europlateBarcode` empty. | 1 |
 | S45 | No `entranceTimestamp` | `entranceTimestamp` absent, `clearanceTimestamp` filled. | 1 |
 
-### G – Customs and hazardous goods (ADR)
+### G – Customs
 
 | ID | Scenario | What the payload must contain | Qty |
 |---|---|---|---|
 | S60 | Customs data | `customsService`: `commercialValueOfGoods` 500.00, `currency` `EUR`, `dutyCode`, `sign`, `number`, `descriptionOfGoods` filled. Shipper outside the EU (e.g. `CH`), consignee in Italy. | 1 |
 | S61 | Customs data, other currency | As S60 with `currency` = `CHF`. | 1 |
-| S62 | Hazardous goods, single parcel | `hazardousADRServices` with one element (`unNumber`, `packingGroup`, `transportCategory`, `tunnelLimitationCode`, `adrGrossWeight`, `materialDescription`, `technicalName`, `identifierMassOrVolume`); `hazardousCollis` with one element. | 1 |
-| S63 | Hazardous goods, multi-parcel | 3 parcels; `hazardousADRServices` with two elements; `hazardousCollis` with three elements. | 1 |
-| S64 | Hazardous goods + customs | S62 data plus `customsService` as in S60. | 1 |
-| S65 | Hazardous goods + COD | S62 data plus `cashOnDeliveryService` (cash). | 1 |
 
 ### F – Anomalous data (optional)
 
@@ -137,7 +134,7 @@ environment allows it; otherwise ignore this section.
 |---|---|
 | 1 | `deliveryService` `W`, `D`, `7`, `T`: are these values really sent to SDA in production, and with which meaning? (S15, S17) |
 | 2 | Delivery to a pick-up point (`Z` + `pudoID`): is it in the scope of the first release? Which field carries the name of the pick-up point? (S19, S37) |
-| 3 | Customs and hazardous goods (section G): which of the fields are always filled in production for shipments to Italy, and which values are admitted (e.g. `packingGroup`, `transportCategory`)? |
+| 3 | Customs (section G): which of the fields are always filled in production for shipments to Italy? |
 | 4 | Repeated `GET /shipments/v1` on TEST returns always the same data: can the set above be consumed once and then re-generated on request (for repetitions)? |
 | 5 | Re-read of a shipment (`GET /shipment/{edReference}/v1`): we will use it in the recovery tests, please confirm it works on TEST for the shipments above. |
 | 6 | Time zone of the timestamps: same as the existing file exchange. Please confirm. |

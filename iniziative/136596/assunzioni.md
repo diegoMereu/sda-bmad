@@ -28,7 +28,7 @@ Legenda stato: `proposta` · `concordata` · `confermata da EURODIS` ·
 | AS-D09 | Produzione | confermata da EURODIS | si cambia endpoint e chiave |
 | AS-D10 | Payload di produzione | **cambiata** il 10-11 | la LDV è in `deliveryPartnerBarcode`, non in `consignorsColloBarcode`; `entranceTimestamp` e `consigneeAddress` in verifica con EURODIS |
 | AS-D11 | Volumi e frequenza | da verificare | i volumi li ricaviamo noi dal flusso FTP |
-| AS-D12 | Dogana e ADR | risposta di EURODIS | nel perimetro dell'interfaccia |
+| AS-D12 | Dogana e ADR | ADR chiusa il 12-11 | ADR non gestiti (Chiapponi); dogana nell'interfaccia, gestione da decidere |
 | AS-D13 | Rollout incrementale | risposta di EURODIS | ibrido, passo per passo; call da fare |
 
 **Temi per la call proposta da Chiapponi**: come si chiede il rimando dei dati
@@ -445,10 +445,16 @@ riceverà solo via API; i volumi SDA li conosce meglio di loro.
 
 ## AS-D12 — Dogana e ADR (domanda 12; PA-13)
 
-**Stato**: risposta di EURODIS; implicazioni da decidere
+**Stato**: ADR chiusa (12-11, non gestiti); dogana da decidere
 
 **Risposta EURODIS**: sì, sono parte dell'interfaccia. Le stesse informazioni
 dell'FTP sono disponibili nell'API.
+
+**Conferma di Chiapponi (12-11)**: gli ADR (merci pericolose) **non sono
+gestiti**. Conseguenze: `hazardousADRServices` e `hazardousCollis` non si
+mappano; gli scenari ADR sono tolti dalla test list UAT (C088-C091) e dalla
+richiesta dati a EURODIS (S62-S65). Resta aperto cosa fare se una spedizione
+arriva comunque con dati ADR (oggi il mapper li ignora).
 
 **Fatti**
 - A03.2 §6 elenca campi di dogana e ADR (descrizione merce, codice dazio, valore
