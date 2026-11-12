@@ -65,3 +65,16 @@ indirizzi reali di luoghi pubblici, resto inventato, `idFile` `acadddc6-…`) e 
 
 Mapper corretto su `develop` `05720e6` (DEF-004, DEF-005; supera il ripiego ISO3 di `a7544a1`).
 Smistatore e TC-025: non verificabili finché un tracciato EURODIS non arriva su `completed`.
+
+## RUN-136596-20261112T130500Z — send-tracking (develop 984aeee rilasciato in svil)
+
+**Tipo**: verifica preliminare, nessun evento prodotto · **Esito**: ⛔ bloccato.
+
+| Verifica | Esito | Evidenza |
+|---|---|---|
+| Consumer su `PACCHI.TRACKING` | ❌ | gruppo `ce-eurodis-send-tracking-group` in stato **Dead**, 0 membri, nessun offset committato (Kafka admin, sola lettura). `PACCHI.TRACKING` in svil: 1 partizione, ~257.600 messaggi; gli altri consumer (`ce-pacchi-tracking-consumer`, `ttsda-*`) sono Stable. Il nome del gruppo coincide con la configurazione (`KAFKA_CONSUMER_GROUP`) e il consumer è abilitato in `deploy-svil` → il servizio non è collegato a Kafka |
+| LDV del giro precedente su Mongo `dichiarato_events` | ⛔ | Mongo non raggiungibile dalla postazione. `9900000000001001`, `…003001`, `…005001`, `…006001` sono passate dal validatore (che salva il tracciato all'emissione), quindi dovrebbero esserci, con canale `EUD_INVIOSYSTEM`; nessuna è arrivata a `completed` (BEP KO) |
+| Log JSON e metriche `eurodis_tracking_*` | ⛔ | il servizio non ha route (`route.enabled: false`) e le metriche sono sulla porta interna 8091; serve accesso al pod (`oc`) o a Datadog |
+
+Nessun evento prodotto su `PACCHI.TRACKING`: con il consumer fermo e `auto-offset-reset` a `latest` verrebbero
+saltati all'avvio e resterebbero sul topic condiviso. → [BLOCCO-136596-003](triage/BLOCCO-136596-003.yaml)

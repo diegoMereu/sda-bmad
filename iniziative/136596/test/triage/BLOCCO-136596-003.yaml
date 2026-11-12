@@ -1,0 +1,14 @@
+id: BLOCCO-136596-003
+iniziativa: "136596"
+campagna: e2e-eurodis-svil
+tipo: ambiente / rilascio
+stato: aperto
+titolo: ce-eurodis-send-tracking in svil non consuma PACCHI.TRACKING (consumer group Dead) e i suoi log e metriche non sono raggiungibili
+osservato: >
+  12-11, dopo il rilascio di develop 984aeee: il gruppo ce-eurodis-send-tracking-group e' Dead, senza membri
+  e senza offset. Configurazione svil coerente (topic PACCHI.TRACKING, gruppo, consumer e invio abilitati).
+cause_possibili: pod non partito o in crash; autenticazione SASL/SCRAM fallita (secret ce-eurodis-send-tracking-secret, chiavi kafka-scram-*); utente SCRAM senza permesso READ su PACCHI.TRACKING o sul gruppo; connessione a Mongo (mongo-string-connection) che impedisce l'avvio.
+serve: >
+  Stato e log del pod ce-eurodis-send-tracking in svil (oc logs) e accesso a log e metriche (oc o Datadog)
+  per verificare gli esiti dei TC-030..039, che non hanno un topic di uscita.
+responsabile: Diego / piattaforma
