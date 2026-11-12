@@ -69,15 +69,15 @@ Prima di questo commit il progetto non aveva test.
 
 ## Da confermare
 
-1. **Filtri sulla riga.** `flag_porting_hub` e `booking_channel` non sono usati come filtri: va
-   chiarito se una riga di `sfa_postazioni_ou` vale solo con un certo valore, come `cap.flag_attivo = 'S'`
-   per `cen`.
-2. **Tipo seme.** La ricerca per seme senza tipo è corretta solo se `id_seme_ldv` è univoco in
-   `sfa_postazioni_ou`, o se lo è almeno la riga più recente.
+1. **Filtri sulla riga.** ✅ Deciso (Diego, 12-11): `flag_porting_hub` e `booking_channel` non
+   filtrano le righe. Il comportamento implementato è già questo.
+2. **Tipo seme.** ✅ Risposta di Diego (12-11): "ci sono sempre entrambi", cioè seme e tipo seme sono
+   sempre presenti. La ricerca in `sfa_postazioni_ou` resta per `id_seme_ldv`, con la riga più recente
+   per `data_ins` in caso di più righe.
 3. **Join su `cen_anagrafica`.** `cen_anagrafica.id_anagrafico` usa lo stesso formato OU… di
    `sfa_postazioni_ou.id_anagrafico`? Se no, ragione sociale e partita IVA restano vuote, e si
    potrebbe usare `piva_cfisc`.
 4. **Campi vuoti.** I campi senza corrispondente, in particolare `idClienteE2`, `codIndMittE2` e
    `idFiliale`, servono a valle per le postazioni PDB? Se sì, va indicato da dove si ricavano.
-5. **Permessi.** L'utente del database di `ce-vendite` deve poter leggere `sfa_postazioni_ou`
-   (`SELECT`) in svil, collaudo e produzione.
+5. **Permessi.** ✅ Confermato (Diego, 12-11): l'utente del database di `ce-vendite` può leggere
+   `sfa_postazioni_ou` in tutti gli ambienti.
