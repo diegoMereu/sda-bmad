@@ -1,0 +1,211 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wiremock-config
+data:
+  shipments.json: |
+    {
+      "request": {
+        "method": "GET",
+        "urlPath": "/receive-pan/shipments/v2"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": [
+          {
+            "edReference": 7319003746401,
+            "referencedEurodisShipmentNumber": 1234567890123,
+            "initiatingPartnerId": 1,
+            "shipmentTypeIndicator": "N",
+            "lineHaulIndicator": "L",
+            "clearanceTimestamp": "2024-03-29T00:00:00",
+            "entranceTimestamp": "2024-03-29T06:53:55",
+            "numberOfHandlingUnits": 1,
+            "shipmentWeight": 15,
+            "consignorsCustomerNumberAtDispatchPartner": "933499999",
+            "consignorsReference": "30151111",
+            "dispatchPartnersDomesticShipmentNumber": "30151111",
+            "truckLicensePlate": "LK 773319",
+            "termsOfDeliveryText": "EXW",
+            "routingCode": "M2012",
+            "shipmentFlexField1": null,
+            "shipmentFlexField2": null,
+            "shipmentFlexField3": null,
+            "shipmentFlexField4": null,
+            "consigneeAddress": null,
+            "returnAddress": {
+              "contactName": "Erika Mustermann",
+              "additionalAddressInfo2": "Additional Info 1",
+              "pudoID": "PARCEL-STATION-DE-57518-STEINEROTH",
+              "contactTelephone": "+990000000001",
+              "alternativeContactTelephone": "+990000000002",
+              "contactSMS": "+880000000002",
+              "contactEMail": "e.mustermann@muster-company.de",
+              "companyName": "Muster Company",
+              "additionalAddressInfo1": "Additional Info 1",
+              "street": "Demo street",
+              "streetNumber": "1",
+              "region": "",
+              "city": "Berlin",
+              "zipcode": "12345",
+              "countryCode": "DE",
+              "additionalConsigneeInfo": "",
+              "gatewayAssigned": "GET"
+            },
+            "shipperAddress": null,
+            "remunerationAddress": null,
+            "bookingInAddress": null,
+            "deliveryService": {
+              "deliveryService": "Z",
+              "deliveryType": "B",
+              "secureDeliveryId": "1234567890",
+              "deliveryBookInRequired": false,
+              "deliveryTimeWindowStart": "08:00:00",
+              "deliveryTimeWindowEnd": "18:00:00",
+              "deliveryDateWindowStart": "2024-04-01",
+              "deliveryDateWindowEnd": "2024-04-03",
+              "completeDeliveryOnly": true,
+              "additionalNotification": false
+            },
+            "cashOnDeliveryService": {
+              "iban": "AA1234567890123456789012",
+              "bic": "ABCDEFGI",
+              "accountHolder": "INTIME",
+              "paymentReason": "9990000000001",
+              "paymentReference": "9990000000001",
+              "amount": 1111.5,
+              "currency": "EUR",
+              "identifierForCODCollection": 3
+            },
+            "customsService": {
+              "commercialValueOfGoods": 1000.5,
+              "currency": "EUR",
+              "dutyCode": "9876543210",
+              "sign": "AA11-00001",
+              "number": 0,
+              "descriptionOfGoods": "FORSCHUNGSCHEMIKALIE"
+            },
+            "hazardousADRServices": [
+              {
+                "billOfDanger": "8",
+                "additionalBillOfDanger1": "61",
+                "additionalBillOfDanger2": "0",
+                "additionalBillOfDanger3": "0",
+                "tunnelLimitationCode": "C/D",
+                "packingGroup": 1,
+                "adrGrossWeight": 10,
+                "unNumber": "1831",
+                "transportCategory": "1",
+                "materialDescription": "SCHWEFELSAEURE, RAUCHEND",
+                "technicalName": "(EPOXYDHARZ)",
+                "identifierMassOrVolume": "kg"
+              }
+            ],
+            "consigneePreAdvice": {
+              "smsPreAdvice": false,
+              "eMailPreAdvice": false,
+              "telephonePreAdvice": false
+            },
+            "collis": [
+              {
+                "identifierPalletOrCollo": "C",
+                "weightOfUnit": 15,
+                "boxType": "8",
+                "boxDimensionCategory": "A",
+                "boxId": "99887766551",
+                "europlateBarcode": "123459000003770904301090",
+                "referencedEuroplateBarcode": "123456789012345678901234",
+                "volumetric": null,
+                "consignorsColloBarcode": "",
+                "length": 33,
+                "width": 44,
+                "height": 55,
+                "volumetricWeight": null,
+                "deliveryPartnerBarcode": "JVGTCRDS0000000000014",
+                "dispatchPartnerBarcode": "51200000225059136400000031001",
+                "pudoOpeningCode": "1234",
+                "colloFlexField1": null,
+                "colloFlexField2": null,
+                "colloFlexField3": null
+              }
+            ],
+            "hazardousCollis": [
+              {
+                "numberOfParcelType": 1,
+                "explanationOfParcelType": "Druckgefaess"
+              }
+            ]
+          }
+        ]
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wiremock-mock
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wiremock-mock
+  template:
+    metadata:
+      labels:
+        app: wiremock-mock
+    spec:
+      containers:
+        - name: wiremock
+          image: wiremock/wiremock:3.13.2-2
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /__admin/health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /__admin/health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 100m
+            limits:
+              memory: 512Mi
+              cpu: 500m
+          volumeMounts:
+            - name: wiremock-config
+              mountPath: /home/wiremock/mappings
+              readOnly: true
+      volumes:
+        - name: wiremock-config
+          configMap:
+            name: wiremock-config
+            items:
+              - key: shipments.json
+                path: shipments.json
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wiremock-mock
+spec:
+  type: ClusterIP
+  selector:
+    app: wiremock-mock
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
