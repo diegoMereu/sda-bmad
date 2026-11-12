@@ -1,11 +1,11 @@
 # `ce-eurodis-send-tracking` — Documento funzionale per lo sviluppo
 
-**Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.2 (bozza) · **Data**: 2026-11-10
+**Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.3 (bozza) · **Data**: 2026-11-12
 **Autrice**: Mary (analyst) · **Destinataria**: Amelia (dev) e team di sviluppo
 **Repository**: https://posteitaliane.ghe.com/SVILUPPO/CORRIERE-ESPRESSO_PREADVISING_ce-eurodis-send-tracking (branch `develop`, allineato anche `feature/eurodis-base-implementation`)
 **Implementazione** (10-11): client EURODIS `4cba024`, traduzione degli stati IN-BOUND `591767d`; 143 test verdi. Formato della traccia SDA in ingresso (`TracciaSda`) proposto da Amelia in attesa della sorgente (PA-35); `1100` senza `acceptorName` scartato in locale (AC-10).
 **Generato da**: [prompt-ce-eurodis-send-tracking.md](prompt-ce-eurodis-send-tracking.md)
-**Fonte principale**: [eurodis-send-tracking-swagger-v1.json](../eurodis-send-tracking-swagger-v1.json) (scaricato il 05-11)
+**Fonti**: [eurodis-send-tracking-swagger-v1.json](../eurodis-send-tracking-swagger-v1.json) (scaricato il 05-11); [A032 API Data interchange.pdf](../documenti/eurodis/A032%20API%20Data%20interchange.pdf) (EURODIS, annex A03.2, 12-03-2026, cap. 5.3); [Elenco codici status.xlsx](../documenti/eurodis/Elenco%20codici%20status.xlsx) e la versione markdown [elenco-codici-status-inbound.md](../documenti/eurodis/elenco-codici-status-inbound.md); [analisi-pacchi-tracking-prod-2026-11-12.md](../analisi-pacchi-tracking-prod-2026-11-12.md) (Fenaroli/Mary)
 
 Etichette usate nel documento:
 - **[FATTO]**: scritto nello swagger EURODIS; la fonte è indicata.
@@ -19,6 +19,14 @@ Etichette usate nel documento:
 > Sorgente degli eventi SDA, persistenza e job (sezioni 3.2, 3.3, 4 e 6) sono **DA DECIDERE**. Finché non si decidono non si scrivono consumer né scheduler.
 >
 > **10-11**: la **traduzione degli stati SDA nei codici EURODIS è decisa** (Diego): file `Elenco codici status.xlsx`, foglio "Decodifica Eurodis IN-BOUND" (sezione 3.4). Si può implementare subito come tabella, indipendente dalla sorgente.
+>
+> **12-11, versione 0.3 (Mary)**: **la sorgente è decisa**: `PACCHI.TRACKING` (sezione 3.2), con tre
+> filtri. Il terzo filtro (l'evento riguarda una spedizione EURODIS) si fa **oggi** cercando l'LDV nel
+> MongoDB del preadvising (`dichiarato_events`) con canale `EUD_INVIOSYSTEM`, **domani** con la regola
+> di sintassi delle LDV EURODIS (DF-29). La tabella degli status da inviare è sovrascrivibile da
+> ConfigMap (TR-01). Esempi di eventi in ingresso e di eventi EURODIS attesi: sezione 3.6. Nuove regole
+> RF-13…RF-26, casi di scarto (7.3), criteri AC-17…AC-30, punti aperti V-01…V-06 (sezione 12).
+> L'architettura (consumer, cache, storico, job, DDL, Helm) la ricava Winston nella sezione 14.
 
 ---
 
@@ -141,28 +149,95 @@ Note sullo swagger:
 
 **Idempotenza** [FATTO, per assenza]: non c'è chiave di idempotenza né un endpoint per leggere gli eventi già creati. Una POST ripetuta dopo una risposta persa **può creare un evento doppio**. Se EURODIS scarti i doppioni (stesso `edReference`/barcode, `eventCode`, `eventTimestamp`) è una domanda (ST-07).
 
-### 3.2 In ingresso: eventi di tracciatura SDA [DA DECIDERE]
+### 3.2 In ingresso: eventi di tracciatura SDA da `PACCHI.TRACKING` [DECISO 12-11]
 
-Non sappiamo ancora da dove arrivano le tracce SDA delle LDV EURODIS né in che formato (PA-07, ST-02). Candidati da verificare:
-- un topic dedicato, per esempio `preadvising.eud.send-tracking` (il nome già messo da azzurrazezza in `application.yaml`), alimentato da chi possiede il tracking SDA;
-- un topic o archivio del tracking SDA esistente (track & trace), filtrato sulle LDV EURODIS.
+**[DECISO 12-11, Diego]** La sorgente è il topic Kafka **`PACCHI.TRACKING`** (opzione A della 3.5,
+chiude PA-35). In produzione porta gli status SDA del foglio IN-BOUND con `header.applicativo = CE`
+(9,85 milioni di eventi `CE` in 24 ore, 65 dei 76 status del foglio: analisi di Fenaroli del 12-11).
 
-**Default per lo sviluppo**: nessun consumer. Il client ha un'interfaccia Java chiara, così che il consumer, quando la sorgente è decisa, la chiami senza toccare il client.
+**Forma dell'evento** [FATTO, analisi del 12-11 e campioni svil del 10-11; nessun dato personale]:
 
-**Verifica sui topic Kafka di svil del 10-11 e proposta**: sezione 3.5. In sintesi: `preadvising.eud.send-tracking` non esiste; i topic di tracking con traffico sono della rete pacchi Poste e non portano gli status SDA; i candidati SDA (`CE-TRACKING-EVENTTUP`, `PSDA-*.EVENTTT.ESITO*`) sono vuoti in svil.
+```json
+{
+  "header":  { "applicativo": "CE", "timestamp": "2026-11-12 10:15:02.123" },
+  "payload": { "canale": "PDT", "status": "GGG", "ldv": "<LDV SDA>", "dataTrack": "2026-11-12 10:14:40",
+               "faseLavorazione": "...", "arealavorazione": "...", "tipologiaUfficioEvento": "...",
+               "idFrazionarioEvento": "...", "idFrazionarioMittente": "...", "idFrazionarioDestinazione": "...",
+               "mazzetto": "...", "tipologiaMazzetto": "...", "numTentativiDiConsegna": "1" }
+}
+```
 
-### 3.3 Persistenza e correlazione [DA DECIDERE]
+| Campo | Uso | Note |
+|---|---|---|
+| `header.applicativo` | filtro 1 | solo `CE` (Corriere Espresso SDA, [IPOTESI forte] da confermare con SDA) |
+| `header.timestamp` | solo log | non fa fede per EURODIS |
+| `payload.status` | filtro 2 e traduzione (3.4) | 3 caratteri |
+| `payload.ldv` | filtro 3 e `deliveryPartnerBarcode` dell'evento EURODIS | è la LDV PDB Express che EURODIS ci manda in `deliveryPartnerBarcode` (mapper 0.4) |
+| `payload.dataTrack` | `eventTimestamp` | `yyyy-MM-dd HH:mm:ss`, ora locale italiana [IPOTESI, V-04] |
+| `payload.idFrazionarioEvento` | `locationCode` (RF-21) | [DA DECIDERE, ST-04] |
+| `payload.canale` | **non si usa** | per `CE` è `HUB`, `PDT`, `DOL`, `MAN` o assente: il filtro non deve dipendere dal canale |
+| altri campi | non si usano | |
 
-Proposta, da confermare quando si decide la sorgente:
-- **Correlazione LDV → spedizione EURODIS** (ST-03). Per tradurre un evento SDA (per LDV) in un evento EURODIS servono `edReference` e il barcode del collo. Si possono ricavare:
-  - dal JSON della spedizione salvato da `-in` in `eurodis_spedizioni` (oggi senza indice sui barcode);
-  - oppure da un indice LDV → (`edReference`, `europlateBarcode`) che il mapper scrive quando pubblica.
-  - Decide l'Architect.
-- **Storico degli invii**: collezione `eurodis_tracce` con un documento per evento. Contiene:
-  - evento SDA di origine ed evento EURODIS inviato;
-  - stato (sezione 6), tentativi, codici di errore e warning EURODIS;
-  - istante di invio.
-  - Serve per audit, ripresa e per non reinviare un evento già creato.
+- **Chiave Kafka**: in svil i messaggi non hanno chiave; in produzione non è stata letta (V-03).
+- **Volumi**: ~275 eventi/s su tutto il topic in produzione, ~114/s `CE`. Dopo i filtri 1 e 2 restano
+  ~5,8 milioni di eventi al giorno (~67/s).
+- **Svil**: `PACCHI.TRACKING` ha solo traffico della rete pacchi Poste (`TT`), nessun evento `CE`:
+  in svil gli eventi si costruiscono (sezione 3.6, test integrati). Collaudo: V-05.
+
+**Filtri, nell'ordine dal più leggero** (RF-13…RF-16):
+
+1. `header.applicativo` deve essere `CE` (scarta ~58% del traffico);
+2. `payload.status` deve essere fra gli status abilitati della tabella 3.4 (TR-01, TR-03): scarta
+   ~40% degli eventi `CE` (per esempio `THE`, `SCP`);
+3. `payload.ldv` deve appartenere a una spedizione EURODIS autoproduttore:
+   - **oggi [DECISO 12-11, Diego]**: l'LDV è presente nel MongoDB del preadvising, collezione
+     `dichiarato_events`, in `spedizione.collo.id_ldv`, e il documento ha `canale = EUD_INVIOSYSTEM`
+     (sezione 3.3);
+   - **domani [DA DECIDERE, DF-29]**: l'LDV si riconosce dalla sua sintassi (regola di validità delle
+     LDV generate da EURODIS, da SDA/Marzilli), senza lookup.
+
+Solo gli eventi che superano i tre filtri si traducono, si salvano nello storico e si inviano.
+
+### 3.3 Correlazione con la spedizione EURODIS e storico [DECISO 12-11]
+
+**Dove si cerca l'LDV (filtro 3) [DECISO 12-11, Diego]**: nel MongoDB del preadvising.
+
+- **Collezione**: `dichiarato_events` [FATTO, codice]. La scrive `ce-dichiarato-validatore`
+  (`FlussoHandler`: storicizza il tracciato unico con `stato`); la legge già `ce-dichiarato-adapter`
+  per gli esiti di fase 2 (`PreadvisingEventsRepository.findFirstByColloIdLdv`, query
+  `{'spedizione.collo.id_ldv': <ldv>}`).
+- **Connessione**: stessa stringa dell'adapter e del validatore, variabile `MONGO_STRING_CONNECTION`
+  dal secret `ce-dichiarato-validatore-secret`, chiave `mongo-string-connection`. Solo lettura.
+- **Documento** (un tracciato unico per `_id` = `id_preadvising`): campi usati
+
+| Campo Mongo | Uso nell'evento EURODIS |
+|---|---|
+| `canale` | deve essere `EUD_INVIOSYSTEM` |
+| `spedizione[].collo[].id_ldv` | deve contenere `payload.ldv` (è il `deliveryPartnerBarcode` ricevuto da EURODIS) |
+| `spedizione[].rif_spedizione` | `edReference` (il mapper vi scrive `edReference` normalizzato) |
+| `spedizione[].internazionale.id_ldv_itz` | `europlateBarcode`, se valorizzato (facoltativo: c'è già `deliveryPartnerBarcode`) |
+| `spedizione[].numero_colli` | `numberOfParcels` (facoltativo) |
+| `id_file`, `_id` | solo storico e log |
+
+- Se per la stessa LDV ci sono più documenti (riconsegne della stessa spedizione), si usa il più
+  recente (`dataUltimaModifica`).
+- **Indice**: nel codice dei servizi non è dichiarato un indice su `spedizione.collo.id_ldv`
+  [FATTO]. Senza indice ogni ricerca scorre la collezione: con ~67 eventi/s non è sostenibile.
+  Serve un indice `{ "spedizione.collo.id_ldv": 1, "canale": 1 }` (da creare dal DBA/owner della
+  collezione, V-06) e una cache in memoria degli esiti della ricerca (RF-16).
+
+**Alternativa scartata per ora**: tabella `eurodis_ldv` di send-tracking alimentata consumando
+`preadvising.eud.pre.build` (proposta della 3.5). Resta valida se il lookup su Mongo non fosse
+sostenibile o accessibile.
+
+**Storico degli invii**: tabella PostgreSQL `eurodis_tracce`, una riga per evento SDA che supera i
+filtri (dettaglio tecnico e DDL nella sezione 14). Contiene:
+- la traccia SDA (LDV, status, `dataTrack`) e il JSON ricevuto (con eventuali dati personali);
+- il codice EURODIS, `edReference`, i barcode;
+- lo stato di invio (sezione 6), i tentativi, gli errori e i warning EURODIS, l'istante di invio.
+
+Chiave naturale **unica** `(ldv, status_sda, data_traccia)`: una traccia riconsegnata da Kafka non
+crea una seconda riga né un secondo invio (RF-18).
 
 ### 3.4 Traduzione degli stati SDA nei codici EURODIS [DECISO 10-11]
 
@@ -188,9 +263,9 @@ Regole:
 
 | # | Regola |
 |---|---|
-| TR-01 | La traduzione è una tabella `statusSDA → codiceEURODIS` caricata da configurazione (file di risorse versionato nel repository, generato dal foglio), non scritta nel codice: se il foglio cambia si aggiorna la risorsa. |
+| TR-01 | La traduzione è una tabella `statusSDA → codiceEURODIS` caricata da configurazione, non scritta nel codice. **[DECISO 12-11, Diego] Si sovrascrive da ConfigMap**: (a) la base è il file indicato da `eurodis.tracking.stati.file` (CSV con le stesse colonne della risorsa, montato da ConfigMap) o, se non configurato, la risorsa interna `classpath:eurodis/stati-inbound.csv` generata dal foglio; (b) `eurodis.tracking.stati.override` (mappa `status=codice`, per esempio da env `EURODIS_TRACKING_STATI_OVERRIDE=GIA=1785,THE=1767`) aggiunge o sostituisce righe; (c) `eurodis.tracking.stati.abilitati` (elenco di status SDA) limita gli status da inviare; vuoto = tutti quelli della tabella. Una configurazione non valida (codice non di 4 cifre, status non di 3 caratteri) fa fallire l'avvio con un messaggio chiaro. All'avvio si registrano in log il numero di status attivi e l'origine della tabella. |
 | TR-02 | Il confronto sullo status SDA è esatto sul codice (3 caratteri, maiuscolo), senza spazi. |
-| TR-03 | **[DA DECIDERE]** Status SDA non presente nella tabella. Default: **non si invia** nulla a EURODIS; log di warning con status e LDV (mai dati personali) e metrica `eurodis_tracking_stato_non_mappato_total{status}`. |
+| TR-03 | Status SDA non presente nella tabella o non abilitato: **non si invia** nulla a EURODIS e non si salva nello storico. Con ~4 milioni di eventi `CE` al giorno fuori dal foglio (soprattutto `THE`) **non si logga ogni evento**: solo la metrica `eurodis_tracking_stato_non_mappato_total{status}` (gli status sono codici, non dati personali). [DA CONFERMARE con SDA che l'esclusione di `THE` e degli altri sia voluta.] |
 | TR-04 | Lo stesso codice EURODIS può arrivare più volte per lo stesso collo da status SDA diversi (per esempio due giacenze): si inviano tutti, la deduplica non spetta a noi (ST-07). |
 
 Tabella del foglio (stessa sequenza del file):
@@ -274,7 +349,7 @@ Tabella del foglio (stessa sequenza del file):
 | `RUS` | Status Precedente | `1785` | On Hold |
 | `UDO` | Uscita: Mag. Temp. Custodia | `1785` | On Hold |
 
-### 3.5 Proposta per la sorgente delle tracce (PA-35) [DA DECIDERE]
+### 3.5 Proposta per la sorgente delle tracce (PA-35) [STORICO: superata dalla decisione del 12-11, vedi 3.2 e 3.3]
 
 Winston, 10-11. Proposta ricavata dai **topic Kafka di svil** (non dal codice degli altri progetti), letti in sola lettura: metadati, offset e un campione di messaggi con `assign` e senza gruppo, quindi senza commit di offset. I campioni contengono dati personali e restano fuori dal repo; qui ci sono solo nomi dei campi e forme.
 
@@ -356,7 +431,65 @@ Vincolo `UNIQUE (ldv, status_sda, data_traccia)`.
 - Dopo N tentativi l'evento passa a `ERRORE_INVIO`, con metrica e alert. `RIFIUTATO` (4xx di EURODIS) non si ritenta.
 - Per lo stesso collo gli eventi si inviano in ordine di `data_traccia`.
 
-## 4. Flusso di elaborazione (proposta, quando la sorgente è decisa)
+### 3.6 Esempi: eventi in ingresso e eventi EURODIS attesi [dati inventati]
+
+LDV e numeri sono inventati. Per tutti gli esempi la LDV `990000000000101` è in `dichiarato_events`
+con `canale = EUD_INVIOSYSTEM`, `rif_spedizione = 9900000000001`, `id_ldv_itz =
+123459000003770904301099`, salvo dove indicato. `dataTrack` è ora italiana; l'evento EURODIS è in UTC
+(RF-05, V-04). `locationCode` = `idFrazionarioEvento` (RF-21), `countryCode` = `IT`.
+
+**E1 — consegnata, `000` → `1100`** (servono `acceptorName`, V-02)
+
+```json
+{ "header": { "applicativo": "CE", "timestamp": "2026-11-12 15:31:10.004" },
+  "payload": { "canale": "PDT", "status": "000", "ldv": "990000000000101",
+               "dataTrack": "2026-11-12 15:30:55", "idFrazionarioEvento": "77001", "numTentativiDiConsegna": "1" } }
+```
+Evento EURODIS (`POST /events/parcel/v1`, un elemento del lotto):
+```json
+{ "eventCode": "1100", "edReference": 9900000000001, "deliveryPartnerBarcode": "990000000000101",
+  "europlateBarcode": "123459000003770904301099", "eventTimestamp": "2026-11-12T14:30:55.000Z",
+  "locationCode": "77001", "countryCode": "IT", "acceptorName": "<nome di chi ritira>" }
+```
+Se la sorgente non fornisce il nome e `eurodis.tracking.acceptor-name-default` è vuoto: riga nello
+storico `SCARTATO` con motivo `acceptor_name_mancante`, nessuna chiamata (RF-06, AC-10, RF-22).
+
+**E2 — in consegna al mattino, `GGG` → `1767`**
+```json
+{ "header": { "applicativo": "CE", "timestamp": "2026-11-12 07:02:31.550" },
+  "payload": { "canale": "DOL", "status": "GGG", "ldv": "990000000000101",
+               "dataTrack": "2026-11-12 07:02:10", "idFrazionarioEvento": "77001" } }
+```
+```json
+{ "eventCode": "1767", "edReference": 9900000000001, "deliveryPartnerBarcode": "990000000000101",
+  "europlateBarcode": "123459000003770904301099", "eventTimestamp": "2026-11-12T06:02:10.000Z",
+  "locationCode": "77001", "countryCode": "IT" }
+```
+
+**E3 — giacenza, `GIA` → `1785`**: come E2 con `"status": "GIA"` → `"eventCode": "1785"`.
+
+**E4 — arrivata in filiale, `ARR` → `1766`**: come E2 con `"status": "ARR"`, `"canale": "HUB"` →
+`"eventCode": "1766"` (il canale non conta).
+
+**E5 — status non mappato, `THE`**: `applicativo CE`, LDV EURODIS, `"status": "THE"` → nessuna
+ricerca su Mongo, nessuna riga nello storico, nessun invio; metrica
+`eurodis_tracking_stato_non_mappato_total{status="THE"}` +1 (TR-03).
+
+**E6 — applicativo diverso da `CE`**: `"applicativo": "TT"`, `"status": "000"` → scartato al filtro 1,
+nessuna altra elaborazione; metrica `eurodis_tracking_scartati_total{filtro="applicativo"}` +1.
+
+**E7 — LDV non EURODIS**: `applicativo CE`, `"status": "GGG"`, `"ldv": "990000000000999"` non presente
+in `dichiarato_events` (o presente con canale diverso da `EUD_INVIOSYSTEM`) → scartato al filtro 3,
+nessuna riga nello storico; metrica `eurodis_tracking_scartati_total{filtro="ldv"}` +1; l'esito della
+ricerca resta in cache (RF-16).
+
+**E8 — stessa traccia riconsegnata da Kafka**: E2 ricevuto due volte → una sola riga nello storico e
+un solo invio (RF-18).
+
+**E9 — status sovrascritto da ConfigMap**: con `EURODIS_TRACKING_STATI_OVERRIDE=THE=1767`, E5 diventa
+un evento `1767`; con `EURODIS_TRACKING_STATI_ABILITATI=000,GGG`, E3 (`GIA`) non si invia (TR-01).
+
+## 4. Flusso di elaborazione (proposta del 05-11, superata: il flusso deciso è nelle sezioni 3.2, 3.3 e 14)
 
 ```mermaid
 sequenceDiagram
@@ -390,6 +523,25 @@ sequenceDiagram
 | RF-11 | I warning EURODIS (per esempio `02050E`) non bloccano: si registra il codice nei log e nelle metriche |
 | RF-12 | Log senza dati personali: si registrano `edReference`, `eventCode`, codici di errore e warning, esito, durata. Mai `acceptorName`, `freeTextInformation`, `bilateralInformation*` né i barcode completi |
 
+**Regole del flusso da `PACCHI.TRACKING`** [12-11]:
+
+| # | Regola |
+|---|---|
+| RF-13 | Il servizio consuma `PACCHI.TRACKING` con un consumer group proprio (`ce-eurodis-send-tracking`), solo lettura. Non scrive su quel topic |
+| RF-14 | Filtro 1: si scartano subito gli eventi con `header.applicativo` diverso da `CE` (configurabile: `eurodis.tracking.filtro.applicativi`, default `CE`) |
+| RF-15 | Filtro 2: si scartano gli eventi con `payload.status` non presente o non abilitato nella tabella (TR-01, TR-03). Filtri 1 e 2 sono in memoria, senza accessi esterni |
+| RF-16 | Filtro 3 (oggi): l'evento passa se `payload.ldv` è in `dichiarato_events.spedizione.collo.id_ldv` di un documento con `canale = EUD_INVIOSYSTEM`. L'esito della ricerca (trovata con i dati della spedizione, oppure non trovata) va in **cache in memoria** per LDV, con TTL configurabile (default 30 minuti per "trovata", 10 minuti per "non trovata"); un errore di Mongo non va in cache |
+| RF-17 | Se Mongo non risponde, l'evento non si scarta: il consumer si ferma su quell'evento e riprova (backoff), così nessuna traccia EURODIS si perde. Metrica e log di errore |
+| RF-18 | Ogni evento che supera i filtri si salva in `eurodis_tracce` con stato `DA_INVIARE`, in modo idempotente sulla chiave `(ldv, status_sda, data_traccia)`: un doppione non crea righe né invii. L'offset Kafka si conferma dopo il salvataggio |
+| RF-19 | L'invio è disaccoppiato: un job (un solo pod alla volta) prende i `DA_INVIARE` e i `DA_RIPROVARE`, li invia a lotti con `POST /events/parcel/v1` (client RF-01…RF-12) e registra l'esito per evento |
+| RF-20 | Per lo stesso collo gli eventi si inviano in ordine di `data_traccia` (gli eventi possono arrivare fuori ordine: V-03) |
+| RF-21 | Valori dell'evento EURODIS: `eventCode` dalla tabella; `edReference` = `rif_spedizione`; `deliveryPartnerBarcode` = `payload.ldv`; `europlateBarcode` = `id_ldv_itz` se valorizzato e diverso da `0`; `eventTimestamp` = `dataTrack` (ora italiana) convertita in UTC (RF-05); `locationCode` = `idFrazionarioEvento` se lungo 1..10, altrimenti `eurodis.tracking.location-code-default` (ST-04); `countryCode` = `eurodis.tracking.country-code` (default `IT`); `numberOfParcels` = `numero_colli` se valorizzato |
+| RF-22 | `acceptorName` per `1100`: dal campo della sorgente indicato da V-02 se esiste; altrimenti da `eurodis.tracking.acceptor-name-default` se configurato; altrimenti l'evento va `SCARTATO` con motivo `acceptor_name_mancante` (nessuna chiamata). Il nome non va mai nei log |
+| RF-23 | Retry solo sugli esiti `ERRORE_TEMPORANEO` (compresi gli esiti incerti, 7.2), con attesa crescente e massimo configurabile; poi `ABBANDONATO` con metrica. `RIFIUTATO` non si ritenta. `ERRORE_CONFIGURAZIONE` sospende gli invii senza consumare tentativi |
+| RF-24 | Abilitazioni separate per ambiente: `eurodis.tracking.consumer.abilitato` (lettura di `PACCHI.TRACKING`) e `eurodis.tracking.invio.abilitato` (chiamate a EURODIS), per poter raccogliere lo storico senza inviare |
+| RF-25 | Nessun dato personale nei log, nelle metriche e negli span: solo status, codici, esiti, id tecnici. L'LDV nei log si maschera (ultime 4 cifre) |
+| RF-26 | Ogni scarto ha una metrica per motivo (`applicativo`, `status`, `ldv`, `acceptor_name_mancante`, `evento_non_valido`); nessun log per evento sui filtri 1-3 (volumi) |
+
 ## 6. Stati di un evento (proposta, per lo storico 3.3)
 
 `DA_INVIARE` → `CREATO` | `RIFIUTATO` | `DA_RIPROVARE` → (tentativi) → `CREATO` | `RIFIUTATO` | `ABBANDONATO` (oltre il massimo dei tentativi, con alert).
@@ -419,6 +571,21 @@ Proposta: si riprova sugli ERRORE_TEMPORANEO con backoff (1, 5, 15 minuti, poi o
 
 Se EURODIS risponde che i doppioni sono un problema, gli esiti incerti vanno a verifica manuale invece che al retry automatico.
 
+### 7.3 Casi di scarto e di errore del flusso [12-11]
+
+| Caso | Esito | Storico | Metrica |
+|---|---|---|---|
+| `applicativo` ≠ `CE` | scartato | no | `scartati_total{filtro=applicativo}` |
+| status non in tabella o non abilitato | scartato | no | `stato_non_mappato_total{status}` |
+| LDV non in `dichiarato_events` o canale ≠ `EUD_INVIOSYSTEM` | scartato | no | `scartati_total{filtro=ldv}` |
+| JSON non leggibile o campi obbligatori assenti (`status`, `ldv`, `dataTrack`) | scartato | no | `scartati_total{filtro=evento_non_valido}` |
+| `1100` senza `acceptorName` | `SCARTATO` | sì | `scartati_total{filtro=acceptor_name_mancante}` |
+| Mongo non disponibile | consumer fermo e ritenta (RF-17) | — | `mongo_errori_total` |
+| PostgreSQL non disponibile | consumer fermo e ritenta | — | errore del consumer |
+| EURODIS `400` / errore per elemento | `RIFIUTATO` | sì | `errori_eurodis_total{codice}` |
+| EURODIS `401`/`424` | invii sospesi (`ERRORE_CONFIGURAZIONE`) | sì | `eventi_total{esito}` + alert |
+| EURODIS `5xx`, timeout | `DA_RIPROVARE`, poi `ABBANDONATO` | sì | `eventi_total{esito}` |
+
 ## 8. Configurazione (client)
 
 | Proprietà (`eurodis.tracking.*`) | Variabile | Default | Note |
@@ -428,7 +595,18 @@ Se EURODIS risponde che i doppioni sono un problema, gli esiti incerti vanno a v
 | `timeout.connect` | `EURODIS_TIMEOUT_CONNECT` | `10s` | |
 | `timeout.read` | `EURODIS_TIMEOUT_READ` | `30s` | |
 | `lotto-max` | `EURODIS_TRACKING_LOTTO_MAX` | `100` | massimo EURODIS non dichiarato (ST-06) |
-| `stati.risorsa` | — | `classpath:eurodis/stati-inbound.csv` | tabella della sezione 3.4 (TR-01) |
+| `stati.risorsa` | — | `classpath:eurodis/stati-inbound.csv` | tabella della sezione 3.4 (TR-01), usata se `stati.file` non è configurato |
+| `stati.file` | `EURODIS_TRACKING_STATI_FILE` | vuoto | percorso del CSV montato da ConfigMap (TR-01) |
+| `stati.override` | `EURODIS_TRACKING_STATI_OVERRIDE` | vuoto | `status=codice` separati da virgola (TR-01) |
+| `stati.abilitati` | `EURODIS_TRACKING_STATI_ABILITATI` | vuoto (= tutti) | status SDA da inviare (TR-01) |
+| `filtro.applicativi` | `EURODIS_TRACKING_APPLICATIVI` | `CE` | RF-14 |
+| `location-code-default` | `EURODIS_TRACKING_LOCATION_CODE` | `SDA` | RF-21, ST-04 |
+| `country-code` | `EURODIS_TRACKING_COUNTRY_CODE` | `IT` | RF-21 |
+| `acceptor-name-default` | `EURODIS_TRACKING_ACCEPTOR_NAME_DEFAULT` | vuoto | RF-22 |
+| `consumer.abilitato`, `invio.abilitato` | `EURODIS_TRACKING_CONSUMER_ABILITATO`, `EURODIS_TRACKING_INVIO_ABILITATO` | `false`, `false` | RF-24 |
+| `cache-ldv.ttl-trovata`, `cache-ldv.ttl-non-trovata` | — | `30m`, `10m` | RF-16 |
+
+Topic, consumer group, Mongo, PostgreSQL, job e Helm: sezione 14 (Winston).
 
 ## 9. Osservabilità
 
@@ -486,16 +664,31 @@ Alert (più avanti, come AS-19 di `-in`):
 | AC-15 | Data la risorsa caricata, contiene 76 status SDA e 24 codici EURODIS distinti, tutti di 4 cifre (controllo di coerenza con il foglio) |
 | AC-16 | Dato uno status SDA non in tabella (es. `XYZ`), non parte nessuna chiamata, c'è un warning e `eurodis_tracking_stato_non_mappato_total{status="XYZ"}` cresce |
 
-### 11.2 End-to-end (quando la sorgente è decisa)
+### 11.2 Flusso da `PACCHI.TRACKING` (dati inventati, esempi della sezione 3.6)
 
-Da scrivere: evento SDA → evento EURODIS creato in TEST, rifiuto con codice errato, ripresa dopo un errore temporaneo.
+| # | Given / When / Then |
+|---|---|
+| AC-17 | Dato E2 con LDV EURODIS in Mongo, quando arriva, allora si salva una riga `DA_INVIARE` con codice `1767`, `edReference` 9900000000001, `eventTimestamp` `2026-11-12T06:02:10.000Z`, e il job invia l'evento di collo atteso |
+| AC-18 | Dato E1 (`000`) senza nome di chi ritira e default vuoto, la riga è `SCARTATO` con motivo `acceptor_name_mancante` e non parte nessuna chiamata |
+| AC-19 | Dato E1 con `acceptor-name-default` configurato, parte l'evento `1100` con quel valore e il valore non compare nei log |
+| AC-20 | Dato E5 (`THE`), non si interroga Mongo, non si salva niente, cresce `stato_non_mappato_total{status="THE"}` |
+| AC-21 | Dato E6 (`TT`), lo scarto avviene al filtro 1 senza altre elaborazioni |
+| AC-22 | Dato E7 (LDV non EURODIS), scarto al filtro 3; un secondo evento sulla stessa LDV entro il TTL non interroga Mongo (cache) |
+| AC-23 | Dato un documento Mongo con la LDV ma canale `PDB_INVIOSYSTEM`, l'evento è scartato al filtro 3 |
+| AC-24 | Dato E2 ricevuto due volte, una sola riga e un solo invio |
+| AC-25 | Dato Mongo non disponibile, l'evento non si perde: dopo il ripristino si salva e si invia |
+| AC-26 | Dato `EURODIS_TRACKING_STATI_OVERRIDE=THE=1767`, E5 genera un evento `1767`; dato `EURODIS_TRACKING_STATI_ABILITATI=000,GGG`, E3 non si invia |
+| AC-27 | Dato un file di stati montato con un codice di 3 cifre, il servizio non parte e il log indica riga e valore errati |
+| AC-28 | Dati due eventi dello stesso collo arrivati in ordine inverso di `dataTrack`, il job li invia in ordine di `dataTrack` |
+| AC-29 | Con `invio.abilitato=false` le righe restano `DA_INVIARE` e non parte nessuna chiamata; con `consumer.abilitato=false` il topic non si legge |
+| AC-30 | Nei log non compaiono nomi, indirizzi né LDV complete; le metriche di scarto si incrementano con i tag attesi |
 
 ## 12. Punti aperti e default provvisori
 
 | # | Punto | Default per partire | Impatto quando arriva la risposta | Rif. |
 |---|---|---|---|---|
 | ST-01 | Catalogo dei codici evento EURODIS e traduzione degli eventi SDA | **CHIUSO 10-11**: tabella del foglio "Decodifica Eurodis IN-BOUND" (sezione 3.4), codici di collo a 4 cifre | — | PA-34 |
-| ST-02 | Sorgente degli eventi SDA delle LDV EURODIS (topic, archivio T&T, formato) | nessun consumer | si scrivono consumer e storico | PA-35 (nuovo), PA-07 |
+| ST-02 | Sorgente degli eventi SDA delle LDV EURODIS | **CHIUSO 12-11**: `PACCHI.TRACKING`, tre filtri (3.2) | — | PA-35 |
 | ST-03 | Correlazione LDV SDA → `edReference` e barcode del collo (gli eventi sono di collo, sezione 3.4); quale barcode EURODIS si aspetta da SDA. Dal 10-11 la LDV SDA del collo è `deliveryPartnerBarcode` (mapper 0.4) | proposta `edReference` + `europlateBarcode` + `deliveryPartnerBarcode` | indice di correlazione nel mapper o in `-in` | PA-35, PA-11 |
 | ST-04 | Significato di `locationCode` (es. `CN-CC`) e di `countryCode` per gli eventi SDA | campi passati dal chiamante | regola di derivazione (deposito SDA? codice EURODIS?) | PA-36 (nuovo) |
 | ST-05 | SDA riceve transit unit EURODIS? Servono gli eventi transit? | no | eventuali endpoint transit | PA-36 |
@@ -505,12 +698,21 @@ Da scrivere: evento SDA → evento EURODIS creato in TEST, rifiuto con codice er
 | ST-09 | Fuso orario atteso in `eventTimestamp` | UTC con `Z` | formato locale se richiesto | PA-27 |
 | ST-10 | Errori verso EURODIS (spedizioni scartate dal mapper): passano da un evento di eccezione? | fuori dal client | eventuale codice evento di scarto | PA-08 |
 | ST-11 | Status SDA non presente nella tabella (TR-03) | non si invia, warning e metrica | eventuale codice EURODIS di default | — |
-| ST-12 | `acceptorName` per `1100`: la sorgente SDA ha il nome di chi ritira? | evento rifiutato localmente se manca (AC-10) | se manca sempre, va chiesto a EURODIS se accettano un valore convenzionale | PA-35 |
+| ST-12 | `acceptorName` per `1100`: la sorgente SDA ha il nome di chi ritira? | `SCARTATO` se manca, salvo `acceptor-name-default` (RF-22) | campo della sorgente (V-02) o valore convenzionale concordato con EURODIS | PA-35, V-02 |
+| V-01 | Le LDV EURODIS (`deliveryPartnerBarcode`) arrivano su `PACCHI.TRACKING` con `applicativo = CE`? Con quali status? | si assume di sì | se no, cambia la sorgente o il filtro 1 | analisi 12-11 |
+| V-02 | Campo con il nome di chi ritira per `000` | nessuno (RF-22) | si legge quel campo per `acceptorName` | ST-12 |
+| V-03 | Chiave Kafka di `PACCHI.TRACKING` in produzione e ordine degli eventi | ordine garantito dal job per `data_traccia` (RF-20) | nessuno se la chiave è l'LDV | analisi 12-11 |
+| V-04 | Formato e fuso di `dataTrack` | `yyyy-MM-dd HH:mm:ss` ora italiana | conversione diversa | ST-09 |
+| V-05 | `PACCHI.TRACKING` in collaudo ha traffico `CE`? | test con eventi costruiti | prova end-to-end in collaudo | analisi 12-11 |
+| V-06 | Indice `{spedizione.collo.id_ldv: 1, canale: 1}` su `dichiarato_events` e accesso in lettura da send-tracking | da creare (owner della collezione/DBA) | senza indice il filtro 3 non regge i volumi | 3.3 |
+| DF-29 | Riconoscere l'LDV EURODIS dalla sintassi, senza lookup (domani) | lookup su Mongo (oggi) | il filtro 3 diventa in memoria, si toglie la dipendenza da Mongo | 3.2 |
 
 ## 13. Riferimenti
 
 - Swagger: [eurodis-send-tracking-swagger-v1.json](../eurodis-send-tracking-swagger-v1.json); originale https://testapi.eurodis.com/send-tracking/swagger/Release%20v1/swagger.json
-- Traduzione degli stati: [Elenco codici status.xlsx](../documenti/eurodis/Elenco%20codici%20status.xlsx), foglio "Decodifica Eurodis IN-BOUND"
+- Traduzione degli stati: [Elenco codici status.xlsx](../documenti/eurodis/Elenco%20codici%20status.xlsx), foglio "Decodifica Eurodis IN-BOUND"; versione markdown [elenco-codici-status-inbound.md](../documenti/eurodis/elenco-codici-status-inbound.md)
+- Specifica EURODIS dello scambio dati: [A032 API Data interchange.pdf](../documenti/eurodis/A032%20API%20Data%20interchange.pdf), cap. 5.3 (Tracking Exchange)
+- Sorgente: [analisi-pacchi-tracking-prod-2026-11-12.md](../analisi-pacchi-tracking-prod-2026-11-12.md); MongoDB `dichiarato_events` (validatore, adapter)
 - [ce-dichiarato-eurodis-in.md](ce-dichiarato-eurodis-in.md): convenzioni, collezione `eurodis_spedizioni`
 - [analisi.md](../analisi.md): PA-07, PA-08, PA-11, PA-12, PA-27, PA-34…PA-36
 - Repository: CORRIERE-ESPRESSO_PREADVISING_ce-eurodis-send-tracking
@@ -518,9 +720,23 @@ Da scrivere: evento SDA → evento EURODIS creato in TEST, rifiuto con codice er
 
 ## Domande per Diego
 
-1. **Sorgente degli eventi SDA** (ST-02): sai chi possiede le tracce SDA delle LDV EURODIS e su quale topic o archivio passano? Il placeholder `preadvising.eud.send-tracking` di azzurrazezza è un topic che esiste o un'idea?
+1. ~~Sorgente degli eventi SDA~~: chiuso il 12-11, `PACCHI.TRACKING` con tre filtri (3.2).
 2. ~~Catalogo dei codici evento~~: chiuso il 10-11 con il foglio "Decodifica Eurodis IN-BOUND" (sezione 3.4).
 3. **Retry sugli esiti incerti** (7.2): va bene la proposta "meglio un doppione che un evento perso" finché EURODIS non risponde su ST-07?
 4. ~~Livello degli eventi~~: collo, perché i codici del foglio sono tutti di 4 cifre.
 5. **Status SDA non mappati** (TR-03): va bene non inviarli, con warning e metrica?
 6. **`acceptorName`** per `1100` (ST-12): la sorgente SDA delle tracce ha il nome di chi ritira?
+
+## Confronto fra le fonti EURODIS (12-11)
+
+- **PDF A03.2, cap. 5.3.1** [FATTO]: rimanda per i campi alla documentazione online dello swagger
+  (`send-tracking/documentation`), prevede invio singolo ("Event") e a lotti ("Events") e tre livelli
+  di evento: spedizione, collo, ritiro (pickup). Non elenca codici evento né codici di errore del
+  tracking (la tabella degli errori del PDF è solo per i PAN). **Nessuna differenza con lo swagger.**
+- **PDF A03.2, cap. 5.4.3**: il POD si rende disponibile solo con gli scan event `100`, `101`, `104`,
+  `416`, `1100`, `1104`, `1416`. Dei nostri codici di collo ci riguardano `1100` (consegnata) e
+  `1416` (smaltita, nel foglio IN-BOUND); `1104` non è nel foglio. Informazione utile se un domani
+  si invieranno POD (fuori perimetro).
+- **Swagger vs client** [FATTO, client `4cba024`]: il client usa gli endpoint di collo
+  `/event/parcel/v1` e `/events/parcel/v1`, `eventCode` di 4 caratteri, `acceptorName` obbligatorio
+  per `1100`, `eventTimestamp` UTC con `Z` (RF-05): coerente con lo swagger. Nessuna differenza nota.
