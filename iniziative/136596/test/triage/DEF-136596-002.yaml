@@ -51,3 +51,7 @@ soluzione_proposta: >
      l'errore PSQLException). Se l'errore è di rete, come per collaudo; se è di autenticazione, verificare
      il secret ce-postgres verso ce_cen. Poi rilanciare GET /anagrafica/indirizzi/nazione/IT.
   3. Solo dopo, con il database raggiungibile, confrontare nazioni_poste e net_delivery_int tra svil e coll.
+aggiornamento_2026_11_12: >
+  Con il DB svil di nuovo su, /anagrafica/indirizzi/nazione/{IT,NL} risponde ancora 500 (11:27 UTC).
+  Il mapper ora ha un ripiego ISO3 (DEF-136596-003), ma l'ISO4 Poste dei paesi esteri resta vuoto finche'
+  ce-anagrafica non risponde.

@@ -26,3 +26,24 @@ Note:
 - DEF-136596-002 (bloccante): `ce-anagrafica` svil 500 sui codici nazione; la regola 1039 del validatore richiede `mittente.codice_nazione`.
 - BLOCCO-136596-001: dati cliente EURODIS mancanti nella configurazione del mapper (regole 1010, 1011, 1012).
 - Prossimo run: dopo il rilascio del validatore, iniezione di `9900000000001` (TEST-LIST) su `preadvising.eud.pre.build` e verifica fino a `preadvising.completed`.
+
+## RUN-136596-20261112T113500Z — ripresa dopo il ripristino del DB e i rilasci del 12-11
+
+**Tipo**: osservazione + iniezione (`9900000000001` mittente IT, `9900000000002` mittente DE, dati
+inventati, `idFile` di test `721909f5-…`) · **Esito**: KO, la catena si ferma a `ldv-pdb`.
+
+Kafka svil non raggiungibile dalla postazione fino alle 12:15 (rete), poi ok.
+
+| TC | Esito | Evidenza |
+|---|---|---|
+| TC-136596-001 | ✅ | `-in` ha ripreso: scarichi ogni 2 minuti; alle 12:22 uno scarico di EURODIS TEST con 2 spedizioni nuove (`5319999944765`, `…773`) |
+| TC-136596-002 | ✅ | `ST_F0002`/`ST_F0005` per lo scarico delle 12:22 |
+| TC-136596-010 | ✅ | mapper in svil con `5e58c23`/`723eb11`: cliente di default valorizzato (codice login, AUC, contratto, centro di costo), destinatario IT con ITA/ITA1 |
+| TC-136596-011 | ❌ | mittente estero (NL, DE) senza `codice_nazione`: `ce-anagrafica` svil risponde ancora 500 anche col DB ripristinato → [DEF-136596-002](triage/DEF-136596-002.yaml); il mapper non aveva ripiego per i paesi esteri → [DEF-136596-003](triage/DEF-136596-003.yaml), corretto su `develop` `a7544a1` |
+| TC-136596-020 | ✅ | validatore `d1d05bd`: i tracciati `EUD_INVIOSYSTEM` entrano nel flusso PDB (prima finivano nel flusso SDA) |
+| TC-136596-021 | ⚠️ | `9900000000001` (mittente IT) passa le regole ed è su `preadvising.enrichment`; `9900000000002` (mittente DE) e le 2 spedizioni EURODIS TEST (mittente NL) bloccate da 1039 "Mittente Codice Nazione" |
+| TC-136596-022 | ❌ | orchestratore: per `9900000000001` invio a `Preadvising.enrichment.normalizzatore` (ritorno ricevuto alle 12:39, indirizzo inventato `SCARTATO` dalla normalizzazione) e a `preadvising.enrichment.pdb`; nessun ritorno da `ldv-pdb`. In svil `ldv-pdb` (`develop`) fa `BepChannel.valueOf("EUD_INVIOSYSTEM")` → eccezione. Correzione su branch `feature/eurodis-canale-eud-inviosystem` `07c13d0` (fast-forward su `develop`), non rilasciata |
+| TC-136596-023 | ⛔ | nessun tracciato EURODIS su `preadvising.completed` |
+| TC-136596-025 | ⛔ | confronto della copertura dei campi: in svil `preadvising.completed` ha solo `PDB` e `TUP`, nessun `EUD_INVIOFILE`; si rifà appena un tracciato EURODIS arriva su `completed` |
+
+Nota per i prossimi casi: usare un indirizzo reale di un luogo pubblico, perché la normalizzazione scarta le vie inventate.

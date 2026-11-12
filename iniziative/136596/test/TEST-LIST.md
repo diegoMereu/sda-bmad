@@ -34,6 +34,7 @@ Esito: vedi [STORICO.md](STORICO.md). Dati: inventati; `edReference` di test `99
 | TC-136596-021 | C | Validatore: regole | nessun errore bloccante sul tracciato di TC-136596-010; tracciato su `preadvising.enrichment` |
 | TC-136596-022 | C | Orchestratore | azioni del canale eseguite, tracciato su **`preadvising.completed`** |
 | TC-136596-023 | C | Arricchimento su `completed` | su `preadvising.completed` restano i campi del mapper (`id_file`, LDV del collo, `id_ldv_itz`, canale, destinatario, contrassegno) e ci sono quelli aggiunti a valle (normalizzazione, enrichment BEP) |
+| TC-136596-025 | A | Copertura dei campi su `completed` (e ai salti intermedi) rispetto ai canali `PDB`/`PDB_INVIOSYSTEM` ed `EUD_INVIOFILE` | per canale, insieme dei campi valorizzati (non vuoti, non 0); tabella campo × canale con i campi pieni negli altri canali e vuoti in `EUD_INVIOSYSTEM` e la causa (dato assente in EURODIS, regola di mapping mancante, arricchimento a valle che non scatta per il canale). Nel repo solo nomi di campo e percentuali |
 | TC-136596-024 | A | Spedizione scartata dal validatore | evento di record con errore (`ST_R0006`), nessun messaggio su `completed` |
 
 ## Dati usati

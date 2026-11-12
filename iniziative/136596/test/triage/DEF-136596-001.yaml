@@ -44,3 +44,8 @@ triage_2026_11_10: >
   - smistatore: correzione su develop in corso (Amelia);
   - state-machine-handler: liste dei canali PDB solo per i timeout LDV PDB; da valutare dopo il primo giro;
   - ce-dichiarato-ldv-pdb: non filtra per canale.
+aggiornamento_2026_11_12: >
+  Validatore rilasciato (d1d05bd): instradamento PDB verificato in svil. Il canale si ferma ora in
+  ce-dichiarato-ldv-pdb (develop: BepChannel.fromCanale -> valueOf("EUD_INVIOSYSTEM") lancia eccezione);
+  correzione su feature/eurodis-canale-eud-inviosystem 07c13d0, fast-forward su develop, da rilasciare.
+  Smistatore develop e03c333 da rilasciare (dopo completed).

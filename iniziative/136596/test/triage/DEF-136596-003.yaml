@@ -1,0 +1,17 @@
+id: DEF-136596-003
+iniziativa: "136596"
+campagna: e2e-eurodis-svil
+run: RUN-136596-20261112T113500Z
+tc: [TC-136596-011, TC-136596-021]
+gravita: bloccante
+stato: corretto_da_rilasciare
+titolo: Il mapper lascia vuoto il codice nazione del mittente estero quando ce-anagrafica non risponde
+osservato: >
+  Con ce-anagrafica in errore il mapper usava il default solo per l'Italia; per NL e DE codice_nazione restava
+  vuoto e il validatore (regole PDB_INVIOSYSTEM) bloccava con 1039 "Mittente Codice Nazione" (2 spedizioni
+  EURODIS TEST delle 12:22 e il caso iniettato 9900000000002).
+correzione: >
+  ce-dichiarato-eurodis-mapper develop a7544a1: ISO3 dall'ISO2 con la tabella ISO 3166 della JVM (stessa codifica
+  di cod_nazione_iso3 in ce-anagrafica), ISO4 Poste vuoto, avviso nazione_iso3_standard. 106 test verdi.
+  Scostamento da RF-15 della specifica del mapper (da aggiornare: Mary).
+responsabile: Amelia (fatto), Diego (rilascio)
