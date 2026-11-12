@@ -1,5 +1,11 @@
 # `ce-eurodis-send-tracking` — Persistenza su PostgreSQL: DDL e ambiente
 
+> **Superato il 12-11: lo storico non serve, nessuna DDL per send-tracking.** Decisione di Diego:
+> send-tracking invia ogni evento direttamente a EURODIS, senza database `ce_eud_tracking`, tabella
+> `eurodis_tracce` né ShedLock. Architettura attuale: sezione 14 di
+> [ce-eurodis-send-tracking.md](ce-eurodis-send-tracking.md) 0.4 (implementazione `ec2f65b`). Il
+> documento resta come riferimento se servisse uno storico minimo (ST-07).
+
 **Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.1 · **Data**: 2026-11-12
 **Autore**: Winston (architect) · **Destinatari**: DBA e piattaforma (script e secret), Amelia (dev)
 **Specifica di riferimento**: [ce-eurodis-send-tracking.md](ce-eurodis-send-tracking.md) 0.3, sezioni 3.3 e 14

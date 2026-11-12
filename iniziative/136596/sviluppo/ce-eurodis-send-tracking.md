@@ -1,9 +1,9 @@
 # `ce-eurodis-send-tracking` — Documento funzionale per lo sviluppo
 
-**Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.3 (bozza) · **Data**: 2026-11-12
+**Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.4 (allineata all'implementazione `ec2f65b`) · **Data**: 2026-11-12
 **Autrice**: Mary (analyst) · **Destinataria**: Amelia (dev) e team di sviluppo
 **Repository**: https://posteitaliane.ghe.com/SVILUPPO/CORRIERE-ESPRESSO_PREADVISING_ce-eurodis-send-tracking (branch `develop`, allineato anche `feature/eurodis-base-implementation`)
-**Implementazione** (10-11): client EURODIS `4cba024`, traduzione degli stati IN-BOUND `591767d`; 143 test verdi. Formato della traccia SDA in ingresso (`TracciaSda`) proposto da Amelia in attesa della sorgente (PA-35); `1100` senza `acceptorName` scartato in locale (AC-10).
+**Implementazione** (12-11): `develop` `ec2f65b`, 174 test verdi. Client EURODIS `4cba024`, traduzione degli stati `591767d`, tabella degli status da ConfigMap `2706254`/`d11bd9c`, consumer di `PACCHI.TRACKING` `4f7f067`, log JSON come `ce-dichiarato-adapter` `ec2f65b`. `1100` senza `acceptorName` scartato in locale (AC-10).
 **Generato da**: [prompt-ce-eurodis-send-tracking.md](prompt-ce-eurodis-send-tracking.md)
 **Fonti**: [eurodis-send-tracking-swagger-v1.json](../eurodis-send-tracking-swagger-v1.json) (scaricato il 05-11); [A032 API Data interchange.pdf](../documenti/eurodis/A032%20API%20Data%20interchange.pdf) (EURODIS, annex A03.2, 12-03-2026, cap. 5.3); [Elenco codici status.xlsx](../documenti/eurodis/Elenco%20codici%20status.xlsx) e la versione markdown [elenco-codici-status-inbound.md](../documenti/eurodis/elenco-codici-status-inbound.md); [analisi-pacchi-tracking-prod-2026-11-12.md](../analisi-pacchi-tracking-prod-2026-11-12.md) (Fenaroli/Mary)
 
@@ -26,7 +26,16 @@ Etichette usate nel documento:
 > di sintassi delle LDV EURODIS (DF-29). La tabella degli status da inviare è sovrascrivibile da
 > ConfigMap (TR-01). Esempi di eventi in ingresso e di eventi EURODIS attesi: sezione 3.6. Nuove regole
 > RF-13…RF-26, casi di scarto (7.3), criteri AC-17…AC-30, punti aperti V-01…V-06 (sezione 12).
-> Architettura (consumer, cache, storico, job, DDL, Helm): sezione 14 e [ddl-ce-eurodis-send-tracking.md](ddl-ce-eurodis-send-tracking.md) (Winston, 12-11).
+> Architettura (consumer, cache, invio, Helm): sezione 14 (Winston, 12-11).
+>
+> **12-11, versione 0.4 (Mary, Winston), allineata a `ec2f65b`**. Decisioni di Diego del 12-11:
+> - **niente storico**: nessun database `ce_eud_tracking`, nessuna tabella `eurodis_tracce`, niente
+>   ShedLock né job di invio, nessuna DDL ([ddl-ce-eurodis-send-tracking.md](ddl-ce-eurodis-send-tracking.md)
+>   è superato). Ogni evento che supera i filtri si traduce e si invia subito;
+> - **contano solo lo status e che la spedizione sia `EUD_INVIOSYSTEM`**: il filtro su
+>   `header.applicativo` diventa facoltativo, di default spento (RF-14);
+> - ordine dei filtri: status → applicativo (se configurato) → LDV della spedizione EURODIS;
+> - span, metriche e log JSON nel formato dei ms `ce-` (sezione 9, [alert-datadog-eurodis.md](alert-datadog-eurodis.md)).
 
 ---
 
@@ -184,11 +193,14 @@ chiude PA-35). In produzione porta gli status SDA del foglio IN-BOUND con `heade
 - **Svil**: `PACCHI.TRACKING` ha solo traffico della rete pacchi Poste (`TT`), nessun evento `CE`:
   in svil gli eventi si costruiscono (sezione 3.6, test integrati). Collaudo: V-05.
 
-**Filtri, nell'ordine dal più leggero** (RF-13…RF-16):
+**Filtri, nell'ordine dal più leggero** (RF-13…RF-16) [DECISO 12-11, Diego: "ci interessa solo lo
+status e che l'evento sia EURODIS INVIOSYSTEM"]:
 
-1. `header.applicativo` deve essere `CE` (scarta ~58% del traffico);
-2. `payload.status` deve essere fra gli status abilitati della tabella 3.4 (TR-01, TR-03): scarta
-   ~40% degli eventi `CE` (per esempio `THE`, `SCP`);
+1. `payload.status` deve essere fra gli status abilitati della tabella 3.4 (TR-01, TR-03): scarta
+   gran parte del traffico (per esempio `THE`, `SCP`, `PCP`);
+2. `header.applicativo` fra quelli configurati in `EURODIS_TRACKING_APPLICATIVI`: **di default vuoto,
+   cioè nessun filtro**. Si riattiva con `CE` se servisse: secondo l'analisi di Fenaroli `CNP` e `ARP`
+   compaiono anche fuori da `CE` con un significato diverso (RF-14);
 3. `payload.ldv` deve appartenere a una spedizione EURODIS autoproduttore:
    - **oggi [DECISO 12-11, Diego]**: l'LDV è presente nel MongoDB del preadvising, collezione
      `dichiarato_events`, in `spedizione.collo.id_ldv`, e il documento ha `canale = EUD_INVIOSYSTEM`
@@ -196,9 +208,9 @@ chiude PA-35). In produzione porta gli status SDA del foglio IN-BOUND con `heade
    - **domani [DA DECIDERE, DF-29]**: l'LDV si riconosce dalla sua sintassi (regola di validità delle
      LDV generate da EURODIS, da SDA/Marzilli), senza lookup.
 
-Solo gli eventi che superano i tre filtri si traducono, si salvano nello storico e si inviano.
+Solo gli eventi che superano i filtri si traducono e si inviano subito a EURODIS: **non c'è storico** [DECISO 12-11].
 
-### 3.3 Correlazione con la spedizione EURODIS e storico [DECISO 12-11]
+### 3.3 Correlazione con la spedizione EURODIS [DECISO 12-11]
 
 **Dove si cerca l'LDV (filtro 3) [DECISO 12-11, Diego]**: nel MongoDB del preadvising.
 
@@ -217,12 +229,13 @@ Solo gli eventi che superano i tre filtri si traducono, si salvano nello storico
 | `spedizione[].rif_spedizione` | `edReference` (il mapper vi scrive `edReference` normalizzato) |
 | `spedizione[].internazionale.id_ldv_itz` | `europlateBarcode`, se valorizzato (facoltativo: c'è già `deliveryPartnerBarcode`) |
 | `spedizione[].numero_colli` | `numberOfParcels` (facoltativo) |
-| `id_file`, `_id` | solo storico e log |
+| `id_file`, `_id` | solo log |
 
 - Se per la stessa LDV ci sono più documenti (riconsegne della stessa spedizione), si usa il più
   recente (`dataUltimaModifica`).
 - **Indice**: nel codice dei servizi non è dichiarato un indice su `spedizione.collo.id_ldv`
-  [FATTO]. Senza indice ogni ricerca scorre la collezione: con ~67 eventi/s non è sostenibile.
+  [FATTO]. Senza indice ogni ricerca scorre la collezione: con i volumi di `PACCHI.TRACKING` non è
+  sostenibile.
   Serve un indice `{ "spedizione.collo.id_ldv": 1, "canale": 1 }` (da creare dal DBA/owner della
   collezione, V-06) e una cache in memoria degli esiti della ricerca (RF-16).
 
@@ -230,14 +243,9 @@ Solo gli eventi che superano i tre filtri si traducono, si salvano nello storico
 `preadvising.eud.pre.build` (proposta della 3.5). Resta valida se il lookup su Mongo non fosse
 sostenibile o accessibile.
 
-**Storico degli invii**: tabella PostgreSQL `eurodis_tracce`, una riga per evento SDA che supera i
-filtri (dettaglio tecnico e DDL nella sezione 14). Contiene:
-- la traccia SDA (LDV, status, `dataTrack`) e il JSON ricevuto (con eventuali dati personali);
-- il codice EURODIS, `edReference`, i barcode;
-- lo stato di invio (sezione 6), i tentativi, gli errori e i warning EURODIS, l'istante di invio.
-
-Chiave naturale **unica** `(ldv, status_sda, data_traccia)`: una traccia riconsegnata da Kafka non
-crea una seconda riga né un secondo invio (RF-18).
+**Nessuno storico degli invii** [DECISO 12-11, Diego]: non serve, almeno per ora. L'esito di ogni
+evento si legge da log e metriche (sezione 9). Una traccia riconsegnata da Kafka dopo un riavvio
+può essere inviata due volte: è accettato, finché EURODIS non risponde su ST-07.
 
 ### 3.4 Traduzione degli stati SDA nei codici EURODIS [DECISO 10-11]
 
@@ -265,7 +273,7 @@ Regole:
 |---|---|
 | TR-01 | La traduzione è una tabella `statusSDA → codiceEURODIS` caricata da configurazione, non scritta nel codice. **[DECISO 12-11, Diego] Si sovrascrive da ConfigMap**: (a) la base è il file indicato da `eurodis.tracking.stati.file` (CSV con le stesse colonne della risorsa, montato da ConfigMap) o, se non configurato, la risorsa interna `classpath:eurodis/stati-inbound.csv` generata dal foglio; (b) `eurodis.tracking.stati.override` (mappa `status=codice`, per esempio da env `EURODIS_TRACKING_STATI_OVERRIDE=GIA=1785,THE=1767`) aggiunge o sostituisce righe; (c) `eurodis.tracking.stati.abilitati` (elenco di status SDA) limita gli status da inviare; vuoto = tutti quelli della tabella. Una configurazione non valida (codice non di 4 cifre, status non di 3 caratteri) fa fallire l'avvio con un messaggio chiaro. All'avvio si registrano in log il numero di status attivi e l'origine della tabella. |
 | TR-02 | Il confronto sullo status SDA è esatto sul codice (3 caratteri, maiuscolo), senza spazi. |
-| TR-03 | Status SDA non presente nella tabella o non abilitato: **non si invia** nulla a EURODIS e non si salva nello storico. Con ~4 milioni di eventi `CE` al giorno fuori dal foglio (soprattutto `THE`) **non si logga ogni evento**: solo la metrica `eurodis_tracking_stato_non_mappato_total{status}` (gli status sono codici, non dati personali). [DA CONFERMARE con SDA che l'esclusione di `THE` e degli altri sia voluta.] |
+| TR-03 | Status SDA non presente nella tabella o non abilitato: **non si invia** nulla a EURODIS. Con ~4 milioni di eventi `CE` al giorno fuori dal foglio (soprattutto `THE`) **non si logga ogni evento**: solo la metrica `eurodis_tracking_stato_non_mappato_total{status}` (gli status sono codici, non dati personali). [DA CONFERMARE con SDA che l'esclusione di `THE` e degli altri sia voluta.] |
 | TR-04 | Lo stesso codice EURODIS può arrivare più volte per lo stesso collo da status SDA diversi (per esempio due giacenze): si inviano tutti, la deduplica non spetta a noi (ST-07). |
 
 Tabella del foglio (stessa sequenza del file):
@@ -451,8 +459,9 @@ Evento EURODIS (`POST /events/parcel/v1`, un elemento del lotto):
   "europlateBarcode": "123459000003770904301099", "eventTimestamp": "2026-11-12T14:30:55.000Z",
   "locationCode": "77001", "countryCode": "IT", "acceptorName": "<nome di chi ritira>" }
 ```
-Se la sorgente non fornisce il nome e `eurodis.tracking.acceptor-name-default` è vuoto: riga nello
-storico `SCARTATO` con motivo `acceptor_name_mancante`, nessuna chiamata (RF-06, AC-10, RF-22).
+Se la sorgente non fornisce il nome e `eurodis.tracking.acceptor-name-default` è vuoto: evento
+scartato, metrica `eurodis_tracking_scartati_total{filtro="acceptor_name_mancante"}`, nessuna chiamata
+(RF-06, AC-10, RF-22).
 
 **E2 — in consegna al mattino, `GGG` → `1767`**
 ```json
@@ -472,19 +481,22 @@ storico `SCARTATO` con motivo `acceptor_name_mancante`, nessuna chiamata (RF-06,
 `"eventCode": "1766"` (il canale non conta).
 
 **E5 — status non mappato, `THE`**: `applicativo CE`, LDV EURODIS, `"status": "THE"` → nessuna
-ricerca su Mongo, nessuna riga nello storico, nessun invio; metrica
-`eurodis_tracking_stato_non_mappato_total{status="THE"}` +1 (TR-03).
+ricerca su Mongo, nessun invio; metriche `eurodis_tracking_scartati_total{filtro="status_non_abilitato"}`
+e `eurodis_tracking_stato_non_mappato_total{status="THE"}` +1 (TR-03).
 
-**E6 — applicativo diverso da `CE`**: `"applicativo": "TT"`, `"status": "000"` → scartato al filtro 1,
-nessuna altra elaborazione; metrica `eurodis_tracking_scartati_total{filtro="applicativo"}` +1.
+**E6 — applicativo diverso da `CE`**: `"applicativo": "TT"`, `"status": "000"`, LDV EURODIS →
+**con la configurazione di default l'evento passa** (filtro applicativo spento) e si invia come E1.
+Solo con `EURODIS_TRACKING_APPLICATIVI=CE` è scartato al filtro 2, con metrica
+`eurodis_tracking_scartati_total{filtro="applicativo"}` +1.
 
 **E7 — LDV non EURODIS**: `applicativo CE`, `"status": "GGG"`, `"ldv": "990000000000999"` non presente
-in `dichiarato_events` (o presente con canale diverso da `EUD_INVIOSYSTEM`) → scartato al filtro 3,
-nessuna riga nello storico; metrica `eurodis_tracking_scartati_total{filtro="ldv"}` +1; l'esito della
-ricerca resta in cache (RF-16).
+in `dichiarato_events` (o presente con canale diverso da `EUD_INVIOSYSTEM`) → scartato al filtro 3;
+metrica `eurodis_tracking_scartati_total{filtro="ldv_non_eurodis"}` +1; l'esito della ricerca resta in
+cache (RF-16).
 
-**E8 — stessa traccia riconsegnata da Kafka**: E2 ricevuto due volte → una sola riga nello storico e
-un solo invio (RF-18).
+**E8 — stessa traccia riconsegnata da Kafka**: senza storico non c'è deduplica. L'offset si conferma
+dopo l'esito, quindi una riconsegna avviene solo dopo un riavvio a metà: in quel caso E2 si invia due
+volte (RF-18, ST-07).
 
 **E9 — status sovrascritto da ConfigMap**: con `EURODIS_TRACKING_STATI_OVERRIDE=THE=1767`, E5 diventa
 un evento `1767`; con `EURODIS_TRACKING_STATI_ABILITATI=000,GGG`, E3 (`GIA`) non si invia (TR-01).
@@ -527,26 +539,25 @@ sequenceDiagram
 
 | # | Regola |
 |---|---|
-| RF-13 | Il servizio consuma `PACCHI.TRACKING` con un consumer group proprio (`ce-eurodis-send-tracking`), solo lettura. Non scrive su quel topic |
-| RF-14 | Filtro 1: si scartano subito gli eventi con `header.applicativo` diverso da `CE` (configurabile: `eurodis.tracking.filtro.applicativi`, default `CE`) |
-| RF-15 | Filtro 2: si scartano gli eventi con `payload.status` non presente o non abilitato nella tabella (TR-01, TR-03). Filtri 1 e 2 sono in memoria, senza accessi esterni |
-| RF-16 | Filtro 3 (oggi): l'evento passa se `payload.ldv` è in `dichiarato_events.spedizione.collo.id_ldv` di un documento con `canale = EUD_INVIOSYSTEM`. L'esito della ricerca (trovata con i dati della spedizione, oppure non trovata) va in **cache in memoria** per LDV, con TTL configurabile (default 30 minuti per "trovata", 10 minuti per "non trovata"); un errore di Mongo non va in cache |
-| RF-17 | Se Mongo non risponde, l'evento non si scarta: il consumer si ferma su quell'evento e riprova (backoff), così nessuna traccia EURODIS si perde. Metrica e log di errore |
-| RF-18 | Ogni evento che supera i filtri si salva in `eurodis_tracce` con stato `DA_INVIARE`, in modo idempotente sulla chiave `(ldv, status_sda, data_traccia)`: un doppione non crea righe né invii. L'offset Kafka si conferma dopo il salvataggio |
-| RF-19 | L'invio è disaccoppiato: un job (un solo pod alla volta) prende i `DA_INVIARE` e i `DA_RIPROVARE`, li invia a lotti con `POST /events/parcel/v1` (client RF-01…RF-12) e registra l'esito per evento |
-| RF-20 | Per lo stesso collo gli eventi si inviano in ordine di `data_traccia` (gli eventi possono arrivare fuori ordine: V-03) |
+| RF-13 | Il servizio consuma `PACCHI.TRACKING` con un consumer group proprio (`ce-eurodis-send-tracking-group`, `KAFKA_CONSUMER_GROUP`), solo lettura, `ack-mode: record`, `auto-offset-reset: latest` (al primo avvio non si rielabora il topic). Non scrive su quel topic |
+| RF-14 | Filtro sull'applicativo, **facoltativo** [DECISO 12-11]: `eurodis.tracking.filtro.applicativi` (`EURODIS_TRACKING_APPLICATIVI`), default vuoto = nessun filtro; se valorizzato (es. `CE`) si scartano gli eventi con `header.applicativo` diverso. Si applica dopo il filtro sullo status |
+| RF-15 | Primo filtro: si scartano gli eventi con `payload.status` non presente o non abilitato nella tabella (TR-01, TR-03). Status e applicativo si controllano in memoria, senza accessi esterni |
+| RF-16 | Filtro 3 (oggi): l'evento passa se `payload.ldv` è in `dichiarato_events.spedizione.collo.id_ldv` di un documento con `canale = EUD_INVIOSYSTEM`. L'esito della ricerca (trovata con i dati della spedizione, oppure non trovata) va in **cache in memoria** per LDV, con TTL configurabile (default 30 minuti per "trovata", 10 minuti per "non trovata", dimensione massima 500.000) — cache Caffeine dietro l'interfaccia `RiconoscitoreSpedizioneEurodis` (oggi `RiconoscitoreSuMongo`); un errore di Mongo non va in cache |
+| RF-17 | Se Mongo non risponde, l'evento non si scarta: il consumer si ferma su quell'evento e riprova con il backoff di RF-23, così nessuna traccia EURODIS si perde. Metrica `eurodis_tracking_mongo_errori_total` e log di errore |
+| RF-18 | Ogni evento che supera i filtri si traduce e **si invia subito** a EURODIS, uno alla volta (`POST /events/parcel/v1` con un elemento, client RF-01…RF-12). Nessuno storico [DECISO 12-11]. L'offset Kafka si conferma **dopo l'esito** (creato, rifiutato o abbandonato): una riconsegna è possibile solo dopo un riavvio a metà, e produce un doppione (ST-07) |
+| RF-19 | L'esito di ogni invio va nei log (JSON, MDC `ldv` mascherata, `status_sda`, `codice_eurodis`, `esito`) e nelle metriche `eurodis_tracking_tracce_total{esito}` ed `eurodis_tracking_eventi_total{esito}` |
+| RF-20 | Gli eventi si inviano nell'ordine in cui arrivano dalla partizione. L'ordine per collo dipende dalla chiave di `PACCHI.TRACKING` (V-03): senza storico non si riordinano |
 | RF-21 | Valori dell'evento EURODIS: `eventCode` dalla tabella; `edReference` = `rif_spedizione`; `deliveryPartnerBarcode` = `payload.ldv`; `europlateBarcode` = `id_ldv_itz` se valorizzato e diverso da `0`; `eventTimestamp` = `dataTrack` (ora italiana) convertita in UTC (RF-05); `locationCode` = `idFrazionarioEvento` se lungo 1..10, altrimenti `eurodis.tracking.location-code-default` (ST-04); `countryCode` = `eurodis.tracking.country-code` (default `IT`); `numberOfParcels` = `numero_colli` se valorizzato |
 | RF-22 | `acceptorName` per `1100`: dal campo della sorgente indicato da V-02 se esiste; altrimenti da `eurodis.tracking.acceptor-name-default` se configurato; altrimenti l'evento va `SCARTATO` con motivo `acceptor_name_mancante` (nessuna chiamata). Il nome non va mai nei log |
-| RF-23 | Retry solo sugli esiti `ERRORE_TEMPORANEO` (compresi gli esiti incerti, 7.2), con attesa crescente e massimo configurabile; poi `ABBANDONATO` con metrica. `RIFIUTATO` non si ritenta. `ERRORE_CONFIGURAZIONE` sospende gli invii senza consumare tentativi |
-| RF-24 | Abilitazioni separate per ambiente: `eurodis.tracking.consumer.abilitato` (lettura di `PACCHI.TRACKING`) e `eurodis.tracking.invio.abilitato` (chiamate a EURODIS), per poter raccogliere lo storico senza inviare |
+| RF-23 | Retry sullo stesso evento, senza avanzare l'offset, sugli esiti `ERRORE_TEMPORANEO` (compresi gli esiti incerti, 7.2), `ERRORE_CONFIGURAZIONE` e sugli errori di Mongo: backoff esponenziale da 2 secondi, moltiplicatore 2, fino a 5 minuti fra i tentativi, abbandono dopo 24 ore con metrica `eurodis_tracking_tracce_abbandonate_total` (`eurodis.tracking.retry.*`). `RIFIUTATO` non si ritenta |
+| RF-24 | Abilitazioni separate per ambiente: `eurodis.tracking.consumer.abilitato` (lettura di `PACCHI.TRACKING`) e `eurodis.tracking.invio.abilitato` (chiamate a EURODIS). Con il consumer acceso e l'invio spento gli eventi si leggono, si filtrano e si contano (`scartati_total{filtro="invio_disabilitato"}`) senza chiamare EURODIS. `true` in svil, `false` nella configurazione base e nel template di prod |
 | RF-25 | Nessun dato personale nei log, nelle metriche e negli span: solo status, codici, esiti, id tecnici. L'LDV nei log si maschera (ultime 4 cifre) |
-| RF-26 | Ogni scarto ha una metrica per motivo (`applicativo`, `status`, `ldv`, `acceptor_name_mancante`, `evento_non_valido`); nessun log per evento sui filtri 1-3 (volumi) |
+| RF-26 | Ogni scarto ha una metrica per motivo (`eurodis_tracking_scartati_total{filtro}`: `status_non_abilitato`, `applicativo`, `ldv_non_eurodis`, `acceptor_name_mancante`, `evento_non_valido`, `invio_disabilitato`); nessun log per evento sui filtri (volumi) |
 
-## 6. Stati di un evento (proposta, per lo storico 3.3)
+## 6. Stati di un evento (superato il 12-11: senza storico non ci sono stati persistiti)
 
-`DA_INVIARE` → `CREATO` | `RIFIUTATO` | `DA_RIPROVARE` → (tentativi) → `CREATO` | `RIFIUTATO` | `ABBANDONATO` (oltre il massimo dei tentativi, con alert).
-
-`ERRORE_CONFIGURAZIONE` non consuma tentativi: blocca gli invii e manda un alert finché la chiave non torna valida.
+L'esito di un evento esiste solo nel momento dell'invio: `CREATO`, `RIFIUTATO`, oppure retry sullo
+stesso evento (RF-23) fino a `CREATO`, `RIFIUTATO` o abbandono dopo 24 ore. Si vede in log e metriche.
 
 ## 7. Errori e recupero
 
@@ -563,9 +574,9 @@ sequenceDiagram
 | Timeout di lettura / connessione caduta dopo l'invio | ERRORE_TEMPORANEO, motivo "esito incerto" | l'evento potrebbe essere stato creato: riprovare può creare un doppione (ST-07) |
 | Corpo `201` non leggibile | ERRORE_TEMPORANEO, motivo "esito incerto" | come sopra |
 
-### 7.2 Politica di retry [DA DECIDERE]
+### 7.2 Politica di retry [DECISO 12-11, implementata]
 
-Proposta: si riprova sugli ERRORE_TEMPORANEO con backoff (1, 5, 15 minuti, poi ogni ora), fino a 24 ore, poi ABBANDONATO con alert. Anche gli "esiti incerti" si riprovano, per due motivi:
+Si riprova lo stesso evento, senza avanzare l'offset, sugli ERRORE_TEMPORANEO, sugli ERRORE_CONFIGURAZIONE e sugli errori di Mongo, con backoff esponenziale: 2 secondi, poi il doppio a ogni tentativo, fino a 5 minuti fra due tentativi; dopo 24 ore l'evento si abbandona con metrica e alert (RF-23). Anche gli "esiti incerti" si riprovano, per due motivi:
 - un evento di tracking doppio è meno grave di un evento perso;
 - EURODIS potrebbe scartare i doppioni (ST-07).
 
@@ -573,18 +584,18 @@ Se EURODIS risponde che i doppioni sono un problema, gli esiti incerti vanno a v
 
 ### 7.3 Casi di scarto e di errore del flusso [12-11]
 
-| Caso | Esito | Storico | Metrica |
-|---|---|---|---|
-| `applicativo` ≠ `CE` | scartato | no | `scartati_total{filtro=applicativo}` |
-| status non in tabella o non abilitato | scartato | no | `stato_non_mappato_total{status}` |
-| LDV non in `dichiarato_events` o canale ≠ `EUD_INVIOSYSTEM` | scartato | no | `scartati_total{filtro=ldv}` |
-| JSON non leggibile o campi obbligatori assenti (`status`, `ldv`, `dataTrack`) | scartato | no | `scartati_total{filtro=evento_non_valido}` |
-| `1100` senza `acceptorName` | `SCARTATO` | sì | `scartati_total{filtro=acceptor_name_mancante}` |
-| Mongo non disponibile | consumer fermo e ritenta (RF-17) | — | `mongo_errori_total` |
-| PostgreSQL non disponibile | consumer fermo e ritenta | — | errore del consumer |
-| EURODIS `400` / errore per elemento | `RIFIUTATO` | sì | `errori_eurodis_total{codice}` |
-| EURODIS `401`/`424` | invii sospesi (`ERRORE_CONFIGURAZIONE`) | sì | `eventi_total{esito}` + alert |
-| EURODIS `5xx`, timeout | `DA_RIPROVARE`, poi `ABBANDONATO` | sì | `eventi_total{esito}` |
+| Caso | Esito | Metrica |
+|---|---|---|
+| status non in tabella o non abilitato | scartato | `scartati_total{filtro=status_non_abilitato}`, `stato_non_mappato_total{status}` |
+| `applicativo` fuori da `EURODIS_TRACKING_APPLICATIVI` (solo se configurato) | scartato | `scartati_total{filtro=applicativo}` |
+| LDV non in `dichiarato_events` o canale ≠ `EUD_INVIOSYSTEM` | scartato | `scartati_total{filtro=ldv_non_eurodis}` |
+| JSON non leggibile o campi obbligatori assenti (`status`, `ldv`, `dataTrack`) | scartato | `scartati_total{filtro=evento_non_valido}` |
+| `1100` senza `acceptorName` | scartato | `scartati_total{filtro=acceptor_name_mancante}` |
+| invio spento (`invio.abilitato=false`) | letto e filtrato, non inviato | `scartati_total{filtro=invio_disabilitato}` |
+| Mongo non disponibile | consumer fermo sullo stesso evento, retry (RF-17, RF-23) | `mongo_errori_total`, `retry_total` |
+| EURODIS `400` / errore per elemento | `RIFIUTATO`, offset avanti | `eventi_total{esito}`, `errori_eurodis_total{codice}` |
+| EURODIS `401`/`424` | retry sullo stesso evento (`ERRORE_CONFIGURAZIONE`) | `eventi_total{esito}`, `retry_total` + alert |
+| EURODIS `5xx`, timeout | retry, abbandono dopo 24 ore | `retry_total`, `tracce_abbandonate_total` |
 
 ## 8. Configurazione (client)
 
@@ -599,14 +610,17 @@ Se EURODIS risponde che i doppioni sono un problema, gli esiti incerti vanno a v
 | `stati.file` | `EURODIS_TRACKING_STATI_FILE` | vuoto | percorso del CSV montato da ConfigMap (TR-01) |
 | `stati.override` | `EURODIS_TRACKING_STATI_OVERRIDE` | vuoto | `status=codice` separati da virgola (TR-01) |
 | `stati.abilitati` | `EURODIS_TRACKING_STATI_ABILITATI` | vuoto (= tutti) | status SDA da inviare (TR-01) |
-| `filtro.applicativi` | `EURODIS_TRACKING_APPLICATIVI` | `CE` | RF-14 |
+| `filtro.applicativi` | `EURODIS_TRACKING_APPLICATIVI` | vuoto (= nessun filtro) | RF-14; `CE` per riattivarlo |
 | `location-code-default` | `EURODIS_TRACKING_LOCATION_CODE` | `SDA` | RF-21, ST-04 |
 | `country-code` | `EURODIS_TRACKING_COUNTRY_CODE` | `IT` | RF-21 |
 | `acceptor-name-default` | `EURODIS_TRACKING_ACCEPTOR_NAME_DEFAULT` | vuoto | RF-22 |
 | `consumer.abilitato`, `invio.abilitato` | `EURODIS_TRACKING_CONSUMER_ABILITATO`, `EURODIS_TRACKING_INVIO_ABILITATO` | `false`, `false` | RF-24 |
-| `cache-ldv.ttl-trovata`, `cache-ldv.ttl-non-trovata` | — | `30m`, `10m` | RF-16 |
+| `consumer.concurrency` | `EURODIS_TRACKING_CONSUMER_CONCURRENCY` | `3` | thread del consumer |
+| `cache-ldv.ttl-trovata`, `cache-ldv.ttl-non-trovata`, `cache-ldv.dimensione-massima` | `EURODIS_TRACKING_CACHE_TTL_TROVATA`, `EURODIS_TRACKING_CACHE_TTL_NON_TROVATA`, `EURODIS_TRACKING_CACHE_DIMENSIONE` | `30m`, `10m`, `500000` | RF-16 |
+| `retry.intervallo-iniziale`, `retry.intervallo-massimo`, `retry.durata-massima` | `EURODIS_TRACKING_RETRY_INIZIALE`, `EURODIS_TRACKING_RETRY_MASSIMO`, `EURODIS_TRACKING_RETRY_DURATA_MASSIMA` | `2s`, `5m`, `24h` (moltiplicatore 2) | RF-23 |
+| `mongo.collezione`, `mongo.canale` | — | `dichiarato_events`, `EUD_INVIOSYSTEM` | RF-16 |
 
-Topic, consumer group, Mongo, PostgreSQL, job e Helm: sezione 14 (Winston).
+Topic (`KAFKA_TOPIC_INPUT`, default `PACCHI.TRACKING`), consumer group (`KAFKA_CONSUMER_GROUP`), Mongo (`MONGO_STRING_CONNECTION`) e Helm: sezione 14 (Winston).
 
 ## 9. Osservabilità
 
@@ -623,12 +637,32 @@ Metriche (Micrometer/Prometheus, tag comune `service=ce-eurodis-send-tracking`),
 | `eurodis_tracking_lotto_non_correlabile_total` | counter | — |
 | `eurodis_tracking_esito_non_coincidente_total` | counter | — (RF-09) |
 
-Span OpenTelemetry: uno per chiamata HTTP, kind CLIENT, nome `eurodis.send-tracking <endpoint>`. Attributi: `http.status_code`, `eurodis.eventi`, `eurodis.creati`, `eurodis.rifiutati`. Il tracing non deve mai far fallire l'invio (principio di `TraceUtil`).
+Metriche del flusso da `PACCHI.TRACKING` [implementate in `4f7f067`]:
 
-Alert (più avanti, come AS-19 di `-in`):
-- qualsiasi `401`/`424`;
-- tasso di ERRORE_TEMPORANEO oltre soglia;
-- eventi ABBANDONATO.
+| Metrica | Tipo | Tag |
+|---|---|---|
+| `eurodis_tracking_tracce_lette_total` | counter | — |
+| `eurodis_tracking_tracce_total` | counter | `esito` |
+| `eurodis_tracking_scartati_total` | counter | `filtro` (`status_non_abilitato`, `applicativo`, `ldv_non_eurodis`, `acceptor_name_mancante`, `evento_non_valido`, `invio_disabilitato`) |
+| `eurodis_tracking_cache_ldv_total` | counter | `esito` (hit, miss) |
+| `eurodis_tracking_mongo_ricerca_durata` | timer | `esito` |
+| `eurodis_tracking_mongo_errori_total` | counter | — |
+| `eurodis_tracking_retry_total` | counter | `esito` |
+| `eurodis_tracking_tracce_abbandonate_total` | counter | — |
+| `kafka_consumer_fetch_manager_records_lag_max` | gauge | lag del consumer (Spring Kafka) |
+
+Span OpenTelemetry (il tracing non deve mai far fallire l'invio, principio di `TraceUtil`):
+- `eurodis.tracking.traccia`: CONSUMER, uno per evento, figlio del `traceparent` se presente;
+  attributi `status_sda`, `ldv` mascherata, `codice_eurodis`, `esito`, partizione, offset;
+- `eurodis.tracking.lookup_ldv`: CLIENT, solo quando la cache non ha la LDV; attributi `esito`, `cache`;
+- `eurodis.send-tracking <endpoint>`: CLIENT, la chiamata a EURODIS; attributi `http.status_code`,
+  `eurodis.eventi`, `eurodis.creati`, `eurodis.rifiutati`.
+
+Log: JSON nel formato di `ce-dichiarato-adapter` in tutti i profili, svil compreso, con MDC `traceId`,
+`spanId`, `partition`, `offset`, `ldv` mascherata, `status_sda`, `codice_eurodis`, `esito`. Nessun
+dato personale (RF-25).
+
+Alert Datadog: monitor TRK-01…TRK-11 in [alert-datadog-eurodis.md](alert-datadog-eurodis.md).
 
 ## 10. Requisiti non funzionali
 
@@ -668,19 +702,19 @@ Alert (più avanti, come AS-19 di `-in`):
 
 | # | Given / When / Then |
 |---|---|
-| AC-17 | Dato E2 con LDV EURODIS in Mongo, quando arriva, allora si salva una riga `DA_INVIARE` con codice `1767`, `edReference` 9900000000001, `eventTimestamp` `2026-11-12T06:02:10.000Z`, e il job invia l'evento di collo atteso |
-| AC-18 | Dato E1 (`000`) senza nome di chi ritira e default vuoto, la riga è `SCARTATO` con motivo `acceptor_name_mancante` e non parte nessuna chiamata |
+| AC-17 | Dato E2 con LDV EURODIS in Mongo, quando arriva, allora parte subito l'evento di collo `1767` con `edReference` 9900000000001 ed `eventTimestamp` `2026-11-12T06:02:10.000Z`, e l'offset si conferma dopo l'esito |
+| AC-18 | Dato E1 (`000`) senza nome di chi ritira e default vuoto, l'evento è scartato con `scartati_total{filtro=acceptor_name_mancante}` e non parte nessuna chiamata |
 | AC-19 | Dato E1 con `acceptor-name-default` configurato, parte l'evento `1100` con quel valore e il valore non compare nei log |
-| AC-20 | Dato E5 (`THE`), non si interroga Mongo, non si salva niente, cresce `stato_non_mappato_total{status="THE"}` |
-| AC-21 | Dato E6 (`TT`), lo scarto avviene al filtro 1 senza altre elaborazioni |
+| AC-20 | Dato E5 (`THE`), non si interroga Mongo, non si invia niente, crescono `scartati_total{filtro=status_non_abilitato}` e `stato_non_mappato_total{status="THE"}` |
+| AC-21 | Dato E6 (`TT`) con la configurazione di default, l'evento passa e si invia; con `EURODIS_TRACKING_APPLICATIVI=CE` è scartato con `scartati_total{filtro=applicativo}` senza interrogare Mongo |
 | AC-22 | Dato E7 (LDV non EURODIS), scarto al filtro 3; un secondo evento sulla stessa LDV entro il TTL non interroga Mongo (cache) |
 | AC-23 | Dato un documento Mongo con la LDV ma canale `PDB_INVIOSYSTEM`, l'evento è scartato al filtro 3 |
-| AC-24 | Dato E2 ricevuto due volte, una sola riga e un solo invio |
-| AC-25 | Dato Mongo non disponibile, l'evento non si perde: dopo il ripristino si salva e si invia |
+| AC-24 | Dato un errore temporaneo di EURODIS, lo stesso evento si ritenta con backoff senza avanzare l'offset; dopo 24 ore senza successo cresce `tracce_abbandonate_total` e l'offset avanza |
+| AC-25 | Dato Mongo non disponibile, l'evento non si perde: il consumer ritenta e dopo il ripristino lo invia |
 | AC-26 | Dato `EURODIS_TRACKING_STATI_OVERRIDE=THE=1767`, E5 genera un evento `1767`; dato `EURODIS_TRACKING_STATI_ABILITATI=000,GGG`, E3 non si invia |
 | AC-27 | Dato un file di stati montato con un codice di 3 cifre, il servizio non parte e il log indica riga e valore errati |
-| AC-28 | Dati due eventi dello stesso collo arrivati in ordine inverso di `dataTrack`, il job li invia in ordine di `dataTrack` |
-| AC-29 | Con `invio.abilitato=false` le righe restano `DA_INVIARE` e non parte nessuna chiamata; con `consumer.abilitato=false` il topic non si legge |
+| AC-28 | Ogni evento produce uno span `eurodis.tracking.traccia` con `status_sda`, `ldv` mascherata ed `esito`, e i log JSON hanno lo stesso MDC |
+| AC-29 | Con `invio.abilitato=false` gli eventi si leggono e si filtrano ma non parte nessuna chiamata (`scartati_total{filtro=invio_disabilitato}`); con `consumer.abilitato=false` il topic non si legge |
 | AC-30 | Nei log non compaiono nomi, indirizzi né LDV complete; le metriche di scarto si incrementano con i tag attesi |
 
 ## 12. Punti aperti e default provvisori
@@ -693,15 +727,15 @@ Alert (più avanti, come AS-19 di `-in`):
 | ST-04 | Significato di `locationCode` (es. `CN-CC`) e di `countryCode` per gli eventi SDA | campi passati dal chiamante | regola di derivazione (deposito SDA? codice EURODIS?) | PA-36 (nuovo) |
 | ST-05 | SDA riceve transit unit EURODIS? Servono gli eventi transit? | no | eventuali endpoint transit | PA-36 |
 | ST-06 | Massimo di eventi per lotto; ordine e numero degli elementi nella risposta | 100; stesso ordine | `lotto-max`; correlazione diversa se l'ordine non è garantito | PA-36 |
-| ST-07 | EURODIS scarta i doppioni? Una POST ripetuta crea due eventi? | retry anche sugli esiti incerti | se i doppioni sono un problema, esiti incerti a verifica manuale | PA-36 |
+| ST-07 | EURODIS scarta i doppioni? Una POST ripetuta crea due eventi? | retry anche sugli esiti incerti; senza storico una riconsegna dopo un riavvio crea un doppione | se i doppioni sono un problema, serve uno storico minimo per deduplicare | PA-36 |
 | ST-08 | Chiave API di send-tracking: la stessa di receive-pan? | stesso secret | secret separato | PA-12 |
 | ST-09 | Fuso orario atteso in `eventTimestamp` | UTC con `Z` | formato locale se richiesto | PA-27 |
 | ST-10 | Errori verso EURODIS (spedizioni scartate dal mapper): passano da un evento di eccezione? | fuori dal client | eventuale codice evento di scarto | PA-08 |
 | ST-11 | Status SDA non presente nella tabella (TR-03) | non si invia, warning e metrica | eventuale codice EURODIS di default | — |
 | ST-12 | `acceptorName` per `1100`: la sorgente SDA ha il nome di chi ritira? | `SCARTATO` se manca, salvo `acceptor-name-default` (RF-22) | campo della sorgente (V-02) o valore convenzionale concordato con EURODIS | PA-35, V-02 |
-| V-01 | Le LDV EURODIS (`deliveryPartnerBarcode`) arrivano su `PACCHI.TRACKING` con `applicativo = CE`? Con quali status? | si assume di sì | se no, cambia la sorgente o il filtro 1 | analisi 12-11 |
+| V-01 | Le LDV EURODIS (`deliveryPartnerBarcode`) arrivano su `PACCHI.TRACKING`? Con quale applicativo e quali status? | si assume di sì; il filtro applicativo è spento | se arrivano anche fuori da `CE` con codici di significato diverso (`CNP`, `ARP`), si riattiva `EURODIS_TRACKING_APPLICATIVI=CE` | analisi 12-11 |
 | V-02 | Campo con il nome di chi ritira per `000` | nessuno (RF-22) | si legge quel campo per `acceptorName` | ST-12 |
-| V-03 | Chiave Kafka di `PACCHI.TRACKING` in produzione e ordine degli eventi | ordine garantito dal job per `data_traccia` (RF-20) | nessuno se la chiave è l'LDV | analisi 12-11 |
+| V-03 | Chiave Kafka di `PACCHI.TRACKING` in produzione e ordine degli eventi | ordine di arrivo dalla partizione (RF-20), nessun riordino | se la chiave non è l'LDV, eventi dello stesso collo possono arrivare fuori ordine: valutare con EURODIS se è un problema | analisi 12-11 |
 | V-04 | Formato e fuso di `dataTrack` | `yyyy-MM-dd HH:mm:ss` ora italiana | conversione diversa | ST-09 |
 | V-05 | `PACCHI.TRACKING` in collaudo ha traffico `CE`? | test con eventi costruiti | prova end-to-end in collaudo | analisi 12-11 |
 | V-06 | Indice `{spedizione.collo.id_ldv: 1, canale: 1}` su `dichiarato_events` e accesso in lettura da send-tracking | da creare (owner della collezione/DBA) | senza indice il filtro 3 non regge i volumi | 3.3 |
@@ -728,131 +762,104 @@ Alert (più avanti, come AS-19 di `-in`):
 6. **`acceptorName`** per `1100` (ST-12): la sorgente SDA delle tracce ha il nome di chi ritira?
 
 
-## 14. Architettura (Winston, 12-11)
+## 14. Architettura (Winston, 12-11, versione 0.4 senza storico)
 
-Ricavata dalla parte funzionale 0.3 (sezioni 3.2-3.6, RF-13…RF-26). DDL e ambiente in
-[ddl-ce-eurodis-send-tracking.md](ddl-ce-eurodis-send-tracking.md).
+Allineata all'implementazione `ec2f65b`. Supera la versione del 12-11 con storico PostgreSQL e job di
+invio: [ddl-ce-eurodis-send-tracking.md](ddl-ce-eurodis-send-tracking.md) è superato, per send-tracking
+non c'è nessuna DDL.
 
 ### 14.1 Componenti
 
 ```mermaid
 flowchart LR
-  T[PACCHI.TRACKING] --> C[TracceConsumer<br/>batch listener]
-  C --> F[FiltroTracce<br/>1 applicativo, 2 status: in memoria]
-  F --> L[LookupLdvEurodis<br/>cache Caffeine + Mongo]
-  L -->|solo trovate| R[(PostgreSQL ce_eud_tracking<br/>eurodis_tracce)]
-  M[(Mongo preadvising<br/>dichiarato_events)] --- L
-  J[JobInvio ShedLock] --> R
-  J --> K[SendTrackingClient esistente] --> E[EURODIS send-tracking]
-  S[TabellaStati<br/>CSV interno / ConfigMap / override] --- F
+  K[PACCHI.TRACKING] --> C[TracceConsumer<br/>ack-mode record]
+  C --> F[Filtri in memoria<br/>1 status abilitato<br/>2 applicativo se configurato]
+  F --> L[RiconoscitoreSpedizioneEurodis<br/>oggi RiconoscitoreSuMongo + cache Caffeine]
+  L --> M[(MongoDB dichiarato_events)]
+  L -->|EUD_INVIOSYSTEM| T[Traduzione TR-01<br/>tabella + override ConfigMap]
+  T --> S[SendTrackingClient]
+  S --> E[EURODIS send-tracking<br/>POST /events/parcel/v1]
 ```
 
-| Componente | Responsabilità | Note |
-|---|---|---|
-| `TracceConsumer` | Consuma `PACCHI.TRACKING` con listener **a lotti** (`max.poll.records` 500), group `ce-eurodis-send-tracking-group`, `ack-mode` manuale per lotto | Legge il JSON con un parser tollerante (solo i campi della 3.2). Commit dell'offset dopo il salvataggio del lotto (RF-18). `auto-offset-reset: latest` al primo avvio: lo storico del topic non si rielabora |
-| `FiltroTracce` | Filtri 1 e 2 su stringhe, nessun accesso esterno | ~114 eventi/s `CE` in produzione: costo trascurabile |
-| `TabellaStati` | Carica la tabella: file `eurodis.tracking.stati.file` (ConfigMap montata) o risorsa interna, poi `override`, poi `abilitati` (TR-01); valida all'avvio | Estende `DecodificaStati`/`TraduttoreStati` esistenti. Ricarica solo al riavvio (un cambio di ConfigMap richiede il restart del pod) |
-| `LookupLdvEurodis` | Filtro 3: cache Caffeine per LDV (TTL 30 min trovata, 10 min non trovata, dimensione massima configurabile, default 500.000), poi query Mongo in sola lettura | Query `{ "spedizione.collo.id_ldv": ldv, "canale": "EUD_INVIOSYSTEM" }`, proiezione su `_id`, `id_file`, `spedizione.rif_spedizione`, `spedizione.numero_colli`, `spedizione.internazionale.id_ldv_itz`, `dataUltimaModifica`; ordinamento per `dataUltimaModifica` decrescente, `limit 1`. Read preference `secondaryPreferred`. Errore Mongo → eccezione: il lotto non si conferma e si riprova (RF-17) |
-| `TracceRepository` | `INSERT ... ON CONFLICT (ldv, status_sda, data_traccia) DO NOTHING`; query del job | JDBC; batch insert |
-| `JobInvio` | Ogni minuto (`eurodis.tracking.invio.cron`), un pod (ShedLock JDBC, `POSTGRES_SQL`): prende fino a `lotto-max` righe `DA_INVIARE`/`DA_RIPROVARE` con `prossimo_tentativo_il` scaduto, in ordine `ldv, data_traccia`; per ogni LDV salta le righe successive alla prima ancora in errore (ordine per collo, RF-20); costruisce gli eventi (RF-21, RF-22) e chiama `SendTrackingClient` a lotti | Esiti come RF-04; `DA_RIPROVARE` con backoff 1, 5, 15, 60 minuti fino a 24 ore, poi `ABBANDONATO`; `ERRORE_CONFIGURAZIONE` sospende il job per `eurodis.tracking.invio.pausa-configurazione` (default 15 min) |
-| `JobPulizia` | Conservazione (DDL, sezione 4) | DA DECIDERE la durata |
+| Componente | Ruolo |
+|---|---|
+| `TracceConsumer` | Consuma `PACCHI.TRACKING` (`KAFKA_TOPIC_INPUT`), group `ce-eurodis-send-tracking-group`, `ack-mode: record`, `auto-offset-reset: latest`, concurrency 3. Uno span CONSUMER per evento, MDC per i log |
+| `ElaboratoreTracce` | Applica i filtri nell'ordine status → applicativo (se configurato) → spedizione EURODIS, traduce lo status, prepara l'evento EURODIS (RF-21, RF-22) e lo invia |
+| `RiconoscitoreSpedizioneEurodis` | Interfaccia del filtro 3. Oggi `RiconoscitoreSuMongo`: query su `dichiarato_events` per `spedizione.collo.id_ldv` e `canale = EUD_INVIOSYSTEM`, cache Caffeine (30 min trovate, 10 min non trovate, 500.000 voci), errori non cachati. Domani una regola sulla sintassi della LDV (DF-29, PA-38), senza Mongo |
+| `TabellaStati` | Tabella SDA → EURODIS dalla risorsa interna o dal file montato (`stati.file`), con `stati.override` e `stati.abilitati` da ConfigMap; configurazione non valida → il servizio non parte |
+| `SendTrackingClient` | Client esistente (RF-01…RF-12), una chiamata per evento |
+| Retry | `DefaultErrorHandler` con backoff esponenziale (2 s, ×2, massimo 5 min fra i tentativi, 24 h in tutto) sugli errori temporanei, di configurazione e di Mongo; l'offset non avanza durante i tentativi; poi abbandono con metrica |
 
 ### 14.2 Flusso
 
 ```mermaid
 sequenceDiagram
   participant K as PACCHI.TRACKING
-  participant C as TracceConsumer
-  participant Ca as Cache LDV
-  participant M as Mongo dichiarato_events
-  participant P as PostgreSQL eurodis_tracce
-  participant J as JobInvio
+  participant C as send-tracking
+  participant M as MongoDB dichiarato_events
   participant E as EURODIS
-  K->>C: lotto di eventi
-  C->>C: filtro 1 (CE) e 2 (status abilitato)
-  C->>Ca: LDV?
-  alt non in cache
-    Ca->>M: find(ldv, canale EUD_INVIOSYSTEM)
-    M-->>Ca: spedizione / nessuna
+  K->>C: evento (header, payload)
+  C->>C: status abilitato? applicativo ammesso (se configurato)?
+  alt LDV non in cache
+    C->>M: find spedizione.collo.id_ldv = ldv, canale = EUD_INVIOSYSTEM
+    M-->>C: documento o niente (in cache)
   end
-  C->>P: insert ON CONFLICT DO NOTHING (solo LDV EURODIS)
-  C->>K: commit offset del lotto
-  J->>P: DA_INVIARE / DA_RIPROVARE in ordine per LDV
-  J->>E: POST /events/parcel/v1
-  E-->>J: 201 con errors/warnings per elemento
-  J->>P: CREATO / RIFIUTATO / DA_RIPROVARE / ABBANDONATO
+  C->>C: traduzione status → codice EURODIS, evento di collo
+  C->>E: POST /events/parcel/v1
+  E-->>C: 201 creato / 400 rifiutato / 5xx, timeout
+  C->>K: commit offset dopo l'esito (retry con backoff sugli errori temporanei)
 ```
 
 ### 14.3 Volumi e prestazioni
 
-- Produzione: ~275 eventi/s sul topic, ~114/s `CE`; dopo i filtri 1-2 ~67/s arrivano al filtro 3.
-- Il filtro 3 regge solo con la **cache** e l'**indice** su `dichiarato_events` (V-06): senza indice
-  ogni ricerca scorre la collezione. Le LDV non EURODIS sono la quasi totalità: la cache "non
-  trovata" evita di rifare la ricerca per le tracce successive dello stesso collo (5-8 per collo).
-- Partizioni: il topic ne ha 15; `concurrency` del listener configurabile (default 3), repliche 1-3.
-- Metriche per dimensionare: lag del consumer, `cache_total{esito}`, durata della ricerca Mongo.
+- Il filtro sullo status (in memoria) scarta gran parte del traffico prima di qualsiasi accesso esterno.
+  Senza il filtro sull'applicativo arrivano al lookup più eventi che nella versione con `CE`: la cache
+  Caffeine e l'indice su Mongo sono necessari.
+- Indice `{ "spedizione.collo.id_ldv": 1, "canale": 1 }` su `dichiarato_events`: da creare dal DBA o
+  dall'owner della collezione (V-06).
+- Gli invii sono singoli: i volumi EURODIS sono bassi e il retry per evento resta semplice.
 
 ### 14.4 Ordine e doppioni
 
-- La chiave Kafka in produzione non è nota (V-03): gli eventi di un collo possono arrivare fuori
-  ordine. Il consumer salva tutto, l'ordine lo garantisce il job (RF-20).
-- Doppioni in ingresso: vincolo unico. In uscita: una riga `CREATO` non si reinvia; gli esiti
-  incerti si ritentano (ST-07, rischio di doppione accettato).
+- Ordine: quello di arrivo dalla partizione, senza riordino (RF-20, V-03).
+- Doppioni: senza storico non si deduplica. L'offset si conferma dopo l'esito, quindi un doppione nasce
+  solo da un riavvio a metà o da un esito incerto ritentato (ST-07).
 
 ### 14.5 Configurazione Helm
 
-| Variabile | Default `.helm` | svil | coll | prod (template) |
-|---|---|---|---|---|
-| `KAFKA_TOPIC_INPUT` | `PACCHI.TRACKING` | `PACCHI.TRACKING` (in svil non c'è traffico `CE`: per i test si può puntare a un topic di prova, vedi 14.7) | `PACCHI.TRACKING` | `_#KAFKA_TOPIC_TRACKING` |
-| `KAFKA_CONSUMER_GROUP` | `ce-eurodis-send-tracking-group` | | | |
-| `EURODIS_TRACKING_CONSUMER_ABILITATO` | `'false'` | `'true'` | `'false'` | `_#…` |
-| `EURODIS_TRACKING_INVIO_ABILITATO` | `'false'` | `'true'` (EURODIS TEST) | `'false'` | `_#…` |
-| `EURODIS_TRACKING_STATI_FILE` | vuoto | | | percorso del file montato se si usa la ConfigMap |
-| `EURODIS_TRACKING_STATI_OVERRIDE`, `EURODIS_TRACKING_STATI_ABILITATI` | vuoti | | | |
-| `DATASOURCE_*`, `MONGO_STRING_CONNECTION` | da secret | DDL, sezione 5 | | |
+| Variabile | svil | base / template prod |
+|---|---|---|
+| `KAFKA_TOPIC_INPUT` | `PACCHI.TRACKING` | idem |
+| `KAFKA_CONSUMER_GROUP` | `ce-eurodis-send-tracking-group` | idem |
+| `MONGO_STRING_CONNECTION` | secret `ce-dichiarato-validatore-secret`, chiave `mongo-string-connection` | idem |
+| `EURODIS_API_KEY` | secret `ce-eurodis-send-tracking-secret`, chiave `api-key` | idem |
+| `EURODIS_TRACKING_CONSUMER_ABILITATO`, `EURODIS_TRACKING_INVIO_ABILITATO` | `true` | `false` |
+| `EURODIS_TRACKING_STATI_OVERRIDE`, `EURODIS_TRACKING_STATI_ABILITATI` | vuoti | vuoti |
+| `EURODIS_TRACKING_APPLICATIVI` | vuoto | vuoto |
 
-ConfigMap degli stati (facoltativa): chiave `stati-inbound.csv` montata in
-`/config/eurodis/stati-inbound.csv` e `EURODIS_TRACKING_STATI_FILE` valorizzata; senza ConfigMap vale
-la risorsa interna.
+Il chart non monta ancora un file di stati da ConfigMap (`EURODIS_TRACKING_STATI_FILE`): oggi si usano
+override e abilitati. Permessi Kafka: l'utente SCRAM di `ce-eurodis-send-tracking-secret` deve leggere
+`PACCHI.TRACKING` con il gruppo indicato (in prod il topic è di un altro team). Senza `api-key` il
+servizio parte, ma gli invii danno `401` e restano in retry.
 
 ### 14.6 Osservabilità
 
-Metriche in aggiunta a quelle del client (sezione 9), prefisso `eurodis_tracking_`:
-
-| Metrica | Tipo | Tag |
-|---|---|---|
-| `tracce_lette_total` | counter | — |
-| `scartati_total` | counter | `filtro` (`applicativo`, `status`, `ldv`, `evento_non_valido`, `acceptor_name_mancante`) |
-| `cache_ldv_total` | counter | `esito` (`hit_trovata`, `hit_non_trovata`, `miss`) |
-| `mongo_ricerca_durata` | timer | — |
-| `mongo_errori_total` | counter | — |
-| `tracce_salvate_total`, `tracce_duplicate_total` | counter | — |
-| `tracce_da_inviare` | gauge | — (righe `DA_INVIARE` + `DA_RIPROVARE`) |
-| `invio_job_durata` | timer | — |
-| `tracce_abbandonate_total` | counter | — |
-
-Span: uno per lotto consumato (`eurodis.tracking.lotto`, attributi `eventi`, `scartati`, `salvati`),
-uno per ricerca Mongo non in cache (`eurodis.tracking.lookup_ldv`), uno per esecuzione del job
-(`eurodis.tracking.invio`) con figli gli span del client. Niente span per evento (volumi). Alert:
-[alert-datadog-eurodis.md](alert-datadog-eurodis.md), gruppo send-tracking.
+Metriche, span e log: sezione 9. Monitor: TRK-01…TRK-11 in [alert-datadog-eurodis.md](alert-datadog-eurodis.md).
 
 ### 14.7 Test
 
-- Unitari con gli esempi E1-E9 (sezione 3.6), Mongo simulato, H2 per il repository (limiti: `ON
-  CONFLICT`, indici parziali, `CHECK` con regex non coperti).
-- In svil `PACCHI.TRACKING` non ha eventi `CE`: per la prova integrata si iniettano gli eventi E1-E9
-  su un topic di prova dedicato (per esempio `preadvising.eud.tracking.test`, da far creare) puntando
-  `KAFKA_TOPIC_INPUT` su di esso, senza scrivere sul topic condiviso della rete pacchi.
+174 test verdi (`ec2f65b`): esempi E1–E9 con le metriche (`ElaboratoreTracceTest`), lookup e cache
+(`RiconoscitoreSuMongoTest`), span ed MDC (`TracceConsumerTracingTest`), tabella e override degli stati,
+client EURODIS con server finto.
 
 ### 14.8 Rischi e prerequisiti
 
-| # | Rischio / prerequisito | Mitigazione |
-|---|---|---|
-| R-1 | Nessun indice su `dichiarato_events.spedizione.collo.id_ldv` | script 5 della DDL (V-06), prima della produzione |
-| R-2 | ACL di lettura su `PACCHI.TRACKING` in produzione (topic di un altro team) | richiesta all'owner del topic |
-| R-3 | Secret Mongo condiviso con validatore e adapter (`ce-dichiarato-validatore-secret`) | stesso schema già usato dall'adapter; solo lettura |
-| R-4 | `acceptorName` assente (V-02): le consegne `1100` non partono | `acceptor-name-default` concordato con EURODIS, o campo della sorgente |
-| R-5 | Dipendenza da Mongo per il filtro 3 | domani regola sintattica delle LDV (DF-29, PA-38) |
+- In svil `PACCHI.TRACKING` non ha eventi `CE`: la prova end-to-end si fa con eventi costruiti sulle LDV
+  delle spedizioni `EUD_INVIOSYSTEM` già passate dalla catena, in numero minimo perché il topic è
+  condiviso.
+- Indice su Mongo (V-06) e permesso di lettura su `PACCHI.TRACKING`.
+- `acceptorName` per `1100` (V-02): senza, le consegne si scartano salvo un default concordato.
+- Doppioni dopo un riavvio (ST-07): se diventano un problema, serve uno storico minimo.
 
 ## Confronto fra le fonti EURODIS (12-11)
 
