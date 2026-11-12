@@ -4,7 +4,7 @@ campagna: e2e-eurodis-svil
 run: RUN-136596-20261112T113500Z
 tc: [TC-136596-011, TC-136596-021]
 gravita: bloccante
-stato: corretto_da_rilasciare
+stato: superato
 titolo: Il mapper lascia vuoto il codice nazione del mittente estero quando ce-anagrafica non risponde
 osservato: >
   Con ce-anagrafica in errore il mapper usava il default solo per l'Italia; per NL e DE codice_nazione restava
@@ -15,3 +15,4 @@ correzione: >
   di cod_nazione_iso3 in ce-anagrafica), ISO4 Poste vuoto, avviso nazione_iso3_standard. 106 test verdi.
   Scostamento da RF-15 della specifica del mapper (da aggiornare: Mary).
 responsabile: Amelia (fatto), Diego (rilascio)
+superato_da: DEF-136596-005 (BEP vuole ISO4 in codice_nazione: il ripiego ISO3 di a7544a1 e' stato tolto in 05720e6)

@@ -47,3 +47,21 @@ Kafka svil non raggiungibile dalla postazione fino alle 12:15 (rete), poi ok.
 | TC-136596-025 | ⛔ | confronto della copertura dei campi: in svil `preadvising.completed` ha solo `PDB` e `TUP`, nessun `EUD_INVIOFILE`; si rifà appena un tracciato EURODIS arriva su `completed` |
 
 Nota per i prossimi casi: usare un indirizzo reale di un luogo pubblico, perché la normalizzazione scarta le vie inventate.
+
+## RUN-136596-20261112T122000Z — dopo il rilascio di ldv-pdb (develop c8b94db)
+
+**Tipo**: iniezione su `preadvising.eud.pre.build` (`9900000000003` mittente IT, `…004` mittente DE,
+indirizzi reali di luoghi pubblici, resto inventato, `idFile` `acadddc6-…`) e reiniezioni mirate su
+`preadvising.pre-enrichment` del tracciato del mapper (`…005`, `…006`, `…007`) per isolare le cause.
+**Esito**: KO, BEP rifiuta; nessun tracciato EURODIS su `completed`.
+
+| Caso | Esito | Evidenza |
+|---|---|---|
+| `…004` (DE) | ❌ 1039 | il mapper `a7544a1` non risulta ancora in svil (codice nazione del mittente vuoto) |
+| `…003` (IT), dal mapper | ❌ BEP:100 `product` | normalizzazione ok; `ldv-pdb` → BEP: prodotto mancante. `ldv-pdb` usa solo `rif_prodotto_cliente`, che il mapper lasciava vuoto → [DEF-136596-004](triage/DEF-136596-004.yaml) |
+| `…005` = `…003` + `rif_prodotto_cliente` APT000901 | ❌ BEP:101 `country` | `codice_nazione` del mapper è ISO3 (`ITA`); nei tracciati PDB che arrivano a BEP è ISO4 Poste (`ITA1`, `USA1`, `SPA1`) → [DEF-136596-005](triage/DEF-136596-005.yaml) |
+| `…006` = `…005` + `codice_nazione` ISO4 | ❌ BEP:112 `Errore di sistema` (2 volte) | il paese passa; LDV del collo inventata (`9900000000006001`) |
+| `…007` = `…006` senza LDV del collo | ❌ BEP:100 `Collo id_ldv: code` | per Invio System la LDV è obbligatoria → serve una LDV PDB Express valida per BEP svil → [BLOCCO-136596-002](triage/BLOCCO-136596-002.yaml) |
+
+Mapper corretto su `develop` `05720e6` (DEF-004, DEF-005; supera il ripiego ISO3 di `a7544a1`).
+Smistatore e TC-025: non verificabili finché un tracciato EURODIS non arriva su `completed`.

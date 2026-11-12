@@ -1,0 +1,11 @@
+id: DEF-136596-004
+iniziativa: "136596"
+campagna: e2e-eurodis-svil
+run: RUN-136596-20261112T122000Z
+tc: [TC-136596-022]
+gravita: bloccante
+stato: corretto_da_rilasciare
+titolo: Il tracciato EURODIS non ha il prodotto BEP, ldv-pdb fallisce con BEP:100 product
+osservato: ce-dichiarato-ldv-pdb (BepRequestMapper.productOf) prende il prodotto solo da spedizione.rif_prodotto_cliente, senza default; il mapper lo lasciava vuoto (si contava sul default del vecchio ms -sync).
+correzione: mapper develop 05720e6, default APT000901 (PDB Express), sovrascrivibile con MAPPER_RIF_PRODOTTO_CLIENTE. Prodotto da confermare con SDA (DF-11, PA-23).
+responsabile: Amelia (fatto), Diego (rilascio e conferma del prodotto)

@@ -1,0 +1,18 @@
+id: DEF-136596-005
+iniziativa: "136596"
+campagna: e2e-eurodis-svil
+run: RUN-136596-20261112T122000Z
+tc: [TC-136596-011, TC-136596-022]
+gravita: bloccante
+stato: corretto_da_rilasciare
+titolo: codice_nazione in ISO3, BEP rifiuta il paese (BEP:101 country)
+osservato: >
+  ce-dichiarato-ldv-pdb manda a BEP country = codice_nazione e countryName = nazione. Il mapper scriveva
+  l'ISO3 (ITA); nei tracciati PDB su preadvising.completed in svil codice_nazione e' ISO4 Poste (ITA1, USA1,
+  BRA1, SPA1). Con codice_nazione = ITA1 (caso 9900000000006) BEP non segnala piu' il paese.
+correzione: >
+  mapper develop 05720e6: codice_nazione = codice_nazione_poste (ISO4). Tolto il ripiego ISO3 di a7544a1
+  (DEF-136596-003, superato): senza ce-anagrafica un paese estero resta senza codice e il validatore lo
+  segnala con 1039, invece di arrivare a BEP con un paese non conforme. La specifica del mapper (sezione 6.4,
+  ISO3 in codice_nazione) va aggiornata.
+responsabile: Amelia (fatto), Mary (specifica), Diego (rilascio)

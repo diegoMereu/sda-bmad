@@ -1,0 +1,13 @@
+id: BLOCCO-136596-002
+iniziativa: "136596"
+campagna: e2e-eurodis-svil
+tipo: dati di test (non e' un difetto)
+stato: aperto
+titolo: Serve una LDV PDB Express valida per BEP svil per portare un tracciato EURODIS fino a preadvising.completed
+osservato: >
+  Con LDV del collo inventata BEP risponde BEP:112 "Errore di sistema"; senza LDV BEP:100 "Collo id_ldv: code"
+  (obbligatoria per Invio System). I dati TEST di EURODIS non hanno deliveryPartnerBarcode.
+serve: >
+  Una o piu' LDV PDB Express di test valide in BEP svil per il cliente EURODIS (cli_c49353), oppure la regola
+  di validita' delle LDV (DF-29, Marzilli/SDA); in alternativa dati di test EURODIS con deliveryPartnerBarcode.
+responsabile: Diego (SDA / EURODIS)
