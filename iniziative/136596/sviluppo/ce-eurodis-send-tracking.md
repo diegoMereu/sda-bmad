@@ -278,6 +278,13 @@ Tabella del foglio (stessa sequenza del file):
 
 Winston, 10-11. Proposta ricavata dai **topic Kafka di svil** (non dal codice degli altri progetti), letti in sola lettura: metadati, offset e un campione di messaggi con `assign` e senza gruppo, quindi senza commit di offset. I campioni contengono dati personali e restano fuori dal repo; qui ci sono solo nomi dei campi e forme.
 
+> **12-11, aggiornamento (Mary)**: in **produzione** `PACCHI.TRACKING` porta gli status SDA del
+> foglio IN-BOUND con `header.applicativo = CE`: 9,85 milioni di eventi in 24 ore e 65 dei 76 status.
+> L'esclusione qui sotto vale solo per svil. Il topic diventa il primo candidato per l'opzione A, con
+> filtro `applicativo = CE` → status nel foglio (TR-03) → LDV in `eurodis_ldv`. Dati, copertura per
+> status e verifiche ancora aperte (V-01..V-05) in
+> [analisi-pacchi-tracking-prod-2026-11-12.md](../analisi-pacchi-tracking-prod-2026-11-12.md).
+
 **Cosa c'è oggi su Kafka svil** [FATTO, 10-11]
 
 - **`preadvising.eud.send-tracking`**, il topic messo come input in `application.yaml`, **non esiste**: nessuno lo alimenta.
