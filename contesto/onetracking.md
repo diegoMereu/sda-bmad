@@ -15,11 +15,11 @@ Repository in `C:\Users\diego.mereu\gitposte\SDA\ONETRACKING` (GitLab
 |---|---|---|---|
 | `PRESENTATION/portal-pages` | Front-end del portale | Nuxt **3.14** / Vue 3 su `develop` (Nuxt 2 sui vecchi `gen3`, ormai cancellato su origin) | `develop`, `master` (release `AA.MM.NN`) |
 | `PRESENTATION/shipment-info` | BFF: espone `/api/**` al FE e chiama tutti i sistemi | Spring Boot 2.7.18, Java 11 | `develop`, `master` |
-| `SHIPMENT/sda-wrapper` | Gateway JDBC verso i DB Informix SDA (ermes, pacchi, poste, billings), 50+ endpoint REST | Spring Boot | `develop` |
-| `SHIPMENT/alert-proattivo-wrapper` | Alert proattivi (cambio stato, cambio frazionario, dashboard NPS) | Spring Boot | `master` |
-| `CE-FILIALI/ce-filiali-wrapper` | Immagini LdV e configurazione filiali (con CE Blob Interface) | Spring Boot | `gen3` |
-| `USER/management` | Utenti, azioni, ultime ricerche (management-onetracking, IAM) | Spring Boot, script SQL in `ScriptSql/` | `develop` |
-| `MONITORING/onetracking-otel` | Collector OpenTelemetry del namespace | config OTel | `develop` |
+| `SHIPMENT/sda-wrapper` | Gateway JDBC in sola lettura verso Informix (ermes, pacchi, poste; billings rimosso), 50+ endpoint REST, nessuna autenticazione | Spring Boot 2.7.17, Java 11 | `develop` |
+| `SHIPMENT/alert-proattivo-wrapper` | Alert proattivi: ricerca, dettaglio, storico, cambio frazionario e stato; Oracle schema `MON_ALERT` (viste `V_*`, procedure `P_AGG_*`) | Spring Boot 2.7.3, immagini JDK 17 | `master` |
+| `CE-FILIALI/ce-filiali-wrapper` | Richiesta e notifica delle immagini di filiale per LdV: REST verso ce-blob-interface e ce-immagini-filiali, Kafka `CE.IMMAGINI-FILIALI-RISPOSTA`, PostgreSQL schema `ce-filiali-immagini` | Spring Boot 2.7.3, Java 17 | `gen3` |
+| `USER/management` | Utenti al login SSO, audit di azioni e ricerche, funzionalità ed eccezioni di profilazione (UPS); PostgreSQL `onetracking` schema `users` (`ScriptSql/`) | Spring Boot 2.4.9, Java 11 | `develop` |
+| `MONITORING/onetracking-otel` | Solo values del collector OTel per le metriche (chart esterno `poste-otel-for-metrics-app`): scrape Prometheus dei pod annotati, remote write su Amazon Managed Prometheus | config OTel 0.85 | `develop` |
 
 I README dei repo sono stati scritti nell'assessment (non committati nei repo).
 
@@ -93,5 +93,9 @@ sda-wrapper e migrazione vs tup`): sda-wrapper ed Ermes Full-Tracking da dismett
 - portal-pages: SAS token Azure in chiaro in `urlRistampaDhl` (nuxt.config, values), plugin axios con
   `NODE_TLS_REJECT_UNAUTHORIZED='0'` e log delle request intere. Da segnalare, non copiare.
 - shipment-info: `application-test.properties` contiene credenziali Solr di test versionate.
+- Nessun servizio del namespace ha Spring Security: tutti si fidano di `sm_user` del chiamante.
+- alert-proattivo-wrapper: WHERE costruita concatenando i filtri (rischio SQL injection).
+- ce-filiali-wrapper: SSL trust-all nel RestTemplate; `chart/templates/valuecoll.yaml` non tracciato
+  (values di collaudo finito in `templates/`, romperebbe l'install Helm).
 - Iniziative che toccano OT: 144216 (sezione preavviso), 138130 (causale reso mittente), 126278
   (autenticazione NFEA), 131176 (digipod), 138151 (blacklist indirizzi), 141077 (POD).
