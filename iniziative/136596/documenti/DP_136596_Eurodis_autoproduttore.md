@@ -8,6 +8,7 @@ approvazione: {nome: "", struttura: ""}
 revisioni:
   - {versione: "0.1", data: "05/11/2026", paragrafi: "Tutti", motivazioni: "Prima emissione"}
   - {versione: "0.2", data: "10/11/2026", paragrafi: "Tutti", motivazioni: "Persistenza su PostgreSQL al posto di MongoDB, area di appoggio locale con recupero, eventi di stato su preadvising.evensource, ce-anagrafica consultato dal mapper, F1 non consultato, catena a valle per il canale EUD_INVIOSYSTEM, frequenze per ambiente, allineamento alla SF 0.3"}
+  - {versione: "0.3", data: "13/11/2026", paragrafi: "1.1, 3.1", motivazioni: "Codice PK delle applicazioni CE (PK-03089, dalle label pkcode dei chart Helm)"}
 ---
 
 # Architettura Applicativa
@@ -21,17 +22,17 @@ L'iniziativa ha lo scopo di prendere in carico le spedizioni del consorzio EUROD
 | Processo | Fase | Sistema Applicativo (AP) / Applicazione (PK) | Ruolo dell'Applicativo | Impatto Applicativo (S/N) | Applicativo esistente o nuovo |
 |---|---|---|---|---|---|
 | Preadvising | Acquisizione spedizioni | EURODIS / API `receive-pan` | Piattaforma del partner: espone le spedizioni affidate a SDA | N | Esistente (esterno) |
-| Preadvising | Acquisizione e storicizzazione | CE (AP-00988) / `ce-dichiarato-eurodis-in` (PK DA DEFINIRE) | Scarica periodicamente le spedizioni da `receive-pan`, le appoggia su un'area locale, ne salva lo storico su PostgreSQL, pubblica gli eventi di stato della presa in carico su `preadvising.evensource` e una spedizione per messaggio su `preadvising.eud.pre.build` | S | Nuovo |
-| Preadvising | Trasformazione nel tracciato unico | CE (AP-00988) / `ce-dichiarato-eurodis-mapper` (PK DA DEFINIRE) | Converte la spedizione EURODIS nel tracciato unico (ICD v11, canale `EUD_INVIOSYSTEM`), ricava i codici nazione da `ce-anagrafica` e pubblica su `preadvising.pre-enrichment` | S | Nuovo |
-| Preadvising | Codici nazione | CE (AP-00988) / `ce-anagrafica` (PK DA DEFINIRE) | Restituisce i codici ISO3, ISO4 Poste e ISO2 della nazione di mittente e destinatario | N | Esistente |
-| Preadvising | Validazione del tracciato unico | CE (AP-00988) / `ce-dichiarato-validatore` (PK DA DEFINIRE) | Consuma il tracciato da `preadvising.pre-enrichment` e lo valida con le regole del canale `EUD_INVIOSYSTEM` (riuso delle regole `PDB_INVIOSYSTEM`); deve accettare i valori oltre le dimensioni ICD (vincolo 2 della SF) | S | Esistente |
-| Preadvising | Orchestrazione | CE (AP-00988) / `ce-dichiarato-orchestratore` (PK DA DEFINIRE) | Per il canale `EUD_INVIOSYSTEM` esegue normalizzazione, arricchimento BEP e creazione su PDB, poi pubblica su `preadvising.completed` | S | Esistente |
-| Preadvising | Arricchimento | CE (AP-00988) / ce-rules (PK DA DEFINIRE) | Determinazione di prodotto e servizi, consultato dalla catena esistente | N | Esistente |
-| Preadvising | Propagazione verso PDB | CE (AP-00988) / `ce-dichiarato-ldv-pdb` (PK DA DEFINIRE) | Converte il tracciato unico nella richiesta PDB e crea la spedizione con `waybillCreate`. Nessuno sviluppo previsto: verifica delle osservazioni della SF, eventuali correzioni a carico del responsabile | N | Esistente |
+| Preadvising | Acquisizione e storicizzazione | CE (AP-00988) / `ce-dichiarato-eurodis-in` (PK-03089) | Scarica periodicamente le spedizioni da `receive-pan`, le appoggia su un'area locale, ne salva lo storico su PostgreSQL, pubblica gli eventi di stato della presa in carico su `preadvising.evensource` e una spedizione per messaggio su `preadvising.eud.pre.build` | S | Nuovo |
+| Preadvising | Trasformazione nel tracciato unico | CE (AP-00988) / `ce-dichiarato-eurodis-mapper` (PK-03089) | Converte la spedizione EURODIS nel tracciato unico (ICD v11, canale `EUD_INVIOSYSTEM`), ricava i codici nazione da `ce-anagrafica` e pubblica su `preadvising.pre-enrichment` | S | Nuovo |
+| Preadvising | Codici nazione | CE (AP-00988) / `ce-anagrafica` (PK-03089) | Restituisce i codici ISO3, ISO4 Poste e ISO2 della nazione di mittente e destinatario | N | Esistente |
+| Preadvising | Validazione del tracciato unico | CE (AP-00988) / `ce-dichiarato-validatore` (PK-03089) | Consuma il tracciato da `preadvising.pre-enrichment` e lo valida con le regole del canale `EUD_INVIOSYSTEM` (riuso delle regole `PDB_INVIOSYSTEM`); deve accettare i valori oltre le dimensioni ICD (vincolo 2 della SF) | S | Esistente |
+| Preadvising | Orchestrazione | CE (AP-00988) / `ce-dichiarato-orchestratore` (PK-03089) | Per il canale `EUD_INVIOSYSTEM` esegue normalizzazione, arricchimento BEP e creazione su PDB, poi pubblica su `preadvising.completed` | S | Esistente |
+| Preadvising | Arricchimento | CE (AP-00988) / ce-rules (PK-03089) | Determinazione di prodotto e servizi, consultato dalla catena esistente | N | Esistente |
+| Preadvising | Propagazione verso PDB | CE (AP-00988) / `ce-dichiarato-ldv-pdb` (PK-03089) | Converte il tracciato unico nella richiesta PDB e crea la spedizione con `waybillCreate`. Nessuno sviluppo previsto: verifica delle osservazioni della SF, eventuali correzioni a carico del responsabile | N | Esistente |
 | Preadvising | Creazione spedizione | PDB (AP DA DEFINIRE) / servizio `waybillCreate` | Crea la spedizione con la LDV assegnata da EURODIS | N | Esistente |
-| Preadvising | Smistamento | CE (AP-00988) / `ce-dichiarato-smistatore` (PK DA DEFINIRE) | Instrada il tracciato completato del canale `EUD_INVIOSYSTEM` tra i canali Poste | S | Esistente |
+| Preadvising | Smistamento | CE (AP-00988) / `ce-dichiarato-smistatore` (PK-03089) | Instrada il tracciato completato del canale `EUD_INVIOSYSTEM` tra i canali Poste | S | Esistente |
 | Preadvising | Ricezione LDV | BEP (AP DA DEFINIRE) | Riceve la LDV dal tracciato unico | N | Esistente |
-| Tracciamento | Invio tracce al partner | CE (AP-00988) / `ce-eurodis-send-tracking` (PK DA DEFINIRE) | Traduce gli stati SDA nei codici evento EURODIS e li invia a EURODIS | S | Nuovo |
+| Tracciamento | Invio tracce al partner | CE (AP-00988) / `ce-eurodis-send-tracking` (PK-03089) | Traduce gli stati SDA nei codici evento EURODIS e li invia a EURODIS | S | Nuovo |
 | Tracciamento | Ricezione tracce | EURODIS / API `send-tracking` | Piattaforma del partner: riceve gli eventi di tracciamento | N | Esistente (esterno) |
 
 Tabella 1: Business Architecture – Preadvising EURODIS autoproduttore
@@ -148,15 +149,15 @@ Namespace esistente `corriere-espresso-preadvising`, condiviso con gli altri mic
 
 | (AP/PK) | Ambiente | Nome Cluster | Tipologia cluster | Namespace | Gen | Request Core (millicore) | Request Ram (MB) | Limit Core (core) | Limit Ram (MB) | Pod | BlobStorage (GB) |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| AP-00988 / `ce-dichiarato-eurodis-in` (PK DA DEFINIRE) | Sviluppo | DA DEFINIRE (esistente) | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | 100 | 256 | 0,5 | 1024 | 1 | Non applicabile |
-| AP-00988 / `ce-dichiarato-eurodis-in` (PK DA DEFINIRE) | Collaudo | DA DEFINIRE | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | 100 | 256 | 0,5 | 1024 | 1 | Non applicabile |
-| AP-00988 / `ce-dichiarato-eurodis-in` (PK DA DEFINIRE) | Produzione | DA DEFINIRE | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | proposta: 100 | proposta: 256 | proposta: 0,5 | proposta: 1024 | proposta: 1 | Non applicabile |
-| AP-00988 / `ce-dichiarato-eurodis-mapper` (PK DA DEFINIRE) | Sviluppo | DA DEFINIRE (esistente) | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | 100 | 256 | 0,5 | 1024 | 1 | Non applicabile |
-| AP-00988 / `ce-dichiarato-eurodis-mapper` (PK DA DEFINIRE) | Collaudo | DA DEFINIRE | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | 100 | 256 | 0,5 | 1024 | 1 | Non applicabile |
-| AP-00988 / `ce-dichiarato-eurodis-mapper` (PK DA DEFINIRE) | Produzione | DA DEFINIRE | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | proposta: 100 | proposta: 256 | proposta: 0,5 | proposta: 1024 | proposta: 1 | Non applicabile |
-| AP-00988 / `ce-eurodis-send-tracking` (PK DA DEFINIRE) | Sviluppo | DA DEFINIRE (esistente) | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | 100 | 256 | 0,5 | 1024 | 1 | Non applicabile |
-| AP-00988 / `ce-eurodis-send-tracking` (PK DA DEFINIRE) | Collaudo | DA DEFINIRE | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | 100 | 256 | 0,5 | 1024 | 1 | Non applicabile |
-| AP-00988 / `ce-eurodis-send-tracking` (PK DA DEFINIRE) | Produzione | DA DEFINIRE | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | proposta: 100 | proposta: 256 | proposta: 0,5 | proposta: 1024 | proposta: 1 | Non applicabile |
+| AP-00988 / `ce-dichiarato-eurodis-in` (PK-03089) | Sviluppo | DA DEFINIRE (esistente) | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | 100 | 256 | 0,5 | 1024 | 1 | Non applicabile |
+| AP-00988 / `ce-dichiarato-eurodis-in` (PK-03089) | Collaudo | DA DEFINIRE | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | 100 | 256 | 0,5 | 1024 | 1 | Non applicabile |
+| AP-00988 / `ce-dichiarato-eurodis-in` (PK-03089) | Produzione | DA DEFINIRE | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | proposta: 100 | proposta: 256 | proposta: 0,5 | proposta: 1024 | proposta: 1 | Non applicabile |
+| AP-00988 / `ce-dichiarato-eurodis-mapper` (PK-03089) | Sviluppo | DA DEFINIRE (esistente) | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | 100 | 256 | 0,5 | 1024 | 1 | Non applicabile |
+| AP-00988 / `ce-dichiarato-eurodis-mapper` (PK-03089) | Collaudo | DA DEFINIRE | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | 100 | 256 | 0,5 | 1024 | 1 | Non applicabile |
+| AP-00988 / `ce-dichiarato-eurodis-mapper` (PK-03089) | Produzione | DA DEFINIRE | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | proposta: 100 | proposta: 256 | proposta: 0,5 | proposta: 1024 | proposta: 1 | Non applicabile |
+| AP-00988 / `ce-eurodis-send-tracking` (PK-03089) | Sviluppo | DA DEFINIRE (esistente) | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | 100 | 256 | 0,5 | 1024 | 1 | Non applicabile |
+| AP-00988 / `ce-eurodis-send-tracking` (PK-03089) | Collaudo | DA DEFINIRE | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | 100 | 256 | 0,5 | 1024 | 1 | Non applicabile |
+| AP-00988 / `ce-eurodis-send-tracking` (PK-03089) | Produzione | DA DEFINIRE | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | proposta: 100 | proposta: 256 | proposta: 0,5 | proposta: 1024 | proposta: 1 | Non applicabile |
 
 Tabella 8: Openshift on Prem
 

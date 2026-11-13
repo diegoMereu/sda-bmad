@@ -145,6 +145,10 @@ Ogni tabella ha la didascalia `Tabella n: …` sotto, numerata in sequenza.
   `DP_136596_Eurodis_autoproduttore.md`.
 - Word: `python contesto/modelli/md2docx.py iniziative/<id>/documenti/DP_<id>_<slug>.md`.
   Il Word non si modifica a mano: si corregge il master e si rigenera.
+  All'apertura Word chiede di aggiornare i campi: rispondere sì per i numeri di pagina.
+  Il sommario lo ricostruisce il generatore dai titoli del master, con i loro
+  segnalibri: il template ha voci d'esempio che puntano a segnalibri inesistenti
+  e davano "Errore! Il segnalibro non è definito." (risolto il 13-11-2026).
 
 ### Front-matter del master
 

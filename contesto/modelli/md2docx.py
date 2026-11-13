@@ -12,7 +12,9 @@ nuova sezione su pagina nuova con quell'orientamento, per le tabelle con molte c
 senza questa riga il documento resta tutto verticale.
 
 Dal template si tiene solo la copertina (tutto quello che precede il primo
-Heading 1); il sommario si aggiorna all'apertura del file in Word.
+Heading 1). Il sommario del template viene ricostruito con le voci dei titoli veri e i loro
+segnalibri (niente "Errore! Il segnalibro non è definito."); i numeri di pagina li calcola Word
+all'apertura del file.
 Richiede python-docx e PyYAML.
 """
 import copy
@@ -62,6 +64,106 @@ def aggiorna_campi_all_apertura(doc):
         el = OxmlElement("w:updateFields")
         settings.append(el)
     el.set(qn("w:val"), "true")
+
+
+def _run(figlio=None, testo=None, campo=None):
+    r = OxmlElement("w:r")
+    rpr = OxmlElement("w:rPr")
+    rpr.append(OxmlElement("w:noProof"))
+    r.append(rpr)
+    if campo:
+        el = OxmlElement("w:fldChar")
+        el.set(qn("w:fldCharType"), campo)
+        r.append(el)
+    elif figlio:
+        el = OxmlElement(figlio)
+        if testo is not None:
+            el.text = testo
+            el.set(qn("xml:space"), "preserve")
+        r.append(el)
+    return r
+
+
+def ricostruisci_sommario(doc):
+    """Sostituisce le voci del sommario ereditate dal template (PAGEREF a segnalibri _Toc del
+    template, che nel documento non esistono: "Errore! Il segnalibro non è definito." appena Word
+    aggiorna i numeri di pagina) con le voci dei titoli veri, ciascuno con il suo segnalibro.
+    I numeri di pagina restano vuoti e li calcola Word all'apertura (updateFields)."""
+    body = doc.element.body
+    # il sommario può stare dentro un controllo contenuto (w:sdt): si cercano tutti i paragrafi
+    pars = list(body.iter(qn("w:p")))
+    inizio = next((p for p in pars if any((t.text or "").strip().startswith("TOC")
+                                           for t in p.iter(qn("w:instrText")))), None)
+    if inizio is None:
+        return
+    # paragrafi del campo TOC: dal begin all'end corrispondente (i PAGEREF sono annidati)
+    vecchi, livello = [], 0
+    for p in pars[pars.index(inizio):]:
+        vecchi.append(p)
+        for fc in p.iter(qn("w:fldChar")):
+            livello += 1 if fc.get(qn("w:fldCharType")) == "begin" else (
+                -1 if fc.get(qn("w:fldCharType")) == "end" else 0)
+        if livello <= 0:
+            break
+    istruzione = next(t.text for t in inizio.iter(qn("w:instrText")) if (t.text or "").strip().startswith("TOC"))
+    m = re.search(r'\\o\s+"(\d)-(\d)"', istruzione)
+    massimo = int(m.group(2)) if m else 3
+
+    titoli, contatori = [], [0] * 9
+    for p in doc.paragraphs:
+        nome = p.style.name if p.style is not None else ""
+        mt = re.match(r"^Heading (\d)$", nome)
+        if not mt or not p.text.strip():
+            continue
+        lv = int(mt.group(1))
+        contatori[lv - 1] += 1
+        contatori[lv:] = [0] * (9 - lv)
+        if lv <= massimo:
+            titoli.append((lv, ".".join(str(c) for c in contatori[:lv]), p))
+
+    nuovi = []
+    for n, (lv, numero, p) in enumerate(titoli):
+        nome_bm = f"_Toc9{n:08d}"
+        bs = OxmlElement("w:bookmarkStart")
+        bs.set(qn("w:id"), str(9000 + n))
+        bs.set(qn("w:name"), nome_bm)
+        be = OxmlElement("w:bookmarkEnd")
+        be.set(qn("w:id"), str(9000 + n))
+        ppr = p._p.find(qn("w:pPr"))
+        (ppr.addnext(bs) if ppr is not None else p._p.insert(0, bs))
+        p._p.append(be)
+
+        voce = OxmlElement("w:p")
+        vppr = OxmlElement("w:pPr")
+        st = OxmlElement("w:pStyle")
+        st.set(qn("w:val"), f"TOC{lv}")
+        vppr.append(st)
+        voce.append(vppr)
+        if n == 0:
+            voce.append(_run(campo="begin"))
+            voce.append(_run("w:instrText", istruzione))
+            voce.append(_run(campo="separate"))
+        link = OxmlElement("w:hyperlink")
+        link.set(qn("w:anchor"), nome_bm)
+        link.set(qn("w:history"), "1")
+        link.append(_run("w:t", numero))
+        link.append(_run("w:tab"))
+        link.append(_run("w:t", p.text.strip()))
+        link.append(_run("w:tab"))
+        link.append(_run(campo="begin"))
+        link.append(_run("w:instrText", f" PAGEREF {nome_bm} \\h "))
+        link.append(_run(campo="separate"))
+        link.append(_run(campo="end"))
+        voce.append(link)
+        if n == len(titoli) - 1:
+            voce.append(_run(campo="end"))
+        nuovi.append(voce)
+    if not nuovi:
+        return
+    for v in nuovi:
+        vecchi[0].addprevious(v)
+    for p in vecchi:
+        p.getparent().remove(p)
 
 
 def scrivi(par_or_cell, testo):
@@ -544,6 +646,7 @@ def main():
     (copertina_sf if tipo == "sf" else copertina_dp)(doc, fm)
     intestazione(doc, fm)
     Corpo(doc, src.parent).scrivi(m.group(2))
+    ricostruisci_sommario(doc)
     aggiorna_campi_all_apertura(doc)
     doc.save(str(dst))
     print(dst)

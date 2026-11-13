@@ -165,6 +165,9 @@ in Reply v1.0. Altrimenti si usa `# Soluzione` per fasi, come in SI.
   e finisce accanto al master, stesso nome `.docx`. Il Word non si modifica a
   mano: si corregge il master e si rigenera. All'apertura Word chiede di
   aggiornare i campi: rispondere sì, così si aggiorna il sommario.
+  Il sommario lo ricostruisce il generatore dai titoli del master, con i loro
+  segnalibri: il template ha voci d'esempio che puntano a segnalibri inesistenti
+  e davano "Errore! Il segnalibro non è definito." (risolto il 13-11-2026).
 
 ### Front-matter del master
 
