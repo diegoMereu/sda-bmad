@@ -45,9 +45,10 @@ Casi del mock up: 1 file con scarto ed errori, 2 file elaborato con successo, 3 
    - un documento → quello;
    - più documenti → **quello nello stato "uno"**; se non ce n'è, **il penultimo in ordine di tempo**
      (`event_ts`).
-   - Interpretazione adottata (AS-01, da confermare): lo stato "uno" è un valore di `event_type`
-     configurabile (`onetracking.preavviso.stato-preferito`, default `COMPLETED`); se più documenti
-     sono in quello stato si prende il più recente.
+   - Lo stato è il campo `event_type` del record di preavviso (ICD `pacchi_anagrafica`, iniziativa
+     138975: `PRE_ENRICHMENT` = ST_R0002, `COMPLETED` = ST_R0004, `ERROR` = ST_R0003/ST_R0006;
+     Diego, 13-11). Si prende il preavviso in `COMPLETED` (valore in proprietà
+     `onetracking.preavviso.stato-preferito`); se più documenti sono `COMPLETED` vince il più recente.
 4. **File**: se il preavviso scelto ha `id_file`, `pacchi_file` con `idfile:"<id_file>"`.
 5. **Errori**: dal campo `preadv_errori` del preavviso scelto (formato da confermare, AS-04).
 
@@ -103,7 +104,7 @@ Date mostrate come `dd/MM/yyyy HH:mm`, ora di Roma.
 
 | ID | Assunzione adottata | Da confermare con |
 |---|---|---|
-| AS-01 | Lo stato "uno" della regola di scelta è un `event_type` configurabile, default `COMPLETED`; fra più documenti in quello stato vince il più recente | Diego |
+| AS-01 | Chiusa (13-11): lo stato è `event_type` del record; si sceglie `COMPLETED`, fra più `COMPLETED` il più recente | — |
 | AS-02 | Numero ordine = `code_externalId` (riferimento spedizione del cliente) | Poste / Diego |
 | AS-03 | Canale del preavviso non da file: nessun campo nell'ICD; il BE legge un campo configurabile (`onetracking.preavviso.campo-canale`, default `channel`), se manca mostra "-" | Poste |
 | AS-04 | Formato di `preadv_errori` non descritto nell'ICD: il BE accetta un array JSON (`campo`/`codice`/`descrizione` e varianti), altrimenti righe `campo|codice|descrizione` separate da `;`, altrimenti un solo errore con il testo grezzo in descrizione | Poste (team T&T-Repo) |
