@@ -73,7 +73,7 @@ Date mostrate come `dd/MM/yyyy HH:mm`, ora di Roma.
 
 ## Contratto dell'API
 
-`GET /api/preavviso/{ldv}` (shipment-info; il FE la chiama come le altre `/api/...`).
+`GET /api/preavviso/{ldv}` lato front-end; il proxy Nuxt toglie `/api`, quindi shipment-info la espone su `GET /preavviso/{ldv}` (come gli altri controller, senza prefisso).
 
 ```json
 {
