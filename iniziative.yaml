@@ -79,8 +79,12 @@ iniziative:
   - id: "144216"
     titolo: "Assistenza Clienti — Customer Journey preavviso"
     prj: PRJ0049429
-    stato: aperta
+    stato: in_corso
     owner_cliente: "Raimondo Malatesta"
     perimetro: >-
-      Customer journey del preavviso lato assistenza clienti: visibilita dello
-      stato di preavviso agli operatori.
+      Customer journey del preavviso lato assistenza clienti: nuova sottosezione
+      "Informazioni preavviso" nel dettaglio LdV di OneTracking (dati preavviso,
+      file di preavviso, errori) letta dal T&T-Repo (Solr pacchi_anagrafica e
+      pacchi_file). Requisiti DREQ0062862, DREQ0062864, DREQ0062865, DREQ0062866.
+      Repo shipment-info (API) e portal-pages (FE). Analisi in
+      iniziative/144216/analisi.md.
