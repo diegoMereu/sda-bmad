@@ -38,7 +38,7 @@ corrispondente di `wiremock-receive-pan.yaml`. Dopo una modifica alla ConfigMap 
   con `404`.
 - **Immagine.** `wiremock/wiremock` è un'immagine di terzi: in svil va presa dal registry Poste e deve
   passare il gate CVE.
-- **Alternativa già presente.** Su `develop` di `-in` c'è un mock di `receive-pan` dentro il servizio
-  (commit `16475e3`, `dd2c8fa`: generazione delle spedizioni e interruttore da Bruno); oggi svil e coll
-  puntano lì (`EURODIS_BASE_URL: 'http://localhost:8080/ce-dichiarato-eurodis-in/receive-pan'`).
+- **Dove punta svil.** Il mock interno a `-in` è stato tolto (revert del 12-11): su `develop` svil usa il
+  default di `.helm/values.yaml`, `https://testapi.eurodis.com/receive-pan`. Per usare questo mock va
+  messo `EURODIS_BASE_URL: 'http://wiremock-mock:8080/receive-pan'` nei values di svil.
 - Il mock Python per i test in locale è in [../README.md](../README.md).
