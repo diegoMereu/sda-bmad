@@ -1,0 +1,73 @@
+<mxfile host="drawio">
+  <diagram id="flussi-144216" name="Flussi dati">
+    <mxGraphModel dx="1600" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="560" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="titolo" value="144216 - Customer Journey preavviso: flussi dati della sezione &quot;Informazioni preavviso&quot;" style="text;html=1;fontSize=16;fontStyle=1;align=left;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="20" y="10" width="900" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="op" value="&lt;b&gt;Operatore&lt;/b&gt;&lt;br&gt;browser&lt;br&gt;dettaglio LV,&lt;br&gt;tab Mittente/Destinatario" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="20" y="110" width="150" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="sm" value="&lt;b&gt;SiteMinder&lt;/b&gt;&lt;br&gt;autenticazione&lt;br&gt;(nessuna modifica)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="210" y="110" width="140" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ns" value="OpenShift - namespace onetracking" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;fillColor=none;strokeColor=#6c8ebf;verticalAlign=top;align=left;spacingLeft=8;fontSize=11;fontColor=#6c8ebf;arcSize=3;" vertex="1" parent="1">
+          <mxGeometry x="390" y="60" width="640" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="fe" value="&lt;b&gt;portal-pages&lt;/b&gt;&lt;br&gt;front-end (Nuxt 3)&lt;br&gt;InfoPreavviso.vue&lt;br&gt;proxy /api" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="420" y="100" width="180" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="be" value="&lt;b&gt;shipment-info&lt;/b&gt;&lt;br&gt;back-end (Spring Boot)&lt;br&gt;PreavvisoController&lt;br&gt;GET /preavviso/{ldv}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="820" y="100" width="180" height="100" as="geometry" />
+        </mxCell>
+
+        <mxCell id="tt" value="T&amp;T-Repo (Solr, tramite AppGW) - nessuna modifica" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;fillColor=none;strokeColor=#666666;verticalAlign=top;align=left;spacingLeft=8;fontSize=11;fontColor=#666666;arcSize=3;" vertex="1" parent="1">
+          <mxGeometry x="1150" y="60" width="430" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="pa" value="&lt;b&gt;pacchi_anagrafica&lt;/b&gt;&lt;br&gt;documento della LdV&lt;br&gt;documenti di preavviso" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;size=10;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1170" y="100" width="190" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="pf" value="&lt;b&gt;pacchi_file&lt;/b&gt;&lt;br&gt;file di preavviso" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;size=10;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1390" y="100" width="170" height="140" as="geometry" />
+        </mxCell>
+
+        <mxCell id="catena" value="&lt;b&gt;Catena di preadvising&lt;/b&gt;&lt;br&gt;(nessuna modifica)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="830" y="400" width="200" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="topic" value="topic Kafka&lt;br&gt;&lt;b&gt;preadvising.evensource&lt;/b&gt;" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="405" width="220" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e1" value="1" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontSize=11;fontStyle=1;" edge="1" parent="1" source="op" target="sm"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e2" value="1" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontSize=11;fontStyle=1;" edge="1" parent="1" source="sm" target="fe"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e3" value="2. GET /preavviso/{ldv}&lt;br&gt;(http, servizio interno&lt;br&gt;shipment-info:8080)" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontSize=10;fontStyle=1;" edge="1" parent="1" source="fe" target="be"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e4" value="3. documento della LdV&lt;br&gt;q=id:&quot;ldv&quot;, rows=1" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontSize=10;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.2143;entryDx=0;entryDy=0;" edge="1" parent="1" source="be" target="pa"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e5" value="4. preavvisi della LdV&lt;br&gt;q=ldv:&quot;ldv&quot;, max 100" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontSize=10;exitX=1;exitY=0.7;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="be" target="pa"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e6" value="5. file del preavviso, q=idfile:&quot;id_file&quot; (solo se il preavviso ha un file)" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;fontSize=10;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.765;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="be" target="pf"><mxGeometry x="-0.6" relative="1" as="geometry"><mxPoint as="offset" /><Array as="points"><mxPoint x="910" y="310" /><mxPoint x="1520" y="310" /></Array></mxGeometry></mxCell>
+
+        <mxCell id="e7" value="6" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;dashed=1;fontSize=11;fontStyle=1;" edge="1" parent="1" source="catena" target="topic"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e8" value="7" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;dashed=1;fontSize=11;fontStyle=1;exitX=0.386;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=-10;" edge="1" parent="1" source="topic" target="pa"><mxGeometry x="-0.5" relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry></mxCell>
+        <mxCell id="e9" value="7" style="endArrow=block;html=1;labelBackgroundColor=#ffffff;dashed=1;fontSize=11;fontStyle=1;exitX=0.864;exitY=0;exitDx=0;exitDy=0;entryX=0.235;entryY=1;entryDx=0;entryDy=-10;" edge="1" parent="1" source="topic" target="pf"><mxGeometry x="-0.5" relative="1" as="geometry"><mxPoint as="offset" /><Array as="points"><mxPoint x="1370" y="360" /><mxPoint x="1430" y="360" /></Array></mxGeometry></mxCell>
+
+        <mxCell id="n1" value="&lt;b&gt;1. GET /api/preavviso/{ldv}&lt;/b&gt;&lt;br&gt;(https, tramite SiteMinder)" style="text;html=1;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="20" y="205" width="330" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="n6" value="6. eventi del preavviso e del file&lt;br&gt;(esistente)" style="text;html=1;align=center;fontSize=10;fontColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="1030" y="470" width="170" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="n7" value="7. indicizzazione nel T&amp;T-Repo&lt;br&gt;(esistente, iniziativa 138975)" style="text;html=1;align=left;fontSize=10;fontColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="1410" y="410" width="180" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="leg" value="I numeri sono quelli dei flussi dati del DP. Le risposte (JSON) seguono il percorso inverso delle richieste 1-5. Azzurro = componente modificato dall'iniziativa; grigio = esistente non modificato; arancio = utente. Tratteggio = alimentazione esistente del T&amp;T-Repo." style="text;html=1;align=left;fontSize=10;fontColor=#555555;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="20" y="500" width="980" height="40" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
