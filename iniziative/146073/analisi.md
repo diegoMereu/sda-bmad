@@ -73,6 +73,75 @@ Declaration ID si predispone nella fase 1 e si valorizza nella fase 2 (PA-01).
   versione della spedizione non si crea più di una dichiarazione.
 - Niente modifiche alle stampe LDV. Niente nuovo framework di logging né nuovo correlation ID.
 
+## Contratto della fase 1 (base comune dei funzionali)
+
+Decisione di Diego del 2026-11-16: **per ora si lavora solo sulla fase 1**. Le assunzioni
+che seguono servono a non bloccare i funzionali. Sono vincolanti per tutti i documenti di
+`sviluppo/` finché Poste non risponde (PA-02, PA-03, PA-04).
+
+**AS-01, nomi e posizione nel tracciato unico.** Si usa lo stile snake_case dell'ICD.
+
+```json
+{
+  "spedizione": [{
+    "account_key": "<52 caratteri>",
+    "declaration_id": null,
+    "collo": [{
+      "articolo": [
+        { "posizione": "1", "codice_taric": "...", "product_id": "<1-255 caratteri>" }
+      ]
+    }]
+  }]
+}
+```
+
+- `account_key` e `declaration_id` stanno sulla testata di ogni elemento di `spedizione[]`.
+- `product_id` sta su ogni elemento di `spedizione[].collo[].articolo[]`.
+- `declaration_id` è solo **predisposto**: in fase 1 è sempre assente o `null`, e si
+  propaga e si salva come gli altri due (è il 3° campo dell'HLD, PA-01).
+- Tutti e tre sono **opzionali** nei DTO, `String`, senza default e senza trasformazioni
+  (R-04, R-05).
+
+**AS-02, riconoscimento delle spedizioni soggette (R-01).** Una spedizione è soggetta se
+valgono **tutte** queste condizioni:
+
+- `importi.cliente_business` = `S`;
+- la nazione del destinatario è USA: `destinatario.codice_nazione_iso_2` = `US`, oppure
+  `destinatario.codice_nazione` in (`USA`, `US`);
+- non contiene solo documenti: `tipo_merce` diverso dal valore "documenti", da confermare;
+- `codice_prodotto` appartiene all'elenco dei prodotti interessati.
+
+I valori (S, US/USA, codice "documenti", elenco dei prodotti) e un flag di attivazione
+generale stanno in **configurazione** del validatore. Con l'elenco dei prodotti vuoto
+valgono tutti i prodotti. Con il flag spento la regola non scatta: è il default fino alla
+conferma di Poste.
+
+**AS-03, errori.** Seguono il modello delle regole esistenti: `errors.put(codice,
+descrizione)` sul `DichiaratoDTO`, con codici numerici di 4 cifre come `1181` e `1182`.
+I codici nuovi sono proposti nel funzionale del validatore, e Poste li conferma. L'esito è
+lo **scarto** della spedizione, come per gli altri campi obbligatori mancanti.
+
+| Errore | Descrizione (proposta) |
+|---|---|
+| Account Key assente | "Account Key: Campo obbligatorio mancante" |
+| Account Key di lunghezza diversa da 52 | "Account Key: lunghezza non valida (attesi 52 caratteri)" |
+| Product ID assente | "Articolo <posizione> collo <n>: Product ID obbligatorio mancante" |
+| Product ID più lungo di 255 | "Articolo <posizione> collo <n>: Product ID lunghezza non valida (1-255)" |
+
+**AS-04, SEW.** `account_key` e `declaration_id` vanno in colonne nuove della tabella della
+spedizione (`sew_spedizioni_work`, `_2` se scritta dallo stesso consumer, `sew_spedizioni_poste`).
+`product_id` va in una colonna nuova della **tabella articoli** che il consumer scrive già.
+Le DDL le esegue il DBA.
+
+**AS-05, ingresso.** Il builder, fuori perimetro, e i canali PDB, PDW e ILP (attraverso
+l'adapter) pubblicano i campi con i nomi di AS-01. Finché il builder non è pronto, i test si
+fanno con messaggi costruiti a mano su `preadvising.pre-enrichment`.
+
+**AS-06, fuori dalla fase 1.**
+- Zonos, valorizzazione del Declaration ID, dazi e fee, verso BEP.
+- Stampe.
+- Palmari (`sew_sped_pre_adv_online_out_tot`), T&T-Repo e OneTracking.
+
 ## Fase 1 — interventi (HLD)
 
 | Int. | Microservizio | Cosa fa | Indicazioni dalla descrizione | Stima TOW 1.2 | Repo |
