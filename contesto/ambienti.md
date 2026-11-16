@@ -40,5 +40,9 @@ lancia Diego: all'agente spetta indicare repo, branch e commit da rilasciare. `d
 - Un errore di riconoscimento del database (ShedLock "unknown database product") o "Could not open
   JDBC Connection" in più servizi insieme indica il database irraggiungibile, non un difetto del
   codice.
+- `NOT_ENOUGH_REPLICAS`, `NOT_LEADER_OR_FOLLOWER`, "Connection to node 2 ... could not be
+  established" su più producer insieme (eurodis-in, smistatore, eurodis-mapper) indicano un broker
+  Kafka di collaudo giù (16-11-2026: `tlogkaf02a`/`kafka-pcl2`, 10.60.35.232), non un difetto del
+  codice. I servizi riprovano da soli; quando il broker torna, si riprende senza intervento.
 - Una route che risponde 200 su un endpoint e 500 su un altro dello stesso servizio può dipendere
   dalla cache (`@Cacheable`) che maschera un database giù.
