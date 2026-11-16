@@ -137,6 +137,12 @@ Le DDL le esegue il DBA.
 l'adapter) pubblicano i campi con i nomi di AS-01. Finché il builder non è pronto, i test si
 fanno con messaggi costruiti a mano su `preadvising.pre-enrichment`.
 
+**Branch (decisione di Diego del 2026-11-16).** Tutto lo sviluppo va su un branch
+dedicato, `146073_compliance_usa_fase1`, uno per ogni repo toccato. Si parte da
+`origin/develop` oppure, se il repo non ha `develop`, dal suo branch di integrazione.
+Non si sviluppa mai su `develop`/`master` né su branch di altre iniziative. Il merge verso
+`develop` si fa con una merge request, dopo la revisione.
+
 **AS-06, fuori dalla fase 1.**
 - Zonos, valorizzazione del Declaration ID, dazi e fee, verso BEP.
 - Stampe.
