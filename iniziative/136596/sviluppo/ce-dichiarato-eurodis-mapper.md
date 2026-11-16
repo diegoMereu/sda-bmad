@@ -149,7 +149,7 @@ sequenceDiagram
 | RF-04 | Nessun troncamento **[DECISO 22-10, PA-16]**: ogni valore passa intero, anche oltre la dimensione ICD. |
 | RF-05 | Forma del tracciato come nella sezione 3.2. |
 | RF-06 | Messaggio non mappabile (corpo non JSON, `edReference` assente o non intero, **destinatario assente**: RF-14) → recoverer (sezione 7), nessuna pubblicazione. **Ogni altra mancanza non blocca**: si pubblica con `""`/`0`, con un warning e una metrica per campo (RF-07). La validazione di business è a valle (PA-32, da confermare). |
-| RF-07 | Obbligatori per BEP, controllati dopo il mapping: `data_spedizione`, `collo[].id_ldv`, `collo[].peso`. Se vuoti: warning con il **nome** del campo (mai il valore) e metrica `eurodis_mapper_campo_mancante_total{campo}`. |
+| RF-07 | Obbligatori per BEP, controllati dopo il mapping: `data_spedizione`, `collo[].id_ldv`, `collo[].peso`. Se vuoti: warning con il **nome** del campo e del campo EURODIS sorgente (mai il valore, sezione 7.1) e metrica `eurodis_mapper_campo_mancante_total{campo}`. |
 | RF-08 | `id_preadvising` = `UUID.randomUUID()` a ogni elaborazione **[DECISO 22-10]**. Una rielaborazione produce un secondo preadvising con lo stesso `rif_spedizione`: la deduplica è a valle (MAP-2). |
 | RF-09 | Date e ore si prendono **come arrivano**, senza conversioni di fuso (PA-27: fuso orario non dichiarato). Con o senza `Z` finale, il risultato è lo stesso. |
 | RF-10 | Pesi: kg → grammi (×1000), arrotondamento `HALF_UP` all'intero. |
@@ -369,6 +369,60 @@ Spring, cioè 9 tentativi senza attesa, poi log e salto del messaggio (MAP-3).
 `mapper.dlt.topic`; vuoto = disabilitata: log ERROR, metrica, offset avanti.
 Proposta: `preadvising.eud.pre.build.DLT`, da far creare se si decide.
 
+### 7.1 Campi nei log di scarti, avvisi e campi mancanti
+
+**[FATTO]** (16-11, branch `136596_dettaglio_scarti_mapper`). Ogni scarto, avviso e campo
+mancante dice **quale campo EURODIS** (o header Kafka) manca o non è valido e **quale campo del
+tracciato** alimenta, nella forma `<campo EURODIS> (causa) -> <campo tracciato>`. Solo nomi di
+campi, mai valori (RF-12). Le metriche non cambiano: il tag `motivo` dello scarto e i tag
+`motivo`/`campo` di avvisi e campi mancanti restano quelli della sezione 9 (bassa cardinalità);
+il dettaglio sta solo nei log e nel messaggio dell'eccezione (che con la DLT finisce
+nell'header `kafka_dlt-exception-message`).
+
+Scarti (log ERROR del recoverer `Messaggio scartato, non mappabile (motivo=…, campi=[…], partition=…,
+offset=…, chiave=…, dlt=…)` e WARN del consumer con `motivo=…, campi=[…]`). Sul destinatario si
+elencano tutti i campi mancanti, non solo il primo.
+
+| Motivo (tag metrica) | Caso | `campi` |
+|---|---|---|
+| `json` | corpo vuoto o non leggibile | `[]`: il messaggio di Jackson non si registra, contiene parti del payload |
+| `ed_reference` | assente | `edReference (assente) -> spedizione.rif_spedizione` |
+| `ed_reference` | parte decimale diversa da zero | `edReference (non intero) -> spedizione.rif_spedizione` |
+| `destinatario_assente` | oggetto assente | `consigneeAddress (oggetto assente) -> spedizione.destinatario` |
+| `destinatario_assente` | cap assente o vuoto | `consigneeAddress.zipcode (assente\|vuoto) -> spedizione.destinatario.cap` |
+| `destinatario_assente` | località assente o vuota | `consigneeAddress.city (assente\|vuoto) -> spedizione.destinatario.localita` |
+| `destinatario_assente` | entrambi | le due righe sopra, nello stesso scarto |
+
+`edReference` alimenta `spedizione.rif_spedizione`, che è anche la chiave Kafka in uscita;
+`id_preadvising` è un UUID generato e non dipende da `edReference` (RF-08).
+
+Avvisi (WARN `Spedizione EURODIS ed_reference=… mappata con avvisi [<motivo>: <campo>, …]`) e
+campi mancanti (WARN `… con campi obbligatori per BEP vuoti [<campo>: <dettaglio>, …]`). Un avviso
+che riguarda più campi (es. `anagrafica_ko` su mittente e destinatario) compare una volta per
+campo nel log, una volta sola nella metrica, come prima.
+
+| Tag metrica | Dettaglio nel log |
+|---|---|
+| `header_mancante` | `header idFile (assente) -> id_file`; `header ricevutoIl (assente) -> upload_time/dataInizioFlusso/instantInizioFlusso`; `header rifGrezzo (assente) -> link_file_fisico_inviato` (solo quelli mancanti) |
+| `colli_incoerenti` | `numberOfHandlingUnits (diverso dal numero di collis[]) -> spedizione.numero_colli` |
+| `fallback_data` | `entranceTimestamp (assente, si usa clearanceTimestamp) -> spedizione.data_spedizione/ora_spedizione` |
+| `anagrafica_ko` | `shipperAddress.countryCode (ce-anagrafica non risponde) -> spedizione.mittente.codice_nazione/codice_nazione_poste/codice_nazione_iso_2`; idem `consigneeAddress.countryCode -> spedizione.destinatario.…` |
+| `nazione_default_italia` | `<shipperAddress\|consigneeAddress>.countryCode (codifiche italiane di configurazione) -> spedizione.<mittente\|destinatario>.codice_nazione/codice_nazione_poste/codice_nazione_iso_2` |
+| `valuta_non_eur` | `cashOnDeliveryService.currency (non EUR) -> spedizione.contrassegno.importo_contrassegno` |
+| `tipo_cod_sconosciuto` | `cashOnDeliveryService.identifierForCODCollection (assente) -> spedizione.contrassegno.tipo_pagamento_contrassegno`, oppure `(diverso da 3 e 5)` |
+| campo `data_spedizione` | `entranceTimestamp e clearanceTimestamp (assenti) -> spedizione.data_spedizione`; oppure `entranceTimestamp (non nel formato yyyy-MM-dd)`; oppure `clearanceTimestamp (entranceTimestamp assente; non nel formato yyyy-MM-dd)` |
+| campo `collo[].id_ldv` | `collis[].deliveryPartnerBarcode (vuoto nei colli [1, 3] di 3) -> spedizione.collo[].id_ldv`; senza colli `collis[] (assente o vuoto) -> spedizione.collo[].id_ldv` |
+| campo `collo[].peso` | `collis[].weightOfUnit (assente o zero nei colli [2] di 3) -> spedizione.collo[].peso`; senza colli `collis[] (assente o vuoto) -> spedizione.collo[].peso` |
+
+Le posizioni dei colli partono da 1, come `numero_colli_parz`. I campi sorgente sono quelli del
+foglio "Mapping EURODIS" dell'ICD v11.
+
+Esempio (spedizione di svil con chiave `8888888888001` senza `consigneeAddress`):
+
+```
+Messaggio scartato, non mappabile (motivo=destinatario_assente, campi=[consigneeAddress (oggetto assente) -> spedizione.destinatario], partition=2, offset=0, chiave=8888888888001, dlt=false)
+```
+
 ## 8. Configurazione
 
 | Parametro | Env | Default | Note |
@@ -407,8 +461,11 @@ Modello: `ce-dichiarato-adapter` e `ce-dichiarato-eurodis-in` (`TraceUtil`,
 | `kafka_message_consumed_total`, `…_ok`, `…_ko`, `…_errore_tecnico` | — | esistenti, si tengono |
 | `eurodis_mapper_spedizioni_total` | `esito` = `pubblicata`, `non_mappabile`, `errore_tecnico`; `motivo` per i non mappabili (`json`, `ed_reference`, `destinatario_assente`) | esito per messaggio |
 | `eurodis_mapper_campo_mancante_total` | `campo` | RF-07 |
-| `eurodis_mapper_avvisi_total` | `motivo` = `colli_incoerenti`, `fallback_data`, `valuta_non_eur`, `tipo_cod_sconosciuto`, `header_mancante`, `anagrafica_ko` | regole con warning |
+| `eurodis_mapper_avvisi_total` | `motivo` = `colli_incoerenti`, `fallback_data`, `valuta_non_eur`, `tipo_cod_sconosciuto`, `header_mancante`, `anagrafica_ko`, `nazione_default_italia` | regole con warning |
 | `eurodis_mapper_durata_seconds` | — | timer dall'ingresso alla pubblicazione |
+
+I tag restano a bassa cardinalità: il campo EURODIS sorgente di scarti, avvisi e campi mancanti
+sta solo nei log (sezione 7.1), mai nei tag.
 
 Span: `eurodis.mapper.elabora`, figlio del `traceparent` di `-in`, con
 attributi `edReference`, `idEsecuzione`, `esito`; `traceparent` propagato in
