@@ -1,51 +1,153 @@
-# 146073 — Dazi USA: nuovi campi e controlli sul preadvising — analisi
+# 146073 — Compliance USA Entry Type 13: nuovi campi e controlli sul preadvising — analisi
 
-Versione 0.1 del 2026-11-16. Fonte: i due HLD v.1 del 09/11/2026 in `cliente/`
-(`HLD_146073_dati_preadvising_fase_1.xlsx`, `HLD_146073_dati_preadvising_fase_2.xlsx`,
-titolo interno "HLD_146073 - Dazi dati preadvising"). Sistema impattato in entrambi:
-**AP-00988 Corriere Espresso / PK-03089 ce-dichiarato**.
+Versione 0.2 del 2026-11-16.
+
+## Fonti
+
+| Documento | Ruolo |
+|---|---|
+| `cliente/HLD_146073_dati_preadvising_fase_1.xlsx` e `_fase_2.xlsx` (HLD v.1 del 09/11/2026, "Dazi dati preadvising") | **Perimetro e impatti di Accenture**: si stima e si sviluppa solo quello che c'è qui |
+| `cliente/20261116_descrizione_compliance_usa_entry_type_13.md` | Contesto generale dell'iniziativa: dati, regole, flusso Zonos, casi di test. Ha come titolo "146023", probabilmente un refuso |
+
+Sistema impattato: **AP-00988 Corriere Espresso / PK-03089 ce-dichiarato**.
 
 ## Obiettivo
 
-Il preavviso delle spedizioni soggette ai dazi USA deve avere due campi in più, **Account Key**
-e **Product ID**. Va controllato in validazione e i dati vanno propagati lungo tutta la
-catena preadvising fino alle tabelle SEW e a BEP. L'HLD parla di **3 nuovi campi**
-(interventi 07, 08 e 09 della fase 1), ma ne nomina solo due (vedi PA-01).
+Le spedizioni business verso gli USA che contengono merce devono rispettare la normativa
+USA **Entry Type 13**.
 
-L'iniziativa è divisa in due fasi:
+- **Fase 1, dati di accettazione**: il preavviso porta due nuovi campi, che vanno validati
+  e propagati lungo tutta la catena preadvising fino alle tabelle SEW:
+  - **Account Key**: uno per spedizione;
+  - **Product ID**: uno per articolo.
+- **Fase 2, lavorazione Zonos**: per queste spedizioni la catena chiama **Zonos**
+  attraverso un nuovo microservizio comune, realizzato dal team applicativo. Zonos
+  restituisce **Declaration ID**, dazi e fee, oppure un errore bloccante. Il risultato
+  va salvato e propagato. Nell'HLD Zonos è scritto "SOROS".
 
-- **Fase 1**: riconoscere le spedizioni, validare e propagare i nuovi campi. Ci sono già
-  i campi predisposti per la fase 2.
-- **Fase 2**: nuova lavorazione dell'orchestratore, ricezione di un campo da un "nuovo
-  sistema integrato" e invio dei due campi a BEP per la verifica su **SOROS**.
+Fuori dal nostro perimetro, secondo la descrizione:
+- `ce-dichiarato-builder`, che resta al team applicativo: acquisisce i campi dai canali e
+  li pubblica su pre-enrichment e cambio stato;
+- portali, servizi di spedizione, Internazionale/SLP, Partner, mappe Sterling;
+- il microservizio Zonos, salvo l'integrazione per chiamarlo e gestirne gli esiti.
 
-## Fase 1 — interventi
+## I dati
 
-| Int. | Microservizio | Cosa fa (HLD) | Stima TOW 1.2 | Repo (da verificare) |
+| Campo | Fase | Cardinalità | Regola | Posizione proposta nel tracciato unico |
 |---|---|---|---|---|
-| 01 | `ce-dichiarato-validatore` | Riconosce i casi in cui il preavviso deve avere Account Key e Product ID, aggiunge una validazione dedicata e prepara la propagazione dei campi. Va modificato il DTO e vanno scritte le nuove regole | 0,80 | `ce-dichiarato-validatore` (regole Drools in `rules/`, handler `PdbPreadvisingHandler`, `SdaFlussoHandler`, `PdbPdwFlussoHandler`…) |
-| 02 | `ce-dichiarato-orchestratore` | Propaga i nuovi campi sul topic: modifica del DTO, salvataggio a DB e metodo di merge | 0,40 | `ce-dichiarato-orchestratore` (`OrchestratoreService`, merge) |
-| 03 | `ce-dichiarato-smistatore` | Riceve i nuovi campi e li propaga sul topic | 0,40 | `ce-dichiarato-smistatore` |
-| 04 | `ce-dichiarato-monitoring`, event store, bff | Riceve i nuovi campi e li propaga | 0,40 | `ce-event-handler-monitoring`, `ce-event-handler-event-store`, `ce-dichiarato-bff` |
-| 05 | `ce-dichiarato-adapter` | Riceve i nuovi campi nei 3 consumer (PDB, PDW, ILP) e li propaga | 0,40 | `ce-dichiarato-adapter` (`KafkaConsumerPDB`, `KafkaConsumerPDW`, consumer ILP) |
-| 07 | Consumer `sew_spedizioni` | Salva i 3 nuovi campi nella tabella `sew_spedizioni_work` | 0,32 | `sda-ldv-preadv-consumer/consumer-sew_sped` (`AppConstants.queryInsertSewSpedizioniWork*`) |
-| 08 | Consumer `sew_spedizioni_poste` | Salva i 3 nuovi campi nella tabella `sew_spedizioni_poste` (unico intervento con impatto Database, M50) | 0,32 | `gitposte/SDA/ESITI/poste-ldv-preadv-consumer/consumer-sew_sped_poste` |
-| 09 | Producer dei dati da portali e web service | Modifica del batch che legge i preavvisi dei portali e dei web service, perché invii anche i 3 nuovi campi | 0,45 | da individuare (forse `sda-ldv-preadv-consumer/producer-sew-sped`, che legge le SEW e pubblica su Kafka) |
+| Account Key | 1 | una per spedizione | obbligatoria per le spedizioni soggette (vedi R-01); lunghezza **52** | testata `spedizione[]` (nome JSON da concordare col builder, es. `account_key`) |
+| Product ID | 1 | uno per **articolo** | obbligatorio per **ogni** articolo delle spedizioni soggette; lunghezza **1–255** | `spedizione[].collo[].articolo[]` (array che esiste già, con `posizione`, `codice_taric`, `valore`, `quantita`…), es. `product_id` |
+| Declaration ID | 2 | uno per spedizione | restituito da Zonos | testata `spedizione[]` |
+| Dazi, fee | 2 | da contratto Zonos | restituiti da Zonos | da contratto (oggi in `spedizione.importi` ci sono `importo_diritti_doganali`, `importo_oneri`…) |
 
-Non esiste un intervento 06 in fase 1: la numerazione salta dal 05 al 07.
+**I 3 campi dell'HLD.** Gli interventi 07, 08 e 09 della fase 1 parlano di "3 nuovi campi"
+da salvare nelle SEW e da inviare dal producer. In fase 2 l'HLD presume che il "campo
+propagato dal nuovo sistema integrato" sia già predisposto in fase 1. La lettura più
+coerente è questa: i 3 campi sono Account Key, Product ID e **Declaration ID**, e il
+Declaration ID si predispone nella fase 1 e si valorizza nella fase 2 (PA-01).
 
-## Fase 2 — interventi
+### Regole
 
-| Int. | Microservizio | Cosa fa (HLD) | Stima TOW 1.2 |
-|---|---|---|---|
-| 02 | `ce-dichiarato-orchestratore` | Instrada i casi riconosciuti in fase 1 verso una **nuova tipologia di lavorazione** e predispone la ricezione del suo esito. Va implementata la **lista dei campi che questa lavorazione può sovrascrivere** nel preavviso (DTO, salvataggio a DB, merge) | 1,00 |
-| 05 | `ce-dichiarato-adapter` | Riceve il nuovo campo nei 3 consumer. Non si può anticipare in fase 1 perché il nome del campo del sistema integrato non è ancora noto | 0,50 |
-| 06 | Invio e ricezione verso BEP | Aggiunge alla richiesta verso BEP i **due nuovi campi** che servono per la verifica su SOROS (modifica dell'evento Kafka prodotto verso BEP) | 0,54 |
-| 03, 04, 07, 08, 09 | smistatore, monitoring/event store/bff, consumer SEW, producer portali | Nessuna stima. L'HLD presume che in fase 1 la predisposizione copra **anche il campo propagato dal nuovo sistema integrato** | — |
+- **R-01**: l'obbligatorietà vale solo per le spedizioni **business**, **dirette negli
+  USA**, **con merce** (non documenti) e appartenenti ai **prodotti interessati**. Campi
+  candidati nel tracciato unico:
+  - `importi.cliente_business`;
+  - `destinatario.codice_nazione` / `codice_nazione_iso_2` (USA / US);
+  - `tipo_merce` o `collo.codice_contenuto` / `internazionale.codice_contenuto` per merce o documenti;
+  - `codice_prodotto` / `id_servizio` per i prodotti.
 
-Il verso BEP passa da `ce-dichiarato-ldv-pdb` e `ce-dichiarato-ldv-pdb-sync`
-(`BepClient`, `waybill-service-ou`). L'HLD però parla di "evento Kafka prodotto verso BEP",
-quindi va confermato quale dei due flussi è coinvolto (PA-06).
+  Valori e prodotti sono da confermare (PA-02).
+- **R-02**: il validatore controlla **solo presenza e lunghezza**. Niente lookup in
+  anagrafica, niente chiamate a Zonos.
+- **R-03**: l'errore deve indicare il campo e, per il Product ID, **l'articolo** non valido
+  (collo e `posizione` dell'articolo).
+- **R-04**: i servizi Preadvising non normalizzano, non convertono e non ricalcolano i due
+  campi. Il Product ID resta legato al suo articolo anche con più articoli, retry, replay e
+  reinvii.
+- **R-05**: i nuovi campi non devono rompere gli scenari non USA né gli eventi storici che
+  non li hanno: sono campi opzionali nei DTO e nel JSON.
+- **R-06 (fase 2)**: Zonos si chiama solo attraverso il microservizio comune. Questi esiti
+  sono **bloccanti** per il completamento dell'accettazione: timeout, errore tecnico,
+  errore di autorizzazione, risposta non valida, esito funzionale negativo.
+- **R-07 (fase 2)**: i retry sono idempotenti, con una chiave condivisa. Per la stessa
+  versione della spedizione non si crea più di una dichiarazione.
+- Niente modifiche alle stampe LDV. Niente nuovo framework di logging né nuovo correlation ID.
+
+## Fase 1 — interventi (HLD)
+
+| Int. | Microservizio | Cosa fa | Indicazioni dalla descrizione | Stima TOW 1.2 | Repo |
+|---|---|---|---|---|---|
+| 01 | `ce-dichiarato-validatore` | Modifica il DTO, riconosce le spedizioni soggette e aggiunge la validazione dedicata | Account Key in testata, Product ID nella lista degli articoli; regole R-01, R-02, R-03 | 0,80 | `ce-dichiarato-validatore` (regole Drools in `rules/`, handler per famiglia di canale) |
+| 02 | `ce-dichiarato-orchestratore` | Modifica il DTO, il salvataggio a DB e il merge | Nessuna perdita dei campi nei rami, nei retry e nelle ripartenze; il Product ID non si appiattisce a livello spedizione | 0,40 | `ce-dichiarato-orchestratore` |
+| 03 | `ce-dichiarato-smistatore` | Riceve e propaga i nuovi campi | Inoltro solo ai destinatari previsti dai contratti; compatibilità con i destinatari non adeguati | 0,40 | `ce-dichiarato-smistatore` |
+| 04 | monitoring, event store, bff | Riceve e propaga i nuovi campi | Event store: cardinalità per articolo nella serializzazione, replay e ricostruzione dello stato, eventi storici senza i campi | 0,40 | `ce-event-handler-monitoring`, `ce-event-handler-event-store`, `ce-dichiarato-bff` |
+| 05 | `ce-dichiarato-adapter` | Riceve e propaga i nuovi campi nei 3 consumer (PDB, PDW, ILP) | Account Key sulla spedizione, ogni Product ID sul suo articolo; campi assenti senza effetti sugli scenari non applicabili | 0,40 | `ce-dichiarato-adapter` (`KafkaConsumerPDB`, `KafkaConsumerPDW`, consumer ILP) |
+| 07 | Consumer `sew_spedizioni` | Salva i 3 campi in `sew_spedizioni_work` | — | 0,32 | `gitposte/SDA/preadvising/sda-ldv-preadv-consumer/consumer-sew_sped` (ha già `ArticoloColloDTO`) |
+| 08 | Consumer `sew_spedizioni_poste` | Salva i 3 campi in `sew_spedizioni_poste`; impatto Database M50 | — | 0,32 | `gitposte/SDA/ESITI/poste-ldv-preadv-consumer/consumer-sew_sped_poste` (scrive già una tabella articoli, `kafka.tabella.articolo`) |
+| 09 | Producer dei dati da portali e web service | Il batch invia anche i 3 campi | — | 0,45 | da individuare (forse `sda-ldv-preadv-consumer/producer-sew-sped`) |
+
+Per le SEW il Product ID, che è per articolo, va nella **tabella articoli**. Account Key e
+Declaration ID vanno nella tabella della spedizione (PA-05).
+
+## Fase 2 — interventi (HLD)
+
+| Int. | Microservizio | Cosa fa | Indicazioni dalla descrizione | Stima TOW 1.2 |
+|---|---|---|---|---|
+| 02 | `ce-dichiarato-orchestratore` | Instrada le spedizioni soggette verso una **nuova lavorazione** (Zonos) e ne riceve l'esito, con l'elenco dei campi che la lavorazione può sovrascrivere | Avvio quando i dati necessari sono disponibili (LDV/S10); esiti positivo, errore funzionale, timeout ed errore tecnico gestiti separatamente; nessun completamento positivo senza successo Zonos; idempotenza; Declaration ID, dazi e fee disponibili alle lavorazioni successive | 1,00 |
+| 05 | `ce-dichiarato-adapter` | Riceve il nuovo campo nei 3 consumer (non anticipabile in fase 1) | Declaration ID, dazi e fee solo dove richiesto; importi e valute senza perdita di precisione; niente esiti parziali spacciati per completi | 0,50 |
+| 06 | Invio e ricezione verso BEP | Aggiunge alla richiesta verso BEP i **due nuovi campi** che servono alla verifica Zonos (evento Kafka verso BEP) | — | 0,54 |
+| 03, 04, 07, 08, 09 | smistatore, monitoring/event store/bff, consumer SEW, producer | Nessuna stima: l'HLD presume che il campo sia già predisposto in fase 1 | Event store: esito e stato della lavorazione Zonos, replay senza chiamate duplicate | — |
+
+I "due nuovi campi" verso BEP sono, con ogni probabilità, Account Key e Product ID (PA-07).
+Verso BEP passano `ce-dichiarato-ldv-pdb` (asincrono, `preadvising.enrichment.pdb`) e
+`ce-dichiarato-ldv-pdb-sync` (`waybillCreate`).
+
+### Differenze fra la descrizione e l'HLD
+
+Vale l'HLD. Le differenze sono da allineare con Poste:
+
+| Nella descrizione, non nell'HLD | Nell'HLD, non nella descrizione |
+|---|---|
+| `ce-dichiarato-ldv`: mantenere i campi nell'associazione della LDV (fase 1); coordinare la chiamata Zonos e associare il Declaration ID (fase 2) | Consumer `sew_spedizioni_work` e `sew_spedizioni_poste` (int. 07, 08) |
+| `ce-dichiarato-state-machine-handler`: stati della lavorazione Zonos (fase 2) | Producer da portali e web service (int. 09) |
+| Event store: persistenza dell'esito Zonos (fase 2) | `ce-event-handler-monitoring` e `ce-dichiarato-bff` (int. 04) |
+| Dazi e fee da persistere e propagare | Invio dei due campi a BEP (int. 06 fase 2) |
+
+Ci sono anche due punti da chiarire nel contenuto:
+
+- La descrizione chiede all'adapter di aggiornare "i mapping verso PDB, IPER". Nel codice e
+  nell'HLD, invece, l'adapter è un ingresso: consuma PDB, PDW e ILP e pubblica su
+  `preadvising.pre-enrichment`.
+- Il passaggio dei campi da `ce-dichiarato-ldv` / `ldv-pdb` serve anche alla fase 1, perché
+  la LDV si crea lì. L'HLD della fase 1 però non lo stima.
+
+## Punti aperti
+
+| # | Punto | Serve per |
+|---|---|---|
+| PA-01 | Conferma che i "3 nuovi campi" dell'HLD sono Account Key, Product ID e Declaration ID, e che il Declaration ID si predispone in fase 1 | DTO, DDL, ICD |
+| PA-02 | Regola R-01 sui campi del tracciato: come si riconoscono "business" (`cliente_business` = S?), "USA" (`destinatario.codice_nazione_iso_2` = US?), "merce" (`tipo_merce`, `codice_contenuto`?) e quali sono i "prodotti interessati" (codici prodotto/servizio) | Validatore |
+| PA-03 | Nomi JSON dei campi nel tracciato unico, decisi con il team del builder, e aggiornamento dell'ICD | Tutti |
+| PA-04 | Codici e descrizioni dei nuovi errori di validazione (Account Key assente, Account Key di lunghezza errata, Product ID assente o errato per articolo) e loro effetto: scarto della spedizione | Validatore, scarti |
+| PA-05 | DDL: colonne in `sew_spedizioni_work` (e `_2`?), `sew_spedizioni_poste` e nelle tabelle articoli; chi le esegue | Int. 07, 08 |
+| PA-06 | Repo del batch producer dei preavvisi da portali e web service | Int. 09 |
+| PA-07 | Fase 2: quali sono i due campi verso BEP, con quale contratto e quale flusso (`ldv-pdb` o `ldv-pdb-sync`) | Int. 06 |
+| PA-08 | Fase 2: contratto del microservizio comune Zonos (sincrono o su topic, chiave di idempotenza, formato di dazi e fee, codici di errore) e punto del processo in cui si avvia la lavorazione | Orchestratore fase 2 |
+| PA-09 | Fase 2: elenco dei campi che la lavorazione Zonos può sovrascrivere nel preavviso; dazi e fee rientrano? | Orchestratore fase 2 |
+| PA-10 | `ce-dichiarato-ldv` e `ce-dichiarato-state-machine-handler` compaiono nella descrizione ma non nell'HLD: chi li fa? | Perimetro |
+| PA-11 | Palmari (`sew_sped_pre_adv_online_out_tot`), T&T-Repo e OneTracking: sono fuori perimetro? | Perimetro |
+
+## Casi di test minimi (fase 1, dalla descrizione)
+
+- Spedizione USA con un articolo, Account Key e Product ID validi.
+- Spedizione USA con più articoli e Product ID distinti.
+- Account Key assente o di lunghezza non valida.
+- Un solo articolo senza Product ID.
+- Retry e replay senza perdita dei nuovi campi.
+- Ricostruzione dello stato dall'event store.
+- Spedizione non USA, e spedizione USA con soli documenti: i campi non sono obbligatori.
+- Eventi storici privi dei nuovi campi.
+- Propagazione a valle con la cardinalità corretta (spedizione / articolo), fino alle SEW.
 
 ## Stime HLD (Accenture)
 
@@ -54,45 +156,12 @@ quindi va confermato quale dei due flussi è coinvolto (PA-06).
 | Fase 1 | 1,89 | 3,49 | 1,25 | 1,10 | 22.388,73 € |
 | Fase 2 | 1,08 | 2,04 | 0,71 | 0,61 | 12.969,62 € |
 
-Catalogo dimensionale:
+Catalogo:
 - Fase 1: 11 Servizio/API/Microservizio medio 0,5 e 1 Database medio 0,5.
 - Fase 2: 6 Servizio/API/Microservizio medio 0,5.
 
-Entrambe le fasi contano anche 1 Integration SFTP e 1 Sterling Integrator (basso 0,3).
-Nel foglio Impatti queste due voci non sono legate a nessun intervento: sembrano un residuo
-del template.
-
-## Cosa c'è già nel tracciato unico
-
-Nell'ICD del tracciato unico preadvising (`ICD_PREADVISING_LDV_EVENT_SOURCE_v11`, in
-`iniziative/136596/`) e nel codice dei repo preadvising **non esiste** nessun campo
-Account Key o Product ID, né riferimenti a SOROS. Ci sono già i campi doganali, che possono
-servire a riconoscere le spedizioni:
-
-- In `spedizione.importi`: `importo_diritti_doganali`, `incasso_diritti_doganali`,
-  `status_doganale`, `flag_pddp`, `addebito_oneri`, `importo_oneri`.
-- In `spedizione.internazionale`: `nazionalita`, `valore_spedizione`, `valuta`,
-  `descrizione`.
-- In `spedizione.collo.articolo`: `codice_taric`, `valore`, `valuta`, `english_descr`.
-
-Nel T&T-Repo (`pacchi_anagrafica`, ICD 138975) esistono `customsDeclaration_*` e
-`price_customsCharges`.
-
-## Punti aperti
-
-| # | Punto | Perché serve |
-|---|---|---|
-| PA-01 | Qual è il **terzo campo**? L'HLD dice "3 nuovi campi" ma nomina solo Account Key e Product ID. Forse è il campo del sistema integrato della fase 2 | DTO, DDL SEW, ICD |
-| PA-02 | Nome, tipo, lunghezza e obbligatorietà di Account Key e Product ID, e la loro posizione nel tracciato unico (sezione `spedizione.importi`, `spedizione.internazionale` o una nuova sezione) | ICD, validatore, DDL |
-| PA-03 | Regola che individua le spedizioni soggette: solo destinazione USA (`nazione` del destinatario `US`/`USA`)? Per quali clienti, canali e prodotti? Ci sono soglie di valore? | Validatore (int. 01) |
-| PA-04 | Esito della validazione se mancano i campi: scarto (codice e descrizione errore) o warning? | Validatore, scarti |
-| PA-05 | Da dove arrivano i campi in ingresso: tracciati a file (builder), PDB, PDW, ILP, portali e web service. Con quali nomi in ciascun canale? | Builder, adapter (int. 05), producer (int. 09) |
-| PA-06 | Verso BEP: quale flusso (`ldv-pdb` asincrono, `ldv-pdb-sync` `waybillCreate`, `enrichment_bep`) e quale contratto per i due campi. Cos'è SOROS e chi fa la verifica | Int. 06 fase 2 |
-| PA-07 | Fase 2: qual è la "nuova tipologia di lavorazione", su che topic gira, chi la esegue e quali campi può sovrascrivere | Orchestratore fase 2 |
-| PA-08 | Fase 2: nome e formato del campo del "nuovo sistema integrato". Senza questo dato non si può fare la predisposizione in fase 1 che l'HLD presume per smistatore, monitoring, SEW e producer | Coerenza fase 1 / fase 2 |
-| PA-09 | DDL di `sew_spedizioni_work` (e `_2`?) e `sew_spedizioni_poste`: l'HLD stima un impatto Database solo per `sew_spedizioni_poste`. Dove sta `sew_spedizioni_poste` e chi esegue le DDL | Int. 07, 08 |
-| PA-10 | Il batch producer dei preavvisi da portali e web service: quale repo? Il consumer di `sew_spedizioni_poste` è `ESITI/poste-ldv-preadv-consumer/consumer-sew_sped_poste` | Int. 09 |
-| PA-11 | Palmari (`sew_sped_pre_adv_online_out_tot`), T&T-Repo e OneTracking sono fuori perimetro? | Perimetro |
+Le voci Integration SFTP e Sterling Integrator (basso 0,3) non sono legate a nessun
+intervento: sembrano un residuo del template.
 
 ## Incongruenze negli HLD
 
@@ -100,5 +169,4 @@ Nel T&T-Repo (`pacchi_anagrafica`, ICD 138975) esistono `customsDeclaration_*` e
 - Nel foglio Impatti la numerazione non corrisponde a quella del foglio HLD:
   - in fase 1 l'intervento 04 compare solo come "monitoring";
   - in fase 2 gli interventi sono numerati 01, 02 e 03, mentre nel foglio HLD sono 02, 05 e 06.
-- Il "nuovo campo" dell'adapter in fase 2 non si può anticipare perché il suo nome è
-  ignoto. Gli altri servizi però dovrebbero predisporlo già in fase 1.
+- In fase 1 non esiste un intervento 06.

@@ -90,17 +90,18 @@ iniziative:
       iniziative/144216/analisi.md.
 
   - id: "146073"
-    titolo: "Dazi USA — nuovi campi e controlli sul preadvising"
+    titolo: "Compliance USA Entry Type 13 — nuovi campi e controlli sul preadvising"
     prj: null  # non ancora assegnato
     stato: in_analisi
     owner_cliente: null  # da definire
     perimetro: >-
-      Spedizioni verso gli USA soggette a dazi: nuovi campi sul preadvising
-      (Account Key, Product ID e un terzo da definire) con validazione
-      dedicata nel ce-dichiarato-validatore e propagazione su orchestratore,
-      smistatore, monitoring/event store/bff, adapter (PDB, PDW, ILP),
-      consumer sew_spedizioni_work e sew_spedizioni_poste, producer da
-      portali e web service (fase 1). Fase 2: nuova lavorazione
-      dell'orchestratore, campo da un nuovo sistema integrato, invio dei due
-      campi a BEP per la verifica su SOROS. HLD in iniziative/146073/cliente/,
-      analisi in iniziative/146073/analisi.md.
+      Spedizioni business verso gli USA con merce (dazi, Entry Type 13).
+      Fase 1: Account Key (per spedizione, 52 car.) e Product ID (per
+      articolo, 1-255) validati nel ce-dichiarato-validatore e propagati su
+      orchestratore, smistatore, monitoring/event store/bff, adapter (PDB,
+      PDW, ILP), consumer sew_spedizioni_work e sew_spedizioni_poste,
+      producer da portali e web service. Fase 2: lavorazione Zonos
+      (Declaration ID, dazi, fee) tramite microservizio comune, invio dei due
+      campi a BEP. Perimetro Accenture = HLD in iniziative/146073/cliente/;
+      builder e microservizio Zonos esclusi. Analisi in
+      iniziative/146073/analisi.md.

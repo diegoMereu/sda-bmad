@@ -1,41 +1,46 @@
-# 146073 — Dazi USA — nuovi campi e controlli sul preadvising
+# 146073 — Compliance USA Entry Type 13 — nuovi campi e controlli sul preadvising
 
 **Data**: 2026-11-16 · **Stato**: in_analisi · **Semaforo**: 🟡
 **Owner cliente**: da definire · **PRJ**: da assegnare
 
 ## In una riga
-Abbiamo letto i due HLD (fase 1 e fase 2) e preparato l'analisi 0.1. Gli interventi sono
-su 8 punti della catena ce-dichiarato. I campi però non sono ancora definiti: l'HLD parla
-di 3 campi e ne nomina 2 (Account Key, Product ID), mancano formato e regola di
-riconoscimento delle spedizioni USA. Senza questi dati non si scrivono i funzionali.
+Analisi 0.2 sugli HLD (che restano il nostro perimetro) e sulla descrizione generale. I
+due campi della fase 1 sono definiti:
+- Account Key: per spedizione, 52 caratteri;
+- Product ID: per articolo, 1–255 caratteri.
+
+Mancano ancora la regola esatta che riconosce le spedizioni soggette (business, USA, merce,
+prodotti), i nomi JSON nel tracciato e i codici di errore.
 
 ## Fatto dall'ultimo punto
 - 2026-11-16 — HLD v.1 del 09/11/2026 in `cliente/` (fase 1: 22.388,73 €, fase 2: 12.969,62 €).
-- 2026-11-16 — Analisi 0.1 (`analisi.md`):
-  - interventi per fase e microservizio, con i repo da toccare;
-  - stime;
-  - campi doganali già presenti nel tracciato unico;
-  - 11 punti aperti e le incongruenze degli HLD.
+- 2026-11-16 — Descrizione generale "Compliance USA Entry Type 13" in `cliente/`: campi, regole, flusso Zonos, casi di test.
+- 2026-11-16 — Analisi 0.2 (`analisi.md`):
+  - campi e regole;
+  - interventi HLD per fase, con le indicazioni della descrizione e i repo;
+  - differenze fra descrizione e HLD;
+  - 11 punti aperti.
 
 ## Prossimi passi
-- Chiedere a Poste la definizione dei campi e la regola di riconoscimento (PA-01…PA-05) — Diego — prossimo passo
-- Aggiornare l'ICD del tracciato unico con i nuovi campi, appena definiti — Mary — dopo le risposte
-- Funzionali per microservizio della fase 1 (`sviluppo/`), partendo dal validatore — Mary — dopo l'ICD
-- Chiarire con Poste il perimetro della fase 2 (lavorazione orchestratore, SOROS, contratto BEP, campo del sistema integrato) — Diego — da definire
+- Chiedere a Poste la regola di riconoscimento (PA-02), i nomi JSON concordati col builder (PA-03) e i codici di errore (PA-04) — Diego — prossimo passo
+- Allineare con Poste le differenze fra descrizione e HLD: `ce-dichiarato-ldv`, state-machine-handler, dazi e fee (PA-10) — Diego — prossimo passo
+- Funzionali della fase 1 per microservizio (`sviluppo/`), partendo dal validatore — Mary — dopo PA-02…PA-04
+- Fase 2: contratto del microservizio Zonos e del verso BEP (PA-07…PA-09) — Diego — da definire
 
 ## Blocchi e rischi
-- 🟡 Campi non definiti (nome, tipo, terzo campo): blocca DTO, DDL e ICD.
-- 🟡 Regola "spedizione USA soggetta a dazi" non descritta negli HLD: è il cuore della validazione.
-- 🟡 Fase 2: l'HLD presume che il campo del nuovo sistema integrato sia predisposto già in fase 1, ma il suo nome non è noto.
+- 🟡 La regola "business, USA, merce, prodotti interessati" non è ancora tradotta nei campi del tracciato: è il cuore della validazione.
+- 🟡 La descrizione assegna attività a `ce-dichiarato-ldv` e allo state-machine-handler, che non sono nell'HLD: rischio di lavoro fuori stima, oppure di campi persi nella creazione della LDV.
+- 🟡 Il "3° campo" dell'HLD sembra essere il Declaration ID, da predisporre in fase 1: va confermato.
 - 🟡 Producer dei preavvisi da portali e web service (int. 09): repo non ancora individuato.
 
 ## Serve dal cliente
-- Definizione dei campi: nome, tipo, lunghezza, obbligatorietà e posizione nel tracciato unico. Qual è il terzo campo?
-- Regola che individua le spedizioni soggette (destinazione USA? clienti, canali, prodotti, soglie).
-- Esito se i campi mancano: scarto con codice errore o warning.
-- Come arrivano i campi da file, PDB, PDW, ILP, portali e web service.
-- Fase 2: cos'è SOROS, contratto verso BEP, nuova lavorazione e campi sovrascrivibili, campo del sistema integrato.
+- Valori dei campi del tracciato che identificano business, USA, merce e prodotti interessati.
+- Nomi JSON di Account Key e Product ID nel tracciato unico (dal team del builder) e ICD aggiornato.
+- Codici e descrizioni dei nuovi errori di validazione.
+- Conferma dei 3 campi SEW (Account Key, Product ID, Declaration ID) e delle DDL.
+- Perimetro di `ce-dichiarato-ldv` e `ce-dichiarato-state-machine-handler`.
+- Fase 2: contratto del microservizio Zonos, contratto verso BEP, campi sovrascrivibili.
 - PRJ e owner cliente.
 
 ## Decisioni prese
-- Nessuna per ora.
+- 2026-11-16 — Il perimetro di Accenture è quello degli interventi negli HLD; la descrizione generale serve da contesto (Diego).
