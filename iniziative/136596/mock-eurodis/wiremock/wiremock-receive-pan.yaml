@@ -1,3 +1,6 @@
+# Mock WireMock di EURODIS receive-pan, come in svil al 2026-11-16 (ConfigMap aggiornata da Diego).
+# Si applica con: oc -n corriere-espresso-preadvising apply -f wiremock-receive-pan.yaml
+# Dati di fantasia: contatti e IBAN fittizi, indirizzi pubblici. Niente dati di produzione.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -7,7 +10,7 @@ data:
     {
       "request": {
         "method": "GET",
-        "urlPath": "/receive-pan/shipments/v2"
+        "urlPath": "/receive-pan/shipments/v1"
       },
       "response": {
         "status": 200,
@@ -16,13 +19,13 @@ data:
         },
         "jsonBody": [
           {
-            "edReference": 7319003746401,
-            "referencedEurodisShipmentNumber": 1234567890123,
+            "edReference": "8888888888001",
+            "referencedEurodisShipmentNumber": "{{randomValue length=13 type='NUMERIC'}}",
             "initiatingPartnerId": 1,
             "shipmentTypeIndicator": "N",
             "lineHaulIndicator": "L",
-            "clearanceTimestamp": "2024-03-29T00:00:00",
-            "entranceTimestamp": "2024-03-29T06:53:55",
+            "clearanceTimestamp": "{{now format='yyyy-MM-dd'}}T00:00:00",
+            "entranceTimestamp": "{{now format='yyyy-MM-dd'}}T06:53:55",
             "numberOfHandlingUnits": 1,
             "shipmentWeight": 15,
             "consignorsCustomerNumberAtDispatchPartner": "933499999",
@@ -35,7 +38,25 @@ data:
             "shipmentFlexField2": null,
             "shipmentFlexField3": null,
             "shipmentFlexField4": null,
-            "consigneeAddress": null,
+            "consigneeAddress": {
+              "contactName": "Mario Rossi",
+              "contactTelephone": "+390600000001",
+              "alternativeContactTelephone": "+390600000002",
+              "contactSMS": "+393330000001",
+              "contactEMail": "mario.rossi@example.it",
+              "companyName": "Poste Italiane S.p.A.",
+              "additionalAddressInfo1": "Direzione Generale",
+              "additionalAddressInfo2": null,
+              "street": "Viale Europa",
+              "streetNumber": "190",
+              "region": "RM",
+              "city": "Roma",
+              "zipcode": "00144",
+              "countryCode": "IT",
+              "additionalConsigneeInfo": "Consegna presso reception",
+              "gatewayAssigned": "ROM",
+              "pudoID": null
+            },
             "returnAddress": {
               "contactName": "Erika Mustermann",
               "additionalAddressInfo2": "Additional Info 1",
@@ -55,7 +76,24 @@ data:
               "additionalConsigneeInfo": "",
               "gatewayAssigned": "GET"
             },
-            "shipperAddress": null,
+            "shipperAddress": {
+              "contactName": "Erika Mustermann",
+              "contactTelephone": "+990000000001",
+              "alternativeContactTelephone": "+990000000002",
+              "contactSMS": "+880000000002",
+              "contactEMail": "e.mustermann@muster-company.de",
+              "companyName": "Muster Company",
+              "additionalAddressInfo1": null,
+              "additionalAddressInfo2": null,
+              "street": "Demo street",
+              "streetNumber": "1",
+              "region": null,
+              "city": "Berlin",
+              "zipcode": "12345",
+              "countryCode": "DE",
+              "additionalConsigneeInfo": null,
+              "gatewayAssigned": "GET"
+            },
             "remunerationAddress": null,
             "bookingInAddress": null,
             "deliveryService": {
@@ -124,7 +162,7 @@ data:
                 "width": 44,
                 "height": 55,
                 "volumetricWeight": null,
-                "deliveryPartnerBarcode": "JVGTCRDS0000000000014",
+                "deliveryPartnerBarcode": "JVGTCRDS{{randomValue length=14 type='NUMERIC'}}",
                 "dispatchPartnerBarcode": "51200000225059136400000031001",
                 "pudoOpeningCode": "1234",
                 "colloFlexField1": null,
@@ -139,6 +177,9 @@ data:
               }
             ]
           }
+        ],
+        "transformers": [
+          "response-template"
         ]
       }
     }
