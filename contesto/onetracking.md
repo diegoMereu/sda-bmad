@@ -5,8 +5,11 @@ lo stato di una spedizione** leggendo da molti back-end: dichiarato, tracking, g
 contrassegni, POD, reclami NFEA, immagini, alert proattivi. Nessun database proprio per i dati di
 spedizione: aggrega in lettura.
 
-Repository in `C:\Users\diego.mereu\gitposte\SDA\ONETRACKING` (GitLab
-`gitlab.alm.poste.it/ONETRACKING/...`), namespace OpenShift **`onetracking`**. Assessment del
+Repository in `C:\Users\diego.mereu\gitposte\SDA\ONETRACKING`, namespace OpenShift **`onetracking`**.
+**Il codice vivo è su GitHub Enterprise**: `https://posteitaliane.ghe.com/SVILUPPO/ONETRACKING_<GRUPPO>_<repo>.git`
+(es. `ONETRACKING_PRESENTATION_shipment-info`). Il GitLab `gitlab.alm.poste.it/ONETRACKING/...` è fermo a
+febbraio 2026 e rifiuta i push (403): prima di sviluppare verifica che `origin` punti a GHE e parti da
+`origin/develop` di GHE (a novembre 2026 era avanti di oltre 200 commit rispetto al GitLab). Assessment del
 13-11-2026: prima di usare un dettaglio in un documento ricontrolla il codice su `origin/develop`.
 
 ## Repository
@@ -55,6 +58,8 @@ operatore (browser) -> SiteMinder (header sm_user, ruolo, frazionario, filiale, 
 | Regole/anomalie | CE Rules | `ce-rules.endpoint` |
 
 Client Solr: `rest/RestClientSolr.java` (RestTemplate, query costruite a mano con `build(true)`).
+Su `develop` di GHE c'è anche `rest/TTRepoClient.java`: proxy T&T-Repo (`tt-repo.endpoint`, token
+Microsoft Entra), oggi solo `anagrafica/{ldv}` per id.
 
 ## T&T-Repo e preavviso
 
