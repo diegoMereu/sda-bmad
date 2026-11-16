@@ -88,3 +88,13 @@ iniziative:
       pacchi_file). Requisiti DREQ0062862, DREQ0062864, DREQ0062865, DREQ0062866.
       Repo shipment-info (API) e portal-pages (FE). Analisi in
       iniziative/144216/analisi.md.
+
+  - id: "146073"
+    titolo: "Spedizioni verso gli USA — nuovi campi e controlli sul preadvising"
+    prj: null  # non ancora assegnato
+    stato: aperta
+    owner_cliente: null  # da definire
+    perimetro: >-
+      Nuovi campi sul preadvising e relativi controlli per gestire i dati
+      richiesti dalle spedizioni verso gli USA. Perimetro di dettaglio da
+      ricavare dagli HLD del cliente (iniziative/146073/cliente/).
