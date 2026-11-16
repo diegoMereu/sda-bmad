@@ -120,13 +120,16 @@ conferma di Poste.
 descrizione)` sul `DichiaratoDTO`, con codici numerici di 4 cifre come `1181` e `1182`.
 I codici nuovi sono proposti nel funzionale del validatore, e Poste li conferma. L'esito è
 lo **scarto** della spedizione, come per gli altri campi obbligatori mancanti.
+Il nome del campo sta sempre prima dei due punti, perché il monitoring legge così il
+"campo in errore". Le occorrenze di più articoli si elencano fra parentesi, separate da
+`"; "`: la mappa degli errori ha una sola voce per codice.
 
 | Errore | Descrizione (proposta) |
 |---|---|
 | Account Key assente | "Account Key: Campo obbligatorio mancante" |
 | Account Key di lunghezza diversa da 52 | "Account Key: lunghezza non valida (attesi 52 caratteri)" |
-| Product ID assente | "Articolo <posizione> collo <n>: Product ID obbligatorio mancante" |
-| Product ID più lungo di 255 | "Articolo <posizione> collo <n>: Product ID lunghezza non valida (1-255)" |
+| Product ID assente | "Product ID: obbligatorio mancante (collo <n> articolo <posizione>)" |
+| Product ID più lungo di 255 | "Product ID: lunghezza non valida, attesi 1-255 caratteri (collo <n> articolo <posizione>)" |
 
 **AS-04, SEW.** `account_key` e `declaration_id` vanno in colonne nuove della tabella della
 spedizione (`sew_spedizioni_work`, `_2` se scritta dallo stesso consumer, `sew_spedizioni_poste`).
@@ -142,6 +145,11 @@ dedicato, `146073_compliance_usa_fase1`, uno per ogni repo toccato. Si parte da
 `origin/develop` oppure, se il repo non ha `develop`, dal suo branch di integrazione.
 Non si sviluppa mai su `develop`/`master` né su branch di altre iniziative. Il merge verso
 `develop` si fa con una merge request, dopo la revisione.
+
+**AS-07, campi assenti.** Un campo assente e un campo `null` si trattano allo stesso modo
+in tutta la catena. Ogni servizio serializza i campi nuovi secondo la propria convenzione:
+il validatore scrive i `null`, orchestratore e smistatore li omettono (`NON_NULL`). Nessun
+consumer deve distinguere i due casi. In tabella si scrive `NULL`, non `" "`.
 
 **AS-06, fuori dalla fase 1.**
 - Zonos, valorizzazione del Declaration ID, dazi e fee, verso BEP.
@@ -159,10 +167,56 @@ Non si sviluppa mai su `develop`/`master` né su branch di altre iniziative. Il 
 | 05 | `ce-dichiarato-adapter` | Riceve e propaga i nuovi campi nei 3 consumer (PDB, PDW, ILP) | Account Key sulla spedizione, ogni Product ID sul suo articolo; campi assenti senza effetti sugli scenari non applicabili | 0,40 | `ce-dichiarato-adapter` (`KafkaConsumerPDB`, `KafkaConsumerPDW`, consumer ILP) |
 | 07 | Consumer `sew_spedizioni` | Salva i 3 campi in `sew_spedizioni_work` | — | 0,32 | `gitposte/SDA/preadvising/sda-ldv-preadv-consumer/consumer-sew_sped` (ha già `ArticoloColloDTO`) |
 | 08 | Consumer `sew_spedizioni_poste` | Salva i 3 campi in `sew_spedizioni_poste`; impatto Database M50 | — | 0,32 | `gitposte/SDA/ESITI/poste-ldv-preadv-consumer/consumer-sew_sped_poste` (scrive già una tabella articoli, `kafka.tabella.articolo`) |
-| 09 | Producer dei dati da portali e web service | Il batch invia anche i 3 campi | — | 0,45 | da individuare (forse `sda-ldv-preadv-consumer/producer-sew-sped`) |
+| 09 | Producer dei dati da portali e web service | Il batch invia anche i 3 campi | — | 0,45 | `sda-ldv-preadv-consumer/producer-sew-sped` (certezza alta) |
 
 Per le SEW il Product ID, che è per articolo, va nella **tabella articoli**. Account Key e
 Declaration ID vanno nella tabella della spedizione (PA-05).
+
+## Esito dei funzionali della fase 1 (2026-11-16)
+
+I funzionali sono in `sviluppo/`, uno per microservizio, ciascuno con il suo prompt. Il codice è
+stato letto sui ref `origin/develop` presenti in locale: il `git fetch` del 16-11 è fallito
+per un problema di rete, quindi va ripetuto prima di creare i branch.
+
+| Int. | Servizio | Modifica di codice | Sintesi |
+|---|---|---|---|
+| 01 | `ce-dichiarato-validatore` | **sì** | I DTO tipizzati oggi perdono i campi: si aggiungono a `SpedizioneDTO` e `ArticoloDTO`, senza annotazioni Bean Validation. La regola R-01 va in un componente Java configurabile (`ComplianceUsaValidator`), chiamato da `SdaFlussoHandler` e `PdbPreadvisingHandler`. I DRL restano come sono. Codici di errore `1320`…`1323` |
+| 02 | `ce-dichiarato-orchestratore` | **sì**, piccola | I campi si perdono in 8 punti (ingresso, Mongo, lavorazioni, merge, uscita): si aggiungono ai DTO. I tre campi vanno esclusi dal merge delle lavorazioni tramite `campi-esclusi` |
+| 03 | `ce-dichiarato-smistatore` | **sì**, piccola | Stesso `SmistatoreDTO` per Poste e SDA: si aggiungono i campi ai DTO. I palmari restano esclusi senza logica nuova |
+| 04 | `ce-event-handler-event-store` | no | `eventData` è un `Object` generico: i campi arrivano su Mongo così come sono. Solo test di non regressione |
+| 04 | `ce-event-handler-monitoring` | no (variante A) | Usa solo identificativi, stato ed errori. Gli errori nuovi arrivano già alla console. Variante B (campi nel `Record`) solo se Poste la chiede |
+| 04 | `ce-dichiarato-bff` | **sì**, piccola | Le API di dettaglio e di ricerca leggono `dichiarato_events` con DTO tipizzati: si aggiungono i tre campi. Nessuna modifica al front-end |
+| 05 | `ce-dichiarato-adapter` | **sì** | Mapping nei 3 consumer, con nomi sorgente provvisori (ADA-01). Su PDB si aggiunge `productId` a `hasValidProperties()` e la testata al merge degli esiti BEP. PDW ha un solo articolo per spedizione |
+| 07 | `consumer-sew_sped` | **sì** | `account_key` e `declaration_id` su `sew_spedizioni_work` e `_2`. Il consumer **non scrive una tabella articoli**: `product_id` non ha dove andare (SEW-02) |
+| 08 | `consumer-sew_sped_poste` | **sì** | Account Key e Declaration ID nella MERGE di `SEW_SPEDIZIONI_POSTE`. `PRODUCT_ID` su `SEW_SPEDIZIONI_POSTE_INTER` (e sullo scarto inter), solo nei rami internazionali PRTN |
+| 09 | `producer-sew-sped` | **sì** | Batch che rilegge le SEW dei portali (MYSDA, INVIO_WEB) e del web service (SDA_WS). Invia `account_key` solo se i portali la scrivono nelle tabelle sorgente; `product_id` non è disponibile per articolo |
+| — | DDL (`ddl-sew-146073.md`) | Informix | `ALTER TABLE … ADD`, con query di verifica e rollback. Esegue il DBA, prima del rilascio del codice |
+
+**Rischi emersi oltre l'HLD**
+
+- **Il validatore non controlla tutti i canali.** Le regole girano solo nel flusso SDA (IF,
+  IS, IE) e in quello PDB/EUD. I canali dei portali e del web service (MYSDA, SDA_WS,
+  INVIO_WEB), l'adapter e TUP passano senza regole: una spedizione business USA che arriva da
+  lì non verrebbe controllata (VAL-DA-04).
+- **Le lavorazioni non conoscono i campi.** `ce-dichiarato-ldv`, `-ldv-pdb` e `-ldv-pdb-sync`
+  restituiscono il tracciato senza i campi. In fase 1 l'orchestratore li conserva da Mongo,
+  ma in fase 2 servono verso BEP. Questi servizi non sono nell'HLD (PA-10).
+- **Due retry li perdono.** `retry-eurodis` e `retry-pread-completo` usano un proprio DTO
+  tipizzato (ORC-08).
+- **Il merge per indice.** Colli e articoli si fondono per indice nella lista, non per
+  `posizione`: oggi non succede, ma se una lavorazione li riordina i Product ID si mescolano
+  (ORC-05).
+- **Il Product ID lato SDA non ha una tabella.** Né il consumer né il producer hanno una
+  sorgente o una destinazione per articolo (SEW-02, PRD-04).
+- **L'Account Key dei portali.** Arriva al producer solo se i portali e il web service, fuori
+  perimetro, la scrivono nelle SEW (PRD-05).
+- **Account Key nei log.** Validatore, event store e monitoring loggano il messaggio intero.
+  Se l'Account Key è un dato riservato va mascherata (VAL-AS-11, EVS-03).
+- **Il carattere non ASCII.** Il consumer Poste toglie i caratteri non ASCII da tutta
+  l'istruzione SQL, Product ID compreso (SWP-08).
+- **Base dei branch.** `sda-ldv-preadv-consumer` non ha `develop`: la base proposta è
+  `origin/dev202508_preadvising` (SEW-07). Sul `develop` locale dell'adapter ci sono due
+  commit di Diego non pubblicati (`c4a26d1`, `1a6202d`) sugli stessi file.
 
 ## Fase 2 — interventi (HLD)
 
