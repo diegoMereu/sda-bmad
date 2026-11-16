@@ -7,7 +7,7 @@ comparsi in una conversazione.
 |---|---|---|
 | Cluster OpenShift | `https://api.gen3gpazne.cloudsvil.poste.it:6443` | `https://api.gen3gpazne.cloudcoll.poste.it:6443` |
 | Namespace | `corriere-espresso-preadvising` | idem |
-| Kafka | `kafka-pcl1.svil.kafka.aztestposte:9092`, `kafka-pcl2…:9092` (raggiungibili dalla postazione); nei values porta 9094 con `hostAliases` | vedi values `deploy-coll` |
+| Kafka | `kafka-pcl1.svil.kafka.aztestposte:9092`, `kafka-pcl2…:9092` (raggiungibili dalla postazione); nei values porta 9094 con `hostAliases` | porta 9094; `hostAliases` `tlogkaf01a` 10.60.35.231 (`kafka-pcl1`), `tlogkaf02a` 10.60.35.232 (`kafka-pcl2`), `tlogkaf03a` 10.60.35.233 (`kafka-pcl3`), dominio `.coll.kafka.aztestposte` |
 | PostgreSQL | `strkevoldb01azwe.postgres.database.azure.com:5432` | `ttrkevoldb01azwe.postgres.database.azure.com:5432` |
 | EURODIS | TEST `https://testapi.eurodis.com/...` (restituisce sempre gli stessi dati) | TEST |
 
