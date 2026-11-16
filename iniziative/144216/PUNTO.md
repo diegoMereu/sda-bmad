@@ -1,12 +1,14 @@
 # 144216 — Assistenza Clienti — Customer Journey preavviso
 
-**Data**: 2026-11-13 · **Stato**: in_corso · **Semaforo**: 🟡
+**Data**: 2026-11-16 · **Stato**: in_corso · **Semaforo**: 🟡
 **Owner cliente**: Raimondo Malatesta · **PRJ**: PRJ0049429
 
 ## In una riga
-La sezione "Informazioni preavviso" del dettaglio LdV di OneTracking è sviluppata su BE (shipment-info, API `/preavviso/{ldv}` sul T&T-Repo, 56 test verdi) e FE (portal-pages, build ok), committata in locale sul branch `144216_preavviso_onetracking` di entrambi i repo, ma **non pushata**: GitLab risponde 403 all'utenza. SF in stesura, DP a seguire.
+Sviluppo completato su BE (shipment-info, API `/preavviso/{ldv}` sul T&T-Repo, 74 test verdi) e FE (portal-pages, build ok), committato in locale sul branch `144216_preavviso_onetracking` di entrambi i repo ma **non pushato** (403 sui permessi, poi GitLab non raggiungibile senza VPN). SF 0.1 e DP 0.2 pronti per Poste.
 
 ## Fatto dall'ultimo punto
+- 2026-11-16 — SF 0.1 (Mary) e DP 0.1 (Winston) in `documenti/`; DP 0.2 dopo l'allineamento del codice.
+- 2026-11-16 — BE allineato alla specifica (commit `44c6c8e`): LdV validata con 400, query Solr con i soli campi usati (`fl`), limite dei preavvisi letti `onetracking.preavviso.max-preavvisi` (default 50); 74 test verdi. Amelia.
 - 2026-11-13 — Materiale del cliente in `cliente/`: mock up v0.8 (DREQ0062862, DREQ0062864, DREQ0062865, DREQ0062866), ICD `pacchi_anagrafica` (138975) e `pacchi_file`.
 - 2026-11-13 — Analisi (`analisi.md`): tre sezioni (preavviso sempre, dati file solo con `id_file`, errori solo se presenti), regola di scelta del preavviso, mapping dei campi, contratto JSON, assunzioni.
 - 2026-11-13 — Funzionali 0.1 di `shipment-info` e `portal-pages` con i prompt (`sviluppo/`), Mary.
@@ -16,13 +18,13 @@ La sezione "Informazioni preavviso" del dettaglio LdV di OneTracking è sviluppa
 
 ## Prossimi passi
 - Ottenere il permesso di push su `ONETRACKING/PRESENTATION/shipment-info` e `portal-pages` e pushare i branch — Diego — prossimo passo
-- SF 0.1 per Poste (`/sf 144216`) — Mary — in corso
-- DP 0.1 (`/dp 144216`) sulla SF 0.1 — Winston — dopo la SF
+- Verifica pagina per pagina di SF e DP (export PDF da Word) e consegna a Poste — Diego — prima della consegna
+- Chiudere con l'infrastruttura i DA DEFINIRE del DP (cluster di collaudo e produzione, tipologia, codice AP di SiteMinder) — Diego — da definire
 - Prova integrata in svil (BE + FE, LdV di test con preavviso da file con scarto, da file ok, da web service) — Amelia / Diego — dopo il push
 - Confermare con Poste le assunzioni AS-02…AS-05 (numero ordine, canale del preavviso non da file, formato di `preadv_errori`, data stato del file) — Diego — da definire
 
 ## Blocchi e rischi
-- 🟡 Push negato (403) su entrambi i repo OneTracking: senza permessi lo sviluppo non arriva in svil.
+- 🟡 Push negato (403) su entrambi i repo OneTracking, e il 16-11 GitLab non era raggiungibile (VPN): senza push lo sviluppo non arriva in svil.
 - 🟡 Formato di `preadv_errori` non descritto nell'ICD: il parsing è tollerante, ma la tabella errori va verificata su dati veri.
 - 🟡 Canale del preavviso non da file (caso 3 del mock up): nessun campo nell'ICD, oggi il BE legge un campo configurabile e mostra "-" se manca.
 - 🟡 Build Maven di shipment-info: la dipendenza `ce-common-utils` richiede le credenziali Nexus nelle variabili d'ambiente; i test sono stati eseguiti con un pom senza quella dipendenza (il codice non la usa).
@@ -37,4 +39,5 @@ La sezione "Informazioni preavviso" del dettaglio LdV di OneTracking è sviluppa
 ## Decisioni prese
 - 2026-11-13 — La sezione parte dalla LdV; "Dati file preavviso" solo se il preavviso ha `id_file`, "Dettaglio errori" solo se ci sono errori (Diego).
 - 2026-11-13 — Con più preavvisi per la LdV si sceglie quello con `event_type` = `COMPLETED` (fra più `COMPLETED` il più recente), altrimenti il penultimo per `event_ts` (Diego).
+- 2026-11-16 — Il codice si allinea alla specifica (400 su LdV non valida, proiezione dei campi, limite configurabile), non il contrario.
 - 2026-11-13 — Sviluppo su branch `144216_preavviso_onetracking` da `origin/develop` in shipment-info e portal-pages (FE su Nuxt 3).
