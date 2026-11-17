@@ -25,13 +25,17 @@ corrispondente di `wiremock-receive-pan.yaml`. Dopo una modifica alla ConfigMap 
 - **Path.** `-in` chiama `EURODIS_BASE_URL + /shipments/v1` (scarico) e `+ /shipment/{edReference}/v1`
   (rilettura). Dal 16-11 la mappatura risponde su `/receive-pan/shipments/v1`. La rilettura puntuale
   non è mappata: WireMock risponde 404.
-- **Contenuto (16-11).** Una spedizione con `edReference` fisso `8888888888001`, destinatario e mittente
-  valorizzati, date di oggi (`{{now}}`). `referencedEurodisShipmentNumber` e la LDV
-  (`deliveryPartnerBarcode` = `JVGTCRDS` + 14 cifre) sono casuali a ogni chiamata (`response-template`).
-  Siccome `edReference` è fisso, ogni scarico ripresenta **la stessa spedizione con una LDV nuova**:
-  `-in` aggiorna il record e la ripubblica, e a valle la stessa spedizione arriva con LDV diverse. Per
-  spedizioni distinte va reso casuale anche `edReference`, per esempio
-  `"88888{{randomValue length=8 type='NUMERIC'}}"`.
+- **Contenuto (17-11).** Una spedizione per chiamata, con destinatario e mittente valorizzati e date di
+  oggi (`{{now}}`). Sono casuali a ogni chiamata (`response-template`) tutti gli identificativi che finiscono
+  nel tracciato:
+  - `edReference` = `88` + 11 cifre: è `spedizione.rif_spedizione`, la chiave Kafka e la chiave della
+    spedizione in `-in`;
+  - `dispatchPartnersDomesticShipmentNumber` = `30` + 6 cifre: `spedizione.id_ldv_partner_master`;
+  - `collis[].europlateBarcode` = `12345` + 19 cifre: `internazionale.id_ldv_itz`;
+  - `collis[].deliveryPartnerBarcode` = `JVGTCRDS` + 14 cifre: la LDV, `collo[].id_ldv`;
+  - `referencedEurodisShipmentNumber`, non mappato.
+
+  Ogni scarico produce quindi una spedizione nuova (ogni 2 minuti in svil).
 - **Consegna una volta sola.** EURODIS restituisce ogni spedizione una volta e poi `404`. Questa
   mappatura statica restituisce sempre la stessa risposta: per simulare il consumo servono gli scenari
   di WireMock (`scenarioName`, `requiredScenarioState`, `newScenarioState`) o una seconda mappatura

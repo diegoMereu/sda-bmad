@@ -19,7 +19,7 @@ data:
         },
         "jsonBody": [
           {
-            "edReference": "8888888888001",
+            "edReference": "88{{randomValue length=11 type='NUMERIC'}}",
             "referencedEurodisShipmentNumber": "{{randomValue length=13 type='NUMERIC'}}",
             "initiatingPartnerId": 1,
             "shipmentTypeIndicator": "N",
@@ -30,7 +30,7 @@ data:
             "shipmentWeight": 15,
             "consignorsCustomerNumberAtDispatchPartner": "933499999",
             "consignorsReference": "30151111",
-            "dispatchPartnersDomesticShipmentNumber": "30151111",
+            "dispatchPartnersDomesticShipmentNumber": "30{{randomValue length=6 type='NUMERIC'}}",
             "truckLicensePlate": "LK 773319",
             "termsOfDeliveryText": "EXW",
             "routingCode": "M2012",
@@ -154,7 +154,7 @@ data:
                 "boxType": "8",
                 "boxDimensionCategory": "A",
                 "boxId": "99887766551",
-                "europlateBarcode": "123459000003770904301090",
+                "europlateBarcode": "12345{{randomValue length=19 type='NUMERIC'}}",
                 "referencedEuroplateBarcode": "123456789012345678901234",
                 "volumetric": null,
                 "consignorsColloBarcode": "",
