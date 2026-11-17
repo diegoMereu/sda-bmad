@@ -23,7 +23,7 @@ corrispondente di `wiremock-receive-pan.yaml`. Dopo una modifica alla ConfigMap 
 ## Da sapere prima di usarlo
 
 - **Path.** `-in` chiama `EURODIS_BASE_URL + /shipments/v1` (scarico) e `+ /shipment/{edReference}/v1`
-  (rilettura). Dal 16-11 la mappatura risponde su `/receive-pan/shipments/v1`. La rilettura puntuale
+  (rilettura). Dal 17-11 `-in` chiama `/shipments/v2` (configurabile con `EURODIS_PATH_SCARICO`) e la mappatura risponde sia su `/receive-pan/shipments/v1` sia su `v2` (`urlPathPattern`). La rilettura puntuale
   non è mappata: WireMock risponde 404.
 - **Contenuto (17-11).** Una spedizione per chiamata, con destinatario e mittente valorizzati e date di
   oggi (`{{now}}`). Sono casuali a ogni chiamata (`response-template`) tutti gli identificativi che finiscono

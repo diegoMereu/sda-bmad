@@ -10,7 +10,7 @@ data:
     {
       "request": {
         "method": "GET",
-        "urlPath": "/receive-pan/shipments/v1"
+        "urlPathPattern": "/receive-pan/shipments/v[12]"
       },
       "response": {
         "status": 200,
