@@ -39,8 +39,15 @@ Etichette usate nel documento:
 >
 > **18-11, filtro postazione EURODIS** (`develop` `c592058`, 197 test verdi): prima della ricerca su Mongo
 > passano solo le **LDV PDB della postazione INVIOSYSTEM di EURODIS** (regola locale di `ce-ldv`, poi
-> postazione del seme da `ce-vendite`, con cache per seme). Regola in 3.2, configurazione in 8,
+> postazione del seme da `ce-vendite`, con cache per seme; `ce-vendite` superato dalla nota sotto). Regola in 3.2, configurazione in 8,
 > metriche in 9, casi di scarto ed errore in 7.3, criteri AC-31…AC-35.
+>
+> **18-11, postazione da `eurodis_postazioni` invece di `ce-vendite`** (`develop` `438c1fe`, 197 test
+> verdi). Decisione di Diego: send-tracking **non chiama più `ce-vendite`**. Il passo 3 del filtro
+> legge la tabella `eurodis_postazioni` (PostgreSQL `ce_eud_api_in`) che `ce-dichiarato-eurodis-in`
+> riempie con la postazione di ogni seme LDV ricevuto: passa solo una LDV **entrata da questo flusso**
+> con `eurodis = true`. Prerequisito: lo script `sql/ddl/07_ddl_eurodis_postazioni.sql` di -in eseguito
+> dal DBA in ogni ambiente. Regola in 3.2, configurazione in 8 e 14.5, metriche in 9.
 
 ---
 
@@ -226,35 +233,47 @@ validità dell'evento e prima della ricerca su Mongo; ogni passo scarta senza fa
    (`substring(2, 7)`, per esempio `3UW2308000001` → `W2308`). Se non è PDB: scarto
    `ldv_non_pdb`. Classe `LdvPdb`: se la regola cambia in `ce-ldv` va riallineata.
 2. **Seme fra i semi EURODIS**, solo se `postazione.semi` è valorizzato: se il seme non è in lista,
-   scarto `postazione_non_eurodis` senza chiamare `ce-vendite`. In svil `W2308` (pds INVIOSYSTEM del
-   contratto; gli altri pds del contratto, `W2306` INVIOEASY, `W2307` INVIOFILE, `W2309` WEB,
-   `W2319` WEBSERVICES, sono esclusi).
-3. **Postazione da `ce-vendite`**: `GET {VENDITE_URL}/vendite/configurazione-postazione-da-seme?idSemeLdv={seme}&idTipoSemeLdv=PPTT`
-   (da `d6525c1` cerca anche in `sfa_postazioni_ou`, vedi
-   [ce-vendite-postazione-sfa-postazioni-ou.md](ce-vendite-postazione-sfa-postazioni-ou.md)). Passa
-   se `idContratto` (trim, maiuscole indifferenti) è il contratto EURODIS `postazione.contratto`
-   (`SFA-00633620`); `404` → scarto (`postazione_non_trovata`), altro contratto → scarto
-   (`altro_contratto`). Della risposta si leggono solo `idPostazione`, `idContratto`, `idSemeLdv`,
-   `idTipoSemeLdv`: ragione sociale, partita IVA e codice fiscale non si leggono.
+   scarto `postazione_non_eurodis` senza accessi al database. In svil `W2308` (pds INVIOSYSTEM del
+   contratto `SFA-00633620`; gli altri pds del contratto, `W2306` INVIOEASY, `W2307` INVIOFILE, `W2309`
+   WEB, `W2319` WEBSERVICES, sono esclusi).
+3. **Postazione registrata da -in** [18-11, Diego: niente più `ce-vendite`]: query in sola lettura su
+   PostgreSQL `ce_eud_api_in`, tabella `public.eurodis_postazioni`
 
-**Cache** [richiesta di Diego, 18-11]: l'esito di `ce-vendite` è in cache Caffeine in memoria con
-**chiave il seme**: "postazione EURODIS" per `postazione.cache.ttl-eurodis` (default **1 ora**),
-"non trovata" e "altro contratto" per `postazione.cache.ttl-non-eurodis` (default **10 minuti**),
-massimo `postazione.cache.dimensione-massima` voci (default 10.000; i semi sono pochi). Due eventi
-con lo stesso seme entro il TTL fanno una sola chiamata. **Gli errori non vanno in cache.**
+   ```sql
+   select eurodis from eurodis_postazioni where id_seme_ldv = ? and id_tipo_seme_ldv = 'PPTT'
+   ```
 
-**Errore di `ce-vendite`** (rete, timeout, HTTP diverso da `200`/`404`, risposta non leggibile): l'evento
-**non si scarta e non si invia**; l'eccezione arriva al listener, che ritenta lo stesso evento con il
-backoff di RF-23 (come per Mongo, RF-17), offset fermo, abbandono dopo 24 ore con
-`tracce_abbandonate_total`. Timeout brevi (connect 2 s, read 3 s), nessun retry automatico nel client.
-Scelta: non perdere tracce EURODIS; il prezzo è che con `ce-vendite` giù la partizione si ferma, come
+   La tabella la scrive `ce-dichiarato-eurodis-in`: una riga per seme LDV (chiave `id_seme_ldv`,
+   `id_tipo_seme_ldv`) con la postazione, il contratto e il flag `eurodis` deciso da -in. Passa se la
+   riga esiste con `eurodis = true`. Riga con `eurodis = false` → scarto (`postazione_non_eurodis` nel
+   filtro, esito `postazione_non_eurodis`); **riga assente** → scarto (`postazione_non_registrata`): la
+   LDV non è entrata dal flusso EURODIS. Del record si legge solo `eurodis`: ragione sociale, partita
+   IVA e codice fiscale non si leggono. Il contratto EURODIS non si configura più in send-tracking: lo
+   decide -in nel flag.
+
+**Cache** [richiesta di Diego, 18-11]: l'esito della tabella è in cache Caffeine in memoria con
+**chiave il seme**: `eurodis = true` per `postazione.cache.ttl-eurodis` (default **1 ora**),
+`eurodis = false` per `postazione.cache.ttl-non-eurodis` (default **10 minuti**), riga assente per
+`postazione.cache.ttl-non-registrata` (default **1 minuto**: il seme può comparire al prossimo scarico
+di -in, ogni 2 minuti in svil), massimo `postazione.cache.dimensione-massima` voci (default 10.000; i
+semi sono pochi). Due eventi con lo stesso seme entro il TTL fanno una sola query. **Gli errori non
+vanno in cache.**
+
+**Errore del database** (connessione, timeout, errore SQL, tabella assente): l'evento **non si scarta e
+non si invia**; `PostazioniNonDisponibiliException` arriva al listener, che ritenta lo stesso evento
+con il backoff di RF-23 (come per Mongo, RF-17), offset fermo, abbandono dopo 24 ore con
+`tracce_abbandonate_total`. Timeout brevi (connessione dal pool 5 s, query 5 s), nessun retry interno.
+Scelta: non perdere tracce EURODIS; il prezzo è che con il database giù la partizione si ferma, come
 già con Mongo giù.
 
 **Spegnimento**: `EURODIS_TRACKING_POSTAZIONE_ABILITATO=false` toglie il filtro (resta la ricerca su
-Mongo). Con il filtro acceso e `postazione.contratto` vuoto il servizio non parte.
+Mongo).
 
-**Limite noto**: la risposta di `ce-vendite` non espone `booking_channel` di `sfa_postazioni_ou`;
-INVIOSYSTEM si riconosce dal seme configurato (`postazione.semi`), non dal canale della postazione.
+**Dipendenza da -in**: la tabella `eurodis_postazioni` va creata dal DBA con lo script
+`sql/ddl/07_ddl_eurodis_postazioni.sql` del repo `ce-dichiarato-eurodis-in`, in ogni ambiente, prima
+di accendere il filtro; senza tabella ogni evento PDB che arriva al passo 3 resta in retry. Un seme
+entra in tabella solo quando -in riceve da EURODIS una spedizione con quel seme: le tracce di semi mai
+ricevuti si scartano.
 
 ### 3.3 Correlazione con la spedizione EURODIS [DECISO 12-11]
 
@@ -635,8 +654,8 @@ Se EURODIS risponde che i doppioni sono un problema, gli esiti incerti vanno a v
 | status non in tabella o non abilitato | scartato | `scartati_total{filtro=status_non_abilitato}`, `stato_non_mappato_total{status}` |
 | `applicativo` fuori da `EURODIS_TRACKING_APPLICATIVI` (solo se configurato) | scartato | `scartati_total{filtro=applicativo}` |
 | LDV non PDB (regola di `ce-ldv`) | scartato, nessuna chiamata | `scartati_total{filtro=ldv_non_pdb}`, `postazione_total{esito=ldv_non_pdb}` |
-| LDV PDB con seme fuori da `postazione.semi`, postazione non trovata da `ce-vendite` o di altro contratto | scartato | `scartati_total{filtro=postazione_non_eurodis}`, `postazione_total{esito=seme_non_eurodis\|postazione_non_trovata\|altro_contratto}` |
-| `ce-vendite` non disponibile (rete, timeout, HTTP ≠ 200/404) | consumer fermo sullo stesso evento, retry, abbandono dopo 24 ore | `chiamata_total{endpoint=vendite_postazione_da_seme,esito}`, `tracce_abbandonate_total` |
+| LDV PDB con seme fuori da `postazione.semi`, seme non in `eurodis_postazioni` o con `eurodis = false` | scartato | `scartati_total{filtro=postazione_non_eurodis}`, `postazione_total{esito=seme_non_eurodis\|postazione_non_registrata\|postazione_non_eurodis}` |
+| database `ce_eud_api_in` non disponibile (connessione, timeout, errore SQL) | consumer fermo sullo stesso evento, retry, abbandono dopo 24 ore | `chiamata_total{endpoint=db_eurodis_postazioni,esito=errore}`, `tracce_abbandonate_total` |
 | LDV non in `dichiarato_events` o canale ≠ `EUD_INVIOSYSTEM` | scartato | `scartati_total{filtro=ldv_non_eurodis}` |
 | JSON non leggibile o campi obbligatori assenti (`status`, `ldv`, `dataTrack`) | scartato | `scartati_total{filtro=evento_non_valido}` |
 | `1100` senza `acceptorName` | scartato | `scartati_total{filtro=acceptor_name_mancante}` |
@@ -669,11 +688,20 @@ Se EURODIS risponde che i doppioni sono un problema, gli esiti incerti vanno a v
 | `retry.intervallo-iniziale`, `retry.intervallo-massimo`, `retry.durata-massima` | `EURODIS_TRACKING_RETRY_INIZIALE`, `EURODIS_TRACKING_RETRY_MASSIMO`, `EURODIS_TRACKING_RETRY_DURATA_MASSIMA` | `2s`, `5m`, `24h` (moltiplicatore 2) | RF-23 |
 | `mongo.collezione`, `mongo.canale` | — | `dichiarato_events`, `EUD_INVIOSYSTEM` | RF-16 |
 | `postazione.abilitato` | `EURODIS_TRACKING_POSTAZIONE_ABILITATO` | `true` | filtro postazione EURODIS (3.2) |
-| `postazione.vendite-base-url` | `VENDITE_URL` | `http://ce-vendite.corriere-espresso-preadvising.svc.cluster.local:8080` | come `ce-dichiarato-ldv` |
-| `postazione.timeout.connect`, `postazione.timeout.read` | `VENDITE_TIMEOUT_CONNECT`, `VENDITE_TIMEOUT_READ` | `2s`, `3s` | |
-| `postazione.contratto` | `EURODIS_TRACKING_CONTRATTO` | `SFA-00633620` | `idContratto` della postazione EURODIS; obbligatorio con il filtro acceso |
-| `postazione.semi` | `EURODIS_TRACKING_SEMI` | vuoto (= conta solo il contratto) | svil `W2308` (Helm) |
-| `postazione.cache.ttl-eurodis`, `postazione.cache.ttl-non-eurodis`, `postazione.cache.dimensione-massima` | `EURODIS_TRACKING_CACHE_POSTAZIONE_TTL_EURODIS`, `EURODIS_TRACKING_CACHE_POSTAZIONE_TTL_NON_EURODIS`, `EURODIS_TRACKING_CACHE_POSTAZIONE_DIMENSIONE` | `1h`, `10m`, `10000` | cache per seme; errori mai in cache |
+| `postazione.semi` | `EURODIS_TRACKING_SEMI` | vuoto (= conta solo la tabella) | svil `W2308` (Helm) |
+| `postazione.cache.ttl-eurodis`, `postazione.cache.ttl-non-eurodis`, `postazione.cache.ttl-non-registrata`, `postazione.cache.dimensione-massima` | `EURODIS_TRACKING_CACHE_POSTAZIONE_TTL_EURODIS`, `EURODIS_TRACKING_CACHE_POSTAZIONE_TTL_NON_EURODIS`, `EURODIS_TRACKING_CACHE_POSTAZIONE_TTL_NON_REGISTRATA`, `EURODIS_TRACKING_CACHE_POSTAZIONE_DIMENSIONE` | `1h`, `10m`, `1m`, `10000` | cache per seme; errori mai in cache |
+
+Database delle postazioni (`spring.datasource.*`, PostgreSQL `ce_eud_api_in`, sola lettura, JDBC senza
+JPA; stesse variabili e credenziali di `ce-dichiarato-eurodis-in`; convive con Mongo):
+
+| Proprietà | Variabile | Default | Note |
+|---|---|---|---|
+| `spring.datasource.url` | `DATASOURCE_URL` | `jdbc:postgresql://localhost:5432/ce_eud_api_in` | per ambiente (14.5) |
+| `spring.datasource.username`, `password` | `DATASOURCE_USERNAME`, `DATASOURCE_PASSWORD` | vuoti | secret `ce-postgres`, chiavi `datasource-name`, `data-source-password` |
+| `spring.datasource.hikari.minimum-idle`, `maximum-pool-size` | `DATASOURCE_HIKARI_MINIMUM_IDLE`, `DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE` | `0`, `3` | pool piccolo (`read-only: true`): con la cache le query sono rare |
+| `spring.datasource.hikari.idle-timeout`, `connection-timeout` | `DATASOURCE_HIKARI_IDLE_TIMEOUT`, `DATASOURCE_HIKARI_CONNECTION_TIMEOUT` | `30000`, `5000` (ms) | |
+| `spring.jdbc.template.query-timeout` | `DATASOURCE_QUERY_TIMEOUT` | `5s` | |
+| `spring.sql.init.mode` | — | `never` | nessuna DDL dal servizio |
 
 Topic (`KAFKA_TOPIC_INPUT`, default `PACCHI.TRACKING`), consumer group (`KAFKA_CONSUMER_GROUP`), Mongo (`MONGO_STRING_CONNECTION`) e Helm: sezione 14 (Winston).
 
@@ -699,9 +727,9 @@ Metriche del flusso da `PACCHI.TRACKING` [implementate in `4f7f067`]:
 | `eurodis_tracking_tracce_lette_total` | counter | — |
 | `eurodis_tracking_tracce_total` | counter | `esito` |
 | `eurodis_tracking_scartati_total` | counter | `filtro` (`status_non_abilitato`, `applicativo`, `ldv_non_pdb`, `postazione_non_eurodis`, `ldv_non_eurodis`, `acceptor_name_mancante`, `evento_non_valido`, `invio_disabilitato`) |
-| `eurodis_tracking_postazione_total` | counter | `esito` (`filtro_disabilitato`, `ldv_non_pdb`, `seme_non_eurodis`, `postazione_non_trovata`, `altro_contratto`, `eurodis`) |
+| `eurodis_tracking_postazione_total` | counter | `esito` (`filtro_disabilitato`, `ldv_non_pdb`, `seme_non_eurodis`, `postazione_non_registrata`, `postazione_non_eurodis`, `eurodis`) |
 | `eurodis_tracking_cache_postazione_total` | counter | `esito` (hit, miss) |
-| `eurodis_tracking_chiamata_total`, `eurodis_tracking_chiamata_durata` | counter, timer | `endpoint=vendite_postazione_da_seme`, `esito` (stato HTTP o `io`); span CLIENT `ce-vendite configurazione-postazione-da-seme` con `seme_ldv` e `http.status_code` |
+| `eurodis_tracking_chiamata_total`, `eurodis_tracking_chiamata_durata` | counter, timer | `endpoint=db_eurodis_postazioni`, `esito` (`trovata`, `assente`, `errore`); span CLIENT `eurodis.tracking.lookup_postazione` con `db.system=postgresql`, `seme_ldv`, `esito` |
 | `eurodis_tracking_cache_ldv_total` | counter | `esito` (hit, miss) |
 | `eurodis_tracking_mongo_ricerca_durata` | timer | `esito` |
 | `eurodis_tracking_mongo_errori_total` | counter | — |
@@ -713,6 +741,8 @@ Span OpenTelemetry (il tracing non deve mai far fallire l'invio, principio di `T
 - `eurodis.tracking.traccia`: CONSUMER, uno per evento, figlio del `traceparent` se presente;
   attributi `status_sda`, `ldv` mascherata, `codice_eurodis`, `esito`, partizione, offset;
 - `eurodis.tracking.lookup_ldv`: CLIENT, solo quando la cache non ha la LDV; attributi `esito`, `cache`;
+- `eurodis.tracking.lookup_postazione`: CLIENT, solo quando la cache non ha il seme; query su
+  `eurodis_postazioni`, attributi `seme_ldv`, `esito`;
 - `eurodis.send-tracking <endpoint>`: CLIENT, la chiamata a EURODIS; attributi `http.status_code`,
   `eurodis.eventi`, `eurodis.creati`, `eurodis.rifiutati`.
 
@@ -774,11 +804,11 @@ Alert Datadog: monitor TRK-01…TRK-11 in [alert-datadog-eurodis.md](alert-datad
 | AC-28 | Ogni evento produce uno span `eurodis.tracking.traccia` con `status_sda`, `ldv` mascherata ed `esito`, e i log JSON hanno lo stesso MDC |
 | AC-29 | Con `invio.abilitato=false` gli eventi si leggono e si filtrano ma non parte nessuna chiamata (`scartati_total{filtro=invio_disabilitato}`); con `consumer.abilitato=false` il topic non si legge |
 | AC-30 | Nei log non compaiono nomi, indirizzi né LDV complete; le metriche di scarto si incrementano con i tag attesi |
-| AC-31 | Data una LDV non PDB (per esempio 15 cifre), l'evento è scartato con `scartati_total{filtro=ldv_non_pdb}` senza chiamare `ce-vendite` né Mongo |
-| AC-32 | Data una LDV PDB il cui seme ha in `ce-vendite` la postazione con `idContratto = SFA-00633620` (e seme in `postazione.semi`, se configurato), l'evento prosegue alla ricerca su Mongo |
-| AC-33 | Data una LDV PDB di altro contratto, o con seme fuori lista, o senza postazione (`404`), l'evento è scartato con `scartati_total{filtro=postazione_non_eurodis}` |
-| AC-34 | Dati due eventi con lo stesso seme entro il TTL, `ce-vendite` è chiamato una volta sola (`cache_postazione_total{esito=hit}`) |
-| AC-35 | Dato `ce-vendite` in errore (`5xx`, timeout), l'evento non si scarta né si invia, l'esito non va in cache e il consumer ritenta |
+| AC-31 | Data una LDV non PDB (per esempio 15 cifre), l'evento è scartato con `scartati_total{filtro=ldv_non_pdb}` senza query su `eurodis_postazioni` né su Mongo |
+| AC-32 | Data una LDV PDB il cui seme è in `eurodis_postazioni` (tipo `PPTT`) con `eurodis = true` (e seme in `postazione.semi`, se configurato), l'evento prosegue alla ricerca su Mongo |
+| AC-33 | Data una LDV PDB con seme in tabella con `eurodis = false`, o con seme fuori lista, o con seme assente dalla tabella, l'evento è scartato con `scartati_total{filtro=postazione_non_eurodis}`; il seme assente resta in cache 1 minuto |
+| AC-34 | Dati due eventi con lo stesso seme entro il TTL, la tabella si interroga una volta sola (`cache_postazione_total{esito=hit}`) |
+| AC-35 | Dato il database in errore (connessione, timeout), l'evento non si scarta né si invia, l'esito non va in cache e il consumer ritenta |
 
 ## 12. Punti aperti e default provvisori
 
@@ -847,12 +877,12 @@ flowchart LR
 | Componente | Ruolo |
 |---|---|
 | `TracceConsumer` | Consuma `PACCHI.TRACKING` (`KAFKA_TOPIC_INPUT`), group `ce-eurodis-send-tracking-group`, `ack-mode: record`, `auto-offset-reset: latest`, concurrency 3. Uno span CONSUMER per evento, MDC per i log |
-| `FiltroPostazioneEurodis` | Filtro postazione (3.2): `LdvPdb` (regola di `ce-ldv`), semi configurati, `VenditeClient` su `configurazione-postazione-da-seme` con contratto EURODIS; cache Caffeine per seme (1 h EURODIS, 10 min non EURODIS, 10.000 voci), errori non cachati e rilanciati |
+| `FiltroPostazioneEurodis` | Filtro postazione (3.2): `LdvPdb` (regola di `ce-ldv`), semi configurati, `PostazioniEurodisRepository` (JDBC, sola lettura) su `eurodis_postazioni` di `ce_eud_api_in`; cache Caffeine per seme (1 h EURODIS, 10 min `eurodis = false`, 1 min seme assente, 10.000 voci), errori non cachati e rilanciati (`PostazioniNonDisponibiliException`) |
 | `ElaboratoreTracce` | Applica i filtri nell'ordine status → applicativo (se configurato) → postazione EURODIS → spedizione EURODIS, traduce lo status, prepara l'evento EURODIS (RF-21, RF-22) e lo invia |
 | `RiconoscitoreSpedizioneEurodis` | Interfaccia del filtro 3. Oggi `RiconoscitoreSuMongo`: query su `dichiarato_events` per `spedizione.collo.id_ldv` e `canale = EUD_INVIOSYSTEM`, cache Caffeine (30 min trovate, 10 min non trovate, 500.000 voci), errori non cachati. Domani una regola sulla sintassi della LDV (DF-29, PA-38), senza Mongo |
 | `TabellaStati` | Tabella SDA → EURODIS dalla risorsa interna o dal file montato (`stati.file`), con `stati.override` e `stati.abilitati` da ConfigMap; configurazione non valida → il servizio non parte |
 | `SendTrackingClient` | Client esistente (RF-01…RF-12), una chiamata per evento |
-| Retry | `DefaultErrorHandler` con backoff esponenziale (2 s, ×2, massimo 5 min fra i tentativi, 24 h in tutto) sugli errori temporanei, di configurazione e di Mongo; l'offset non avanza durante i tentativi; poi abbandono con metrica |
+| Retry | `DefaultErrorHandler` con backoff esponenziale (2 s, ×2, massimo 5 min fra i tentativi, 24 h in tutto) sugli errori temporanei, di configurazione, di Mongo e del database delle postazioni; l'offset non avanza durante i tentativi; poi abbandono con metrica |
 
 ### 14.2 Flusso
 
@@ -900,11 +930,16 @@ sequenceDiagram
 | `EURODIS_TRACKING_CONSUMER_ABILITATO`, `EURODIS_TRACKING_INVIO_ABILITATO` | `true` | `false` |
 | `EURODIS_TRACKING_STATI_OVERRIDE`, `EURODIS_TRACKING_STATI_ABILITATI` | vuoti | vuoti |
 | `EURODIS_TRACKING_APPLICATIVI` | vuoto | vuoto |
+| `DATASOURCE_URL` | `jdbc:postgresql://strkevoldb01azwe.postgres.database.azure.com:5432/ce_eud_api_in` (coll `ttrkevoldb01azwe`) | `_#DATASOURCE_URL`, server di cert e prod da definire (come -in) |
+| `DATASOURCE_USERNAME`, `DATASOURCE_PASSWORD` | secret `ce-postgres`, chiavi `datasource-name`, `data-source-password` | idem |
+| `DATASOURCE_HIKARI_MINIMUM_IDLE`, `DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE` | `0`, `3` | idem |
+| `EURODIS_TRACKING_SEMI` | `W2308` | idem (da rivedere per prod) |
 
 Il chart non monta ancora un file di stati da ConfigMap (`EURODIS_TRACKING_STATI_FILE`): oggi si usano
 override e abilitati. Permessi Kafka: l'utente SCRAM di `ce-eurodis-send-tracking-secret` deve leggere
 `PACCHI.TRACKING` con il gruppo indicato (in prod il topic è di un altro team). Senza `api-key` il
-servizio parte, ma gli invii danno `401` e restano in retry.
+servizio parte, ma gli invii danno `401` e restano in retry. Il truststore (`ssl-secrets`) e gli
+`hostAliases` restano quelli di Kafka: per PostgreSQL non servono, come in -in.
 
 ### 14.6 Osservabilità
 
@@ -922,6 +957,8 @@ client EURODIS con server finto.
   delle spedizioni `EUD_INVIOSYSTEM` già passate dalla catena, in numero minimo perché il topic è
   condiviso.
 - Indice su Mongo (V-06) e permesso di lettura su `PACCHI.TRACKING`.
+- Tabella `eurodis_postazioni` creata dal DBA (script `07_ddl_eurodis_postazioni.sql` di -in) e
+  riempita da -in prima di accendere il filtro postazione; utenza `ce-postgres` con lettura sulla tabella.
 - `acceptorName` per `1100` (V-02): senza, le consegne si scartano salvo un default concordato.
 - Doppioni dopo un riavvio (ST-07): se diventano un problema, serve uno storico minimo.
 
