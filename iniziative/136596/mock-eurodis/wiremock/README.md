@@ -32,13 +32,14 @@ corrispondente di `wiremock-receive-pan.yaml`. Dopo una modifica alla ConfigMap 
     spedizione in `-in`;
   - `dispatchPartnersDomesticShipmentNumber` = `30` + 6 cifre: `spedizione.id_ldv_partner_master`;
   - `collis[].europlateBarcode` = `12345` + 19 cifre: `internazionale.id_ldv_itz`;
-  - `collis[].deliveryPartnerBarcode` = `1UW2308` + 6 cifre: la LDV, `collo[].id_ldv` (dal 18-11; prima
+  - `collis[].deliveryPartnerBarcode` = `3UW2308` + 6 cifre: la LDV, `collo[].id_ldv` (dal 18-11; prima
     `JVGTCRDS` + 14 cifre, che `ce-ldv` non riconosce). È una LDV PDB di 13 caratteri: `[1-8]U` + seme
     di 5 + progressivo di 6 (semantica `PPTT` di `ce-ldv`). Il seme è il `pds_code` del contratto
     `SFA-00633620` per il canale di prenotazione (`contract_ps_data.pds`): `W2308` = `INVIOSYSTEM`
     (gli altri: `W2306` INVIOEASY, `W2307` INVIOFILE, `W2309` WEB, `W2319` WEBSERVICES). Il primo
     tentativo con `W0008` (seme di postazione in `sfa_postazioni_ou`) è stato rifiutato da BEP come
-    "barcode non utilizzabile". Un collo figlio PDB ha invece 22 caratteri (9 del figlio + 13 della
+    "barcode non utilizzabile", e così anche `1UW2308` (errore BEP `131`). Il prefisso è `3U`,
+    indicato da Poste il 18-11 e coerente con le LDV che BEP restituisce. Un collo figlio PDB ha invece 22 caratteri (9 del figlio + 13 della
     madre): non usare 22 caratteri per un collo singolo;
   - `referencedEurodisShipmentNumber`, non mappato.
 

@@ -78,7 +78,7 @@ appartenga al contratto. Il seme corretto è il `pds_code` del contratto per il 
 | WEB | `W2309` |
 | WEBSERVICES | `W2319` |
 
-Il mock ora genera `1UW2308` + 6 cifre. Se si passa a `waybill/create` REST (`WEBSERVICES`, minuta
+Anche `1UW2308` + 6 cifre è stato rifiutato con `131` (18-11, `1UW2308638917`). Il prefisso giusto è `3U`, indicato da Poste. Per `INVIOSYSTEM` l'ICD Mediation v2.5 richiede codici "staccati da range prestabiliti". Il mock ora genera `3UW2308` + 6 cifre. Se si passa a `waybill/create` REST (`WEBSERVICES`, minuta
 29/07), il seme diventa `W2319`. Da verificare: `ce-dichiarato-ldv` ricava la postazione dal seme della
 LDV (`ce-vendite`, `cen_postazioni` poi `sfa_postazioni_ou`); se `W2308` non è un `id_seme_ldv` lì,
 scarta con `144` "Postazione non ricavata da seme".
