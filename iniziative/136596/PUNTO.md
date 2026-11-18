@@ -47,6 +47,7 @@ I tre microservizi sono implementati su `develop` (`-in` su PostgreSQL con event
 - 🟡 Fuso orario dei timestamp non noto; sintassi LDV non nota (il mock genera LDV inventate).
 - 🟡 Perimetro e PRJ non definiti: non si può stimare né pianificare. Go-live a fine gennaio 2027.
 - 🟡 Il ms `ce-dichiarato-ldv-pdb` è ancora in test e alcune osservazioni toccano i nostri dati.
+- 🔴 2026-11-18 — BEP scarta le preadvising EURODIS con mittente estero (`101 country`): oggi arriva `GER1`, mentre la minuta del 29/07 vuole `ITA1` costante anche per il mittente estero, e il contratto `SFA-00633620` non ha nazioni estere abilitate. Riguarda sia `EUD_INVIOSYSTEM` sia `EUD_INVIOFILE`. Da decidere dove applicare la costante: vedi `bep-nazione-mittente-estero.md`.
 
 ## Serve dal cliente
 - Codice PRJ.
