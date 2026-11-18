@@ -1,12 +1,18 @@
 # `ce-dichiarato-eurodis-in` — Persistenza su PostgreSQL: DDL e ambiente
 
-**Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.1 · **Data**: 2026-11-10
+**Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.2 · **Data**: 2026-11-18
 **Autore**: Winston (architect) · **Destinatari**: DBA e piattaforma (script e secret), Amelia (dev)
 **Specifica di riferimento**: [ce-dichiarato-eurodis-in.md](ce-dichiarato-eurodis-in.md) 0.6, sezione 3.4
 
 **[DECISO 10-11, Diego]** Lo scarico EURODIS passa da MongoDB a PostgreSQL, sul database dedicato
 `ce_eud_api_in`. Le tre collezioni Mongo diventano tre tabelle, più la tabella del lock dei job. Le
 credenziali sono quelle già usate da `ce-db-sync`, nello stesso secret.
+
+**[DECISO 18-11, Diego]** Sullo stesso database c'è anche `eurodis_postazioni` (script 7): la
+postazione di ogni seme LDV PDB visto nelle spedizioni EURODIS. **Non la usa `-in`**: la scrive
+`ce-dichiarato-eurodis-mapper` (che riempie contratto e centro di costo e chiama già ce-vendite) e la
+legge `ce-eurodis-send-tracking`, per sapere se una LDV è entrata da questo flusso senza chiamare
+ce-vendite. Lo script sta in `sql/ddl/` di `-in` perché `ce_eud_api_in` è il database del flusso EURODIS.
 
 ---
 
@@ -212,6 +218,69 @@ COMMENT ON TABLE public.shedlock IS 'Lock dei job schedulati (ShedLock): ogni jo
 Il provider va configurato con `usingDbTime()`: i tempi del lock li decide il database, non
 l'orologio dei pod.
 
+### Script 7 — `eurodis_postazioni`
+
+Una riga per seme LDV (chiave seme + tipo seme), con la postazione restituita da ce-vendite
+(`GET /vendite/configurazione-postazione-da-seme?idSemeLdv=..&idTipoSemeLdv=PPTT`). Il seme è
+quello della LDV PDB del collo (`collis[].deliveryPartnerBarcode`, regola di ce-ldv: 13 caratteri,
+`[1-8]U[A-Z0-9]{5}[0-9A-Z]{6}`, seme = caratteri 3-7, tipo `PPTT`). La definizione è concordata fra
+mapper e send-tracking: non si cambia senza allinearli.
+
+```sql
+CREATE TABLE IF NOT EXISTS public.eurodis_postazioni (
+    id_seme_ldv        varchar(10)   NOT NULL,
+    id_tipo_seme_ldv   varchar(10)   NOT NULL,
+    id_postazione      varchar(30),
+    id_anagrafico      varchar(30),
+    id_contratto       varchar(30),
+    id_centro_costo    varchar(30),
+    ragione_sociale    varchar(255),
+    partita_iva        varchar(20),
+    codice_fiscale     varchar(20),
+    eurodis            boolean       NOT NULL,
+    inserita_il        timestamptz   NOT NULL,
+    verificata_il      timestamptz   NOT NULL,
+    CONSTRAINT pk_eurodis_postazioni PRIMARY KEY (id_seme_ldv, id_tipo_seme_ldv)
+);
+```
+
+Più i `COMMENT` su tabella e colonne (nel file `sql/ddl/07_ddl_eurodis_postazioni.sql`).
+
+| Colonna | Significato |
+|---|---|
+| `eurodis` | `true` se `id_contratto` (trim, senza distinzione maiuscole) è il contratto EURODIS configurato nel mapper (`SFA-00633620`) |
+| `inserita_il` | prima registrazione del seme; un aggiornamento non la cambia |
+| `verificata_il` | ultima verifica su ce-vendite; oltre i giorni configurati nel mapper (default 7) si riverifica |
+| `ragione_sociale`, `partita_iva`, `codice_fiscale` | dati del cliente della postazione: solo in tabella, mai nei log |
+
+Scrittura (mapper), upsert che lascia invariata `inserita_il`:
+
+```sql
+INSERT INTO public.eurodis_postazioni (id_seme_ldv, id_tipo_seme_ldv, id_postazione, id_anagrafico,
+       id_contratto, id_centro_costo, ragione_sociale, partita_iva, codice_fiscale, eurodis,
+       inserita_il, verificata_il)
+VALUES (:idSemeLdv, 'PPTT', :idPostazione, :idAnagrafico, :idContratto, :idCentroCosto,
+        :ragioneSociale, :partitaIva, :codiceFiscale, :eurodis, :ora, :ora)
+ON CONFLICT (id_seme_ldv, id_tipo_seme_ldv) DO UPDATE SET
+       id_postazione = EXCLUDED.id_postazione, id_anagrafico = EXCLUDED.id_anagrafico,
+       id_contratto = EXCLUDED.id_contratto, id_centro_costo = EXCLUDED.id_centro_costo,
+       ragione_sociale = EXCLUDED.ragione_sociale, partita_iva = EXCLUDED.partita_iva,
+       codice_fiscale = EXCLUDED.codice_fiscale, eurodis = EXCLUDED.eurodis,
+       verificata_il = EXCLUDED.verificata_il;
+```
+
+Lettura (send-tracking), per chiave primaria:
+
+```sql
+SELECT eurodis, verificata_il FROM public.eurodis_postazioni
+ WHERE id_seme_ldv = :seme AND id_tipo_seme_ldv = 'PPTT';
+```
+
+Mapper e send-tracking si collegano a `ce_eud_api_in` con lo stesso utente di `-in` (secret
+`ce-postgres`): da proprietario delle tabelle, `ce_user` non ha bisogno di altri grant. Se uno dei
+due usasse un altro utente servono `SELECT, INSERT, UPDATE` (mapper) o `SELECT` (send-tracking) su
+`eurodis_postazioni`.
+
 ### Script 6 — Permessi
 
 Gli oggetti sono creati da `ce_user`, che ne è proprietario: non servono altri grant. Se il DBA li
@@ -222,6 +291,7 @@ ALTER TABLE public.eurodis_scarichi          OWNER TO ce_user;
 ALTER TABLE public.eurodis_spedizioni        OWNER TO ce_user;
 ALTER TABLE public.eurodis_richieste_manuali OWNER TO ce_user;
 ALTER TABLE public.shedlock                  OWNER TO ce_user;
+ALTER TABLE public.eurodis_postazioni        OWNER TO ce_user;   -- dopo lo script 7
 ```
 
 ## 3. Dimensioni attese
@@ -232,6 +302,7 @@ ALTER TABLE public.shedlock                  OWNER TO ce_user;
 | `eurodis_spedizioni` | quante sono le spedizioni EURODIS (volumi ancora da chiedere, PA-14) | il JSON di una spedizione è di qualche KB |
 | `eurodis_richieste_manuali` | poche, a mano | |
 | `shedlock` | 4 righe fisse | |
+| `eurodis_postazioni` | quasi nessuna: una riga per seme, i semi EURODIS sono pochi | non si pulisce |
 
 Con questi volumi il partizionamento non serve.
 
@@ -371,7 +442,7 @@ da una ripresa concorrente.
 
 ## 7. Cosa serve dal DBA e dalla piattaforma
 
-**Script DDL eseguiti dal DBA** (secondo Diego, 10-11; ambiente non specificato). Restano i punti 3 e 4.
+**Script DDL eseguiti dal DBA** (secondo Diego, 10-11; ambiente non specificato). Restano i punti 3, 4 e 5.
 
 1. Script 1 sul server svil (`strkevoldb01azwe`) e su quello di collaudo (`ttrkevoldb01azwe`),
    con il `GRANT ... ON SCHEMA public` eseguito connessi a `ce_eud_api_in`.
@@ -380,6 +451,9 @@ da una ripresa concorrente.
 3. Conferma che l'utente nel secret `ce-postgres` (chiave `datasource-name`) è `ce_user`, cioè il
    proprietario del nuovo database.
 4. Togliere la chiave `mongo-string-connection` da `ce-dichiarato-eurodis-in-secret`, dopo il rilascio.
+5. **Script 7 (18-11)** come `ce_user` su `ce_eud_api_in`, in svil e collaudo: dove gli script 1-6
+   sono già stati eseguiti si esegue solo questo (e la riga di `eurodis_postazioni` dello script 6,
+   se le tabelle non le crea `ce_user`). Serve prima del rilascio del mapper che la scrive.
 
 ## 8. Domande per Diego
 
