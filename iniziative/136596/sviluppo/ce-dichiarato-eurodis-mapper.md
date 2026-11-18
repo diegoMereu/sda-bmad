@@ -5,6 +5,7 @@
 **Repository**: https://posteitaliane.ghe.com/SVILUPPO/CORRIERE-ESPRESSO_PREADVISING_ce-dichiarato-eurodis-mapper
 **Generato da**: [prompt-ce-dichiarato-eurodis-mapper.md](prompt-ce-dichiarato-eurodis-mapper.md)
 **Implementazione** (10-11): branch `develop`, commit `dbb3b59` (tracciato completo, canale, LDV, destinatario) e `474c8ef` (`ce-anagrafica`, header di `-in`, error handler con DLT, metriche e span); 94 test verdi. Scostamenti: `collo.articolo: []` presente e `codici_servizi` ripetuto alla radice, come nell'esempio EUD (AC-14); tolta la bean validation su `dispatchPartnersDomesticShipmentNumber` (bloccano solo JSON, `edReference` e destinatario, RF-06). Spring Boot del repo a 4.1.2 (azzurrazezza), contro la decisione 3.5.14: da chiarire.
+**Implementazione** (18-11): commit `5a5faf1` su `develop`: cliente, contratto e centro di costo dalla postazione della LDV del collo (sezione 6.2.1), configurazione solo come fallback; 159 test verdi.
 
 Etichette usate nel documento:
 - **[FATTO]**: scritto nella specifica EURODIS, nel codice o verificato in ambiente; la fonte è indicata.
@@ -157,6 +158,7 @@ sequenceDiagram
 | RF-12 | Nessun dato personale nei log: solo `edReference`, `idEsecuzione`, esito, nomi dei campi mancanti. |
 | RF-13 | Nessun riferimento a PA/DF o a documenti di analisi nei commenti del codice (MAP-7): le regole aperte stanno in questo documento. |
 | RF-14 | **Il destinatario deve essere presente** **[DECISO 06-11, Diego, DF-30; confermato 10-11: in produzione il destinatario è in `consigneeAddress`, il TEST non è rappresentativo]**: `consigneeAddress` assente, oppure `zipcode` o `city` vuoti (obbligatori per ICD e BEP) → messaggio **non mappabile**, motivo `destinatario_assente`. `returnAddress` non lo sostituisce. |
+| RF-16 | Cliente, contratto e centro di costo si ricavano dalla **postazione della LDV del collo** (sezione 6.2.1). Se la postazione non si ricava (LDV vuota o non riconosciuta, postazione non trovata, errore di `ce-ldv`, `ce-vendite` o del database) **non si scarta**: si pubblica con i valori di configurazione, con avviso e metrica. **[DECISO 18-11, Diego]** |
 | RF-15 | Errore o risposta vuota di `ce-anagrafica` non blocca: si pubblica, con errore sullo span e avviso `anagrafica_ko`. Se il codice paese è IT, ITA o ITA1 si usano le codifiche italiane di configurazione (`mapper.nazione.italia.*`: IT / ITA / ITA1) con l'avviso `nazione_default_italia`; per gli altri paesi ISO3 e ISO4 restano vuoti. Gli errori non entrano in cache (sezione 6.4). **[DECISO 10-11, Diego]** |
 
 ## 6. Regole di mapping
@@ -185,13 +187,59 @@ dice `""`/`0` il campo è presente ma vuoto finché il punto non si chiude.
 
 | Campo ICD | Sorgente | Regola | Rif. |
 |---|---|---|---|
-| `codice_login_cliente` | config `mapper.cliente.codice-login` | `cli_c49353` | **[DECISO 10-11]** stessi valori che `ce-dichiarato-builder` imposta per il flusso a file EURODIS (`EUD_INVIOFILE`): `clientId` del file e `cli_c49353.ini`. Niente chiamata a F1 (PA-33) |
-| `codice_auc` | config `mapper.cliente.codice-auc` | `1335062583` | idem (`cli_c49353.ini`, `Codice_AUC`) |
-| `codice_contratto` | config `mapper.cliente.codice-contratto` | `SFA-00633620` | idem (`Codice_Contratto`) |
-| `id_cliente` | config `mapper.cliente.id-cliente` | `""` | nel flusso a file arriva dal record; l'API non lo fornisce |
-| `ragione_sociale` | `shipperAddress.companyName` | diretto | |
+| `codice_contratto` | postazione `idContratto` | trim; se vuoto o postazione non ricavata: config `mapper.cliente.codice-contratto` (`SFA-00633620`) | **[DECISO 18-11]** sezione 6.2.1 |
+| `id_cliente` | postazione `idAnagrafico` | trim; se vuoto o postazione non ricavata: config `mapper.cliente.id-cliente` (`""`) | **[DECISO 18-11]** l'anagrafico della postazione (per le postazioni PDB in formato `OU…`) |
+| `ragione_sociale` | postazione `ragioneSociale` | trim; se vuota o postazione non ricavata: `shipperAddress.companyName` | **[DECISO 18-11]** il cliente è il titolare del contratto, non il mittente |
+| `partita_iva` | postazione `partitaIva` | trim; se postazione non ricavata `""` | **[DECISO 18-11]** |
+| `cod_fiscale` | postazione `codiceFiscale` | trim; se postazione non ricavata `""` | **[DECISO 18-11]** |
+| `codice_login_cliente` | config `mapper.cliente.codice-login` | `cli_c49353` | **[DECISO 10-11]** stessi valori che `ce-dichiarato-builder` imposta per il flusso a file EURODIS (`EUD_INVIOFILE`): `clientId` del file e `cli_c49353.ini`. Niente chiamata a F1 (PA-33). La configurazione postazione non ha un campo corrispondente |
+| `codice_auc` | config `mapper.cliente.codice-auc` | `1335062583` | idem (`cli_c49353.ini`, `Codice_AUC`); nessun campo corrispondente nella postazione |
 | `no_firma` | `deliveryService.deliveryType` | `S` → `"N"`; `N` → `"S"`; altro o assente → `""` | commento Diego 23-10 |
 | altri campi dell'esempio EUD | — | `""` | |
+
+### 6.2.1 Postazione dalla LDV del collo **[DECISO 18-11, Diego]**
+
+La LDV è `collis[].deliveryPartnerBarcode` del primo collo che ne ha una (i colli di una spedizione
+condividono il seme). Ordine di risoluzione:
+
+1. **Seme e tipo seme.** LDV PDB (13 caratteri, trim e maiuscolo, `[1-8]U[A-Z0-9]{5}[0-9A-Z]{6}`):
+   regola locale, seme = caratteri 3-7, tipo `PPTT` (copia del ramo PDB di `LdvSemanticaUtil` di `ce-ldv`,
+   identica a `LdvPdb` di `ce-eurodis-send-tracking`), nessuna chiamata. Esempio: `4UW2308123456` → `W2308`/`PPTT`.
+   Altre LDV: `GET {ce-ldv}/ldv/seme/{ldv}` → `{semeLdv, tipoSemeLdv}`; una risposta 4xx (tipicamente 422) o
+   senza seme vale "LDV non riconosciuta".
+2. **Cache in memoria** (Caffeine) per seme + tipo seme (trim, maiuscolo). Una postazione trovata resta
+   `client.postazione.cache.ttl` (default 1 ora), un "non trovata" `ttl-non-trovata` (default 5 minuti),
+   al massimo `dimensione-massima` semi (default 1000). Gli errori non entrano in cache: la spedizione
+   successiva riprova. In cache non si legge la tabella e non si chiama `ce-vendite`.
+3. **Tabella `public.eurodis_postazioni`** (database `ce_eud_api_in`, DDL: script
+   `sql/ddl/07_ddl_eurodis_postazioni.sql` di `ce-dichiarato-eurodis-in`, da eseguire **prima** del rilascio del
+   mapper). Se c'è la riga del seme e `verificata_il` è più recente di `client.postazione.riverifica-giorni`
+   (default 7), vale la riga.
+4. **`ce-vendite`** `GET /vendite/configurazione-postazione-da-seme?idSemeLdv=&idTipoSemeLdv=` se la riga
+   manca o è da riverificare (da `cen_postazioni`, altrimenti da `sfa_postazioni_ou`: vedi
+   [ce-vendite-postazione-sfa-postazioni-ou.md](ce-vendite-postazione-sfa-postazioni-ou.md)). 404 = postazione
+   non trovata.
+5. **Upsert** della riga: `INSERT … ON CONFLICT (id_seme_ldv, id_tipo_seme_ldv) DO UPDATE`, con
+   `inserita_il` invariata e `verificata_il` = ora; `eurodis` = `id_contratto` (trim, senza distinzione di
+   maiuscole) uguale a `mapper.cliente.codice-contratto` (`SFA-00633620`). Se `ce-vendite` non trova la
+   postazione non si scrive niente.
+
+Fallback, sempre senza scartare la spedizione (RF-16):
+
+| Caso | Tracciato | Avviso / metrica |
+|---|---|---|
+| LDV vuota in tutti i colli | valori di configurazione | `postazione_ldv_vuota` |
+| LDV non PDB e non riconosciuta da `ce-ldv` | idem | `postazione_ldv_non_riconosciuta` |
+| `ce-vendite` non trova la postazione | idem | `postazione_non_trovata` |
+| Errore o timeout di `ce-ldv` o `ce-vendite` | idem | `postazione_ko` + `eurodis_mapper_postazione_errori_total{componente=ce_ldv o ce_vendite}` |
+| Postazione senza `idContratto` o `idCentroCosto` | i campi vuoti da configurazione, gli altri dalla postazione | `postazione_incompleta` |
+| Errore di lettura della tabella | si chiede a `ce-vendite` | `eurodis_mapper_postazione_errori_total{componente=db_lettura}` |
+| Errore di scrittura della tabella | vale la risposta di `ce-vendite` | `eurodis_mapper_postazione_errori_total{componente=db_scrittura}` |
+
+Gli avvisi sono in `eurodis_mapper_avvisi_total{motivo}` e nel WARN della spedizione. Con
+`client.postazione.abilitata=false` non si chiama niente e si usano i valori di configurazione, senza avviso.
+Nei log solo seme, tipo seme e tipo di errore: mai ragione sociale, partita IVA o codice fiscale della postazione.
+Span CLIENT `getSemeLdv` (solo per le LDV non PDB) e `getConfigurazionePostazioneDaSeme` (solo per le chiamate vere).
 
 ### 6.3 Spedizione
 
@@ -204,7 +252,7 @@ dice `""`/`0` il campo è presente ma vuoto finché il punto non si chiude.
 | `codici_servizi` | `deliveryService`, `cashOnDeliveryService` | sezione 6.8 | [DA DECIDERE PA-03] |
 | `flag_stampa_ldv` | — | `"N"` (etichetta prodotta da EURODIS) | |
 | `flag_attivazione_ritiro` | — | `"N"` | |
-| `centro_costo` | config `mapper.centro-costo` | `CDC-00000014` | **[DECISO 10-11]** come il builder per EURODIS (`cli_c49353.ini`, `Centro_Costo`) |
+| `centro_costo` | postazione `idCentroCosto` | trim; se vuoto o postazione non ricavata: config `mapper.centro-costo` (`CDC-00000014`) | **[DECISO 18-11]** sezione 6.2.1; il valore di configurazione è quello del builder per EURODIS (`cli_c49353.ini`, `Centro_Costo`) |
 | `rif_prodotto_cliente` | config `mapper.rif-prodotto-cliente` | `""` | come il builder, che non lo imposta: il servizio a valle usa il prodotto di default |
 | `data_spedizione` | `entranceTimestamp` | `yyyy-MM-dd` (RF-09) | commento Diego 23-10 |
 | `ora_spedizione` | `entranceTimestamp` | `HH:mm:ss` | |
@@ -361,6 +409,7 @@ Spring, cioè 9 tentativi senza attesa, poi log e salto del messaggio (MAP-3).
 | `edReference` assente o non intero | come sopra | idem | idem |
 | Destinatario assente, o senza cap o località (RF-14) | non mappabile, niente tentativi | `esito=non_mappabile`, `motivo=destinatario_assente`, WARN | correzione lato EURODIS, poi ripubblicazione da `-in` |
 | `ce-anagrafica` in errore o lenta | si pubblica; per IT/ITA/ITA1 con le codifiche italiane di configurazione, per gli altri paesi senza ISO3/ISO4 (RF-15) | avviso `anagrafica_ko` (+ `nazione_default_italia`), errore sullo span | al messaggio successivo si riprova (gli errori non sono in cache) |
+| Postazione non ricavata (LDV vuota o non riconosciuta, postazione non trovata, `ce-ldv`/`ce-vendite`/database in errore) | **si pubblica** con cliente, contratto e centro di costo di configurazione (RF-16, sezione 6.2.1) | avvisi `postazione_*`, `eurodis_mapper_postazione_errori_total{componente}`, WARN con seme e tipo seme | gli errori non sono in cache: la spedizione successiva riprova |
 | Spedizione incompleta (data, LDV, peso) | **si pubblica** (RF-06) | `campo_mancante{campo}`, WARN | a valle |
 | Kafka in uscita non disponibile, timeout | eccezione → `DefaultErrorHandler` con backoff (default 3 tentativi, 2 s), poi recoverer | `esito=errore_tecnico`, ERROR | offset non committato durante i tentativi; dopo, DLT o ripubblicazione da `-in` |
 | Errore inatteso nel mapping | come Kafka giù | idem | idem |
@@ -431,11 +480,23 @@ Messaggio scartato, non mappabile (motivo=destinatario_assente, campi=[consignee
 | `kafka.producer.topic.output` | `KAFKA_TOPIC_OUTPUT` | `preadvising.pre-enrichment` | esistente |
 | `mapper.canale` | `MAPPER_CANALE` | `EUD_INVIOSYSTEM` | deciso 05-11 |
 | `mapper.id-partner` | `MAPPER_ID_PARTNER` | `EURODIS` | PA-15 |
-| `mapper.cliente.codice-login` | `MAPPER_CLIENTE_CODICE_LOGIN` | `cli_c49353` | → `codice_login_cliente`; valori del builder per EURODIS (anche in `.helm/values.yaml`) |
-| `mapper.cliente.codice-auc` | `MAPPER_CLIENTE_CODICE_AUC` | `1335062583` | → `codice_auc` |
-| `mapper.cliente.id-cliente` | `MAPPER_CLIENTE_ID` | `""` | → `id_cliente` |
-| `mapper.cliente.codice-contratto` | `MAPPER_CLIENTE_CONTRATTO` | `SFA-00633620` | → `codice_contratto` |
-| `mapper.centro-costo` | `MAPPER_CENTRO_COSTO` | `CDC-00000014` | → `centro_costo` |
+| `mapper.cliente.codice-login` | `MAPPER_CLIENTE_CODICE_LOGIN` | `cli_c49353` | → `codice_login_cliente` (sempre: la postazione non ha il campo); valori del builder per EURODIS (anche in `.helm/values.yaml`) |
+| `mapper.cliente.codice-auc` | `MAPPER_CLIENTE_CODICE_AUC` | `1335062583` | → `codice_auc` (sempre: la postazione non ha il campo) |
+| `mapper.cliente.id-cliente` | `MAPPER_CLIENTE_ID` | `""` | → `id_cliente` solo come fallback (sezione 6.2.1) |
+| `mapper.cliente.codice-contratto` | `MAPPER_CLIENTE_CONTRATTO` | `SFA-00633620` | → `codice_contratto` solo come fallback; è anche il contratto EURODIS per la colonna `eurodis` della tabella |
+| `mapper.centro-costo` | `MAPPER_CENTRO_COSTO` | `CDC-00000014` | → `centro_costo` solo come fallback |
+| `client.postazione.abilitata` | `POSTAZIONE_ABILITATA` | `true` | `false` = valori di configurazione, nessuna chiamata |
+| `client.postazione.riverifica-giorni` | `POSTAZIONE_RIVERIFICA_GIORNI` | `7` | oltre, la riga di `eurodis_postazioni` si riverifica su `ce-vendite` |
+| `client.postazione.ldv.base-url` | `LDV_URL` | `http://ce-ldv.corriere-espresso-preadvising.svc.cluster.local:8080` | solo per le LDV non PDB |
+| `client.postazione.ldv.connect-timeout-ms`, `read-timeout-ms` | `LDV_CONNECT_TIMEOUT_MS`, `LDV_READ_TIMEOUT_MS` | `1000`, `2000` | nessun retry |
+| `client.postazione.vendite.base-url` | `VENDITE_URL` | `http://ce-vendite.corriere-espresso-preadvising.svc.cluster.local:8080` | |
+| `client.postazione.vendite.connect-timeout-ms`, `read-timeout-ms` | `VENDITE_CONNECT_TIMEOUT_MS`, `VENDITE_READ_TIMEOUT_MS` | `1000`, `2000` | nessun retry |
+| `client.postazione.cache.ttl` | `POSTAZIONE_CACHE_TTL` | `1h` | postazione trovata |
+| `client.postazione.cache.ttl-non-trovata` | `POSTAZIONE_CACHE_TTL_NON_TROVATA` | `5m` | "non trovata" da `ce-vendite` |
+| `client.postazione.cache.dimensione-massima` | `POSTAZIONE_CACHE_DIMENSIONE_MASSIMA` | `1000` | semi in cache |
+| `spring.datasource.url` | `DATASOURCE_URL` | `jdbc:postgresql://localhost:5432/ce_eud_api_in` | per ambiente in `deploy-*/values.yaml`, stesso server di `-in` (svil `strkevoldb01azwe`, collaudo `ttrkevoldb01azwe`) |
+| `spring.datasource.username`, `password` | `DATASOURCE_USERNAME`, `DATASOURCE_PASSWORD` | — | secret `ce-postgres` (`datasource-name`, `data-source-password`), come `-in` |
+| `spring.datasource.hikari.*` | `DATASOURCE_HIKARI_MINIMUM_IDLE`, `…_MAXIMUM_POOL_SIZE`, `…_IDLE_TIMEOUT`, `…_CONNECTION_TIMEOUT` | `1`, `3`, `30000`, `3000` | pool piccolo: una query per seme non in cache |
 | `mapper.rif-prodotto-cliente` | `MAPPER_RIF_PRODOTTO_CLIENTE` | `""` | |
 | `mapper.codici-servizi.abilitati` | `MAPPER_CODICI_SERVIZI` | `true` | PA-03 |
 | `mapper.consegna.separatore-note` | — | `" "` | |
@@ -461,7 +522,10 @@ Modello: `ce-dichiarato-adapter` e `ce-dichiarato-eurodis-in` (`TraceUtil`,
 | `kafka_message_consumed_total`, `…_ok`, `…_ko`, `…_errore_tecnico` | — | esistenti, si tengono |
 | `eurodis_mapper_spedizioni_total` | `esito` = `pubblicata`, `non_mappabile`, `errore_tecnico`; `motivo` per i non mappabili (`json`, `ed_reference`, `destinatario_assente`) | esito per messaggio |
 | `eurodis_mapper_campo_mancante_total` | `campo` | RF-07 |
-| `eurodis_mapper_avvisi_total` | `motivo` = `colli_incoerenti`, `fallback_data`, `valuta_non_eur`, `tipo_cod_sconosciuto`, `header_mancante`, `anagrafica_ko`, `nazione_default_italia` | regole con warning |
+| `eurodis_mapper_avvisi_total` | `motivo` = `colli_incoerenti`, `fallback_data`, `valuta_non_eur`, `tipo_cod_sconosciuto`, `header_mancante`, `anagrafica_ko`, `nazione_default_italia`, `postazione_ldv_vuota`, `postazione_ldv_non_riconosciuta`, `postazione_non_trovata`, `postazione_ko`, `postazione_incompleta` | regole con warning |
+| `eurodis_mapper_postazione_cache_total` | `esito` = `hit`, `miss` | cache della postazione per seme |
+| `eurodis_mapper_postazione_total` | `sorgente` = `tabella`, `ce_vendite`, `non_trovata` | da dove arriva la postazione di un seme non in cache |
+| `eurodis_mapper_postazione_errori_total` | `componente` = `ce_ldv`, `ce_vendite`, `db_lettura`, `db_scrittura` | errori tecnici della risoluzione (sezione 6.2.1) |
 | `eurodis_mapper_durata_seconds` | — | timer dall'ingresso alla pubblicazione |
 
 I tag restano a bassa cardinalità: il campo EURODIS sorgente di scarti, avvisi e campi mancanti
@@ -644,6 +708,17 @@ non mappabile, motivo `destinatario_assente`, nessuna pubblicazione (RF-14).
    (`mittente.codice_nazione`). Riguarda il **mittente**: con mittenti esteri (come nei
    dati di TEST) dipende dalla risposta di `ce-anagrafica`; il default italiano non la
    copre. Se `shipperAddress` è assente il mittente è vuoto e la regola scatta comunque.
+
+## Decisioni di Diego del 18-11 (cliente dalla postazione)
+
+1. **Contratto e tutto ciò che era configurabile dalla postazione della LDV** (sezioni 6.2 e 6.2.1, RF-16):
+   `codice_contratto`, `centro_costo`, `id_cliente`, `ragione_sociale`, `partita_iva`, `cod_fiscale` dalla
+   configurazione postazione di `ce-vendite`; `codice_login_cliente` e `codice_auc` restano di configurazione
+   perché la risposta non ha campi corrispondenti. La configurazione resta solo come fallback.
+2. **Cache → tabella `eurodis_postazioni` → `ce-vendite` → upsert**, con riverifica dopo 7 giorni; la tabella la
+   legge anche `ce-eurodis-send-tracking`. Dipende dallo script 07 di `ce-dichiarato-eurodis-in`.
+3. **Da verificare in svil**: l'upsert `ON CONFLICT … DO UPDATE` è provato solo nel testo (H2 non lo supporta);
+   la prima spedizione con un seme nuovo deve creare la riga, una con riga più vecchia di 7 giorni aggiornarla.
 
 ## Domande per Diego
 
