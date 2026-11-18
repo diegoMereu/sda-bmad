@@ -65,9 +65,23 @@ Entrambi i canali usano il contratto `SFA-00633620` e il centro di costo `CDC-00
 Le prove in svil finora usavano `deliveryPartnerBarcode` = `JVGTCRDS` + 14 cifre (22 caratteri):
 `ce-ldv` non lo riconosce, `ce-dichiarato-ldv` ripiegava sul seme della postazione configurata, e
 `ldv-pdb` lo mandava a BEP come `code` (canale `INVIOSYSTEM`). Lo scarto `101 country` arriva prima e
-non dice se BEP accetta quel `code`. Il mock ora genera LDV PDB `1UW0008` + 6 cifre (seme della
-postazione EURODIS in `sfa_postazioni_ou`): dopo la correzione della nazione la prova verso BEP va
-rifatta con questo formato. Resta da capire se BEP verifica che la numerazione appartenga al contratto.
+non dice se BEP accetta quel `code`. Con `1UW0008` + 6 cifre (seme di postazione in
+`sfa_postazioni_ou`) BEP ha risposto "barcode non utilizzabile": BEP verifica che la numerazione
+appartenga al contratto. Il seme corretto è il `pds_code` del contratto per il canale di prenotazione
+(`contract_ps_data.pds`, `SFA-00633620`, `CDC-00000014`, AUC `1335062583`):
+
+| `booking_channel` | `pds_code` |
+|---|---|
+| INVIOEASY | `W2306` |
+| INVIOFILE | `W2307` |
+| INVIOSYSTEM | `W2308` |
+| WEB | `W2309` |
+| WEBSERVICES | `W2319` |
+
+Il mock ora genera `1UW2308` + 6 cifre. Se si passa a `waybill/create` REST (`WEBSERVICES`, minuta
+29/07), il seme diventa `W2319`. Da verificare: `ce-dichiarato-ldv` ricava la postazione dal seme della
+LDV (`ce-vendite`, `cen_postazioni` poi `sfa_postazioni_ou`); se `W2308` non è un `id_seme_ldv` lì,
+scarta con `144` "Postazione non ricavata da seme".
 
 ## Altri riferimenti utili dallo stesso documento
 

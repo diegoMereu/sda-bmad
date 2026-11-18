@@ -162,7 +162,7 @@ data:
                 "width": 44,
                 "height": 55,
                 "volumetricWeight": null,
-                "deliveryPartnerBarcode": "1UW0008{{randomValue length=6 type='NUMERIC'}}",
+                "deliveryPartnerBarcode": "1UW2308{{randomValue length=6 type='NUMERIC'}}",
                 "dispatchPartnerBarcode": "51200000225059136400000031001",
                 "pudoOpeningCode": "1234",
                 "colloFlexField1": null,

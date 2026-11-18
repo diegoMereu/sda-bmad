@@ -32,13 +32,14 @@ corrispondente di `wiremock-receive-pan.yaml`. Dopo una modifica alla ConfigMap 
     spedizione in `-in`;
   - `dispatchPartnersDomesticShipmentNumber` = `30` + 6 cifre: `spedizione.id_ldv_partner_master`;
   - `collis[].europlateBarcode` = `12345` + 19 cifre: `internazionale.id_ldv_itz`;
-  - `collis[].deliveryPartnerBarcode` = `1UW0008` + 6 cifre: la LDV, `collo[].id_ldv` (dal 18-11; prima
+  - `collis[].deliveryPartnerBarcode` = `1UW2308` + 6 cifre: la LDV, `collo[].id_ldv` (dal 18-11; prima
     `JVGTCRDS` + 14 cifre, che `ce-ldv` non riconosce). È una LDV PDB di 13 caratteri: `[1-8]U` + seme
-    di 5 + progressivo di 6 (semantica `PPTT` di `ce-ldv`). `W0008` è il seme della postazione EURODIS più
-    recente in `sfa_postazioni_ou` di svil (contratto `SFA-00633620`; le altre: `W0009`, `W0019`,
-    `W0029`, `W0039`). Con un seme estraneo `ce-dichiarato-ldv` scarta con `144` o `134`. Un collo
-    figlio PDB ha invece 22 caratteri (9 del figlio + 13 della madre): non usare 22 caratteri per un
-    collo singolo;
+    di 5 + progressivo di 6 (semantica `PPTT` di `ce-ldv`). Il seme è il `pds_code` del contratto
+    `SFA-00633620` per il canale di prenotazione (`contract_ps_data.pds`): `W2308` = `INVIOSYSTEM`
+    (gli altri: `W2306` INVIOEASY, `W2307` INVIOFILE, `W2309` WEB, `W2319` WEBSERVICES). Il primo
+    tentativo con `W0008` (seme di postazione in `sfa_postazioni_ou`) è stato rifiutato da BEP come
+    "barcode non utilizzabile". Un collo figlio PDB ha invece 22 caratteri (9 del figlio + 13 della
+    madre): non usare 22 caratteri per un collo singolo;
   - `referencedEurodisShipmentNumber`, non mappato.
 
   Ogni scarico produce quindi una spedizione nuova (ogni 2 minuti in svil).
