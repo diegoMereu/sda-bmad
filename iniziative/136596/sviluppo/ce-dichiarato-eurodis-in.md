@@ -517,6 +517,7 @@ Variabili d'ambiente (Helm) → proprietà `eurodis.in.*` in `application.yaml`.
 | `KAFKA_TOPIC_OUTPUT` | `topic` | `preadvising.eud.pre.build` | |
 | `KAFKA_TOPIC_EVENT_STORE` | `kafka.topics.event-store` | `preadvising.evensource` | eventi di stato (sezione 3.3), stesso nome di variabile del builder |
 | `EURODIS_FILE_CODICE_LOGIN_CLIENTE` / `_NOMINATIVO_CLIENTE` / `_PARTITA_IVA` / `_RAGIONE_SOCIALE` | `file.*` | vuoti (campo omesso) | dati del cliente EURODIS negli eventi; valori per ambiente da ricevere |
+| | | svil (18-11): `_CODICE_LOGIN_CLIENTE` = `cli_c49353`, `_RAGIONE_SOCIALE` = `EURODIS GmbH` (il consorzio, dal mapping ImportPAN BEP v1.7); nominativo e partita IVA non documentati, restano vuoti | la console di monitoraggio mostrava l'evento del file senza ragione sociale |
 | `EURODIS_FILE_CANALE` | `file.canale` | `EUD_INVIOSYSTEM` | |
 | `KAFKA_PRODUCER_SEND_TIMEOUT` | `pubblicazione.timeout` | 10 s | |
 | `EURODIS_RIPUBBLICAZIONE_CRON` / `_ATTESA_MIN` / `_TENTATIVI_MAX` | `ripubblicazione.*` | ogni 2 min / 5 min / 10 | RF-11 |
