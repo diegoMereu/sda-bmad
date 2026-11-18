@@ -23,8 +23,9 @@ Database: `ce_cen` (anagrafica, db-sync), `ce_eud_api_in` (eurodis-in). Endpoint
 
 ## Accesso al cluster
 
-- Il server API spesso non risponde dalla postazione (timeout): in quel caso log e pod li legge
-  Diego.
+- Il server API spesso non risponde dalla postazione (timeout, o `oc` resta anonimo): in quel caso
+  log e pod li legge Diego. Kafka svil invece è raggiungibile in chiaro sulla 9092 (lettura e
+  produzione di messaggi di test dalla postazione).
 - Quando Diego dà un token: usarlo solo sul momento, con un kubeconfig separato nello scratchpad
   (`oc login --kubeconfig=<scratchpad>/kc-svil ...`) per non interferire con altri agenti; solo
   comandi di lettura (get, logs, exec di sola lettura); `oc logout` alla fine. Mai salvare il token.

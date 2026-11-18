@@ -359,7 +359,8 @@ spring:
       mode: never
 ```
 
-Va tolto `spring.data.mongodb.uri`. `spring.sql.init.mode: never`: il servizio non crea tabelle,
+`spring.data.mongodb.uri` resta: dal 18-11 (-in 0.8, `8ce7666`) `-in` scrive il file fittizio nella
+collection Mongo `preadvising_file`, come `ce-dichiarato-builder`. `spring.sql.init.mode: never`: il servizio non crea tabelle,
 le crea il DBA con gli script.
 
 ### Variabili e secret (Helm)
@@ -371,11 +372,13 @@ le crea il DBA con gli script.
 | `DATASOURCE_USERNAME` | `.helm/values.yaml`, `env` | `secretKeyRef`: secret `ce-postgres`, chiave `datasource-name` |
 | `DATASOURCE_PASSWORD` | `.helm/values.yaml`, `env` | `secretKeyRef`: secret `ce-postgres`, chiave `data-source-password` |
 | `DATASOURCE_HIKARI_MINIMUM_IDLE` / `_MAXIMUM_POOL_SIZE` / `_IDLE_TIMEOUT` | `.helm/values.yaml`, `envFrom` | `1` / `5` / `30000` (quattro job, uno alla volta per pod) |
-| `MONGO_STRING_CONNECTION` | `.helm/values.yaml`, `env` | **da togliere** |
+| `MONGO_STRING_CONNECTION` | `.helm/values.yaml`, `env` | **resta** (18-11): serve per `preadvising_file`; deve puntare allo stesso database Mongo del builder |
 | `TRUSTSTORE_PASSWORD`, `TRUSTSTORE_CA_POSTE_LOCATION`, volume `sslsecrets` (`ssl.trustore.sslsecretname: ssl-secrets`) | `.helm/values.yaml` | già presenti in `-in` (servono a Kafka): nessuna modifica |
 
-Nel secret `ce-dichiarato-eurodis-in-secret` la chiave `mongo-string-connection` non serve più;
-restano `api-key` e le chiavi di Kafka. Il secret `ce-postgres` esiste già nel namespace
+Nel secret `ce-dichiarato-eurodis-in-secret` restano `api-key`, le chiavi di Kafka e
+`mongo-string-connection`, che serve di nuovo dal 18-11 (file fittizio in `preadvising_file`). Da
+verificare che punti allo stesso database Mongo del builder (`MONGODB_CONNECTION_URI` del secret
+`ce-mongodb-dichiarato-builder`). Il secret `ce-postgres` esiste già nel namespace
 `corriere-espresso-preadvising` (lo usano `ce-db-sync`, `ce-anagrafica`, `ce-ldv`).
 
 Rete: `ce-anagrafica` e `ce-db-sync`, nello stesso namespace, raggiungono già entrambi i server;
@@ -385,7 +388,7 @@ non servono `hostAliases`. Come in `ce-db-sync`, l'URL non specifica `sslmode`.
 
 | Azione | Dipendenza |
 |---|---|
-| togliere | `spring-boot-starter-data-mongodb` |
+| tenere (18-11) | `spring-boot-starter-data-mongodb`: serve per `preadvising_file` |
 | togliere | `net.javacrumbs.shedlock:shedlock-provider-mongo` |
 | aggiungere | `spring-boot-starter-jdbc` |
 | aggiungere | `org.postgresql:postgresql` (scope `runtime`, versione dal BOM di Spring Boot) |
@@ -450,7 +453,9 @@ da una ripresa concorrente.
    solo se le tabelle le crea un altro utente).
 3. Conferma che l'utente nel secret `ce-postgres` (chiave `datasource-name`) è `ce_user`, cioè il
    proprietario del nuovo database.
-4. Togliere la chiave `mongo-string-connection` da `ce-dichiarato-eurodis-in-secret`, dopo il rilascio.
+4. ~~Togliere la chiave `mongo-string-connection`~~ (superato il 18-11): la chiave resta e deve puntare
+   allo stesso database Mongo di `ce-dichiarato-builder` (`MONGODB_CONNECTION_URI` del secret
+   `ce-mongodb-dichiarato-builder`), da verificare.
 5. **Script 7 (18-11)** come `ce_user` su `ce_eud_api_in`, in svil e collaudo: dove gli script 1-6
    sono già stati eseguiti si esegue solo questo (e la riga di `eurodis_postazioni` dello script 6,
    se le tabelle non le crea `ce_user`). Serve prima del rilascio del mapper che la scrive.

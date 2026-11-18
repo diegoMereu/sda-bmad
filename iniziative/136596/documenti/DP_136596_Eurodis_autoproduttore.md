@@ -9,11 +9,12 @@ revisioni:
   - {versione: "0.1", data: "05/11/2026", paragrafi: "Tutti", motivazioni: "Prima emissione"}
   - {versione: "0.2", data: "10/11/2026", paragrafi: "Tutti", motivazioni: "Persistenza su PostgreSQL al posto di MongoDB, area di appoggio locale con recupero, eventi di stato su preadvising.evensource, ce-anagrafica consultato dal mapper, F1 non consultato, catena a valle per il canale EUD_INVIOSYSTEM, frequenze per ambiente, allineamento alla SF 0.3"}
   - {versione: "0.3", data: "13/11/2026", paragrafi: "1.1, 3.1", motivazioni: "Codice PK delle applicazioni CE (PK-03089, dalle label pkcode dei chart Helm)"}
+  - {versione: "0.4", data: "18/11/2026", paragrafi: "1.1, 1.2, 2.1, Allegati", motivazioni: "Allineamento alla SF 0.6: postazione del seme LDV da ce-vendite con tabella eurodis_postazioni, file fittizio in preadvising_file, sorgente PACCHI.TRACKING e filtro EURODIS del tracciamento, monitoraggio del canale EUD_INVIOSYSTEM"}
 ---
 
 # Architettura Applicativa
 
-L'iniziativa ha lo scopo di prendere in carico le spedizioni del consorzio EURODIS in modalità autoproduttore: la lettera di vettura è assegnata da EURODIS e i dati di spedizione (PAN) vengono prelevati dall'API EURODIS `receive-pan`, invece che dal dichiarato tradizionale. Le spedizioni acquisite vengono convertite nel tracciato unico del preadvising con il nuovo canale `EUD_INVIOSYSTEM` e immesse nella catena di preadvising esistente, che le valida, le arricchisce e le crea su PDB; SDA restituisce infine a EURODIS le tracce delle spedizioni prese in carico. Le regole funzionali sono descritte nella Specifica Funzionale dell'iniziativa (allegato SF_136596_Eurodis_autoproduttore, versione 0.3).
+L'iniziativa ha lo scopo di prendere in carico le spedizioni del consorzio EURODIS in modalità autoproduttore: la lettera di vettura è assegnata da EURODIS e i dati di spedizione (PAN) vengono prelevati dall'API EURODIS `receive-pan`, invece che dal dichiarato tradizionale. Le spedizioni acquisite vengono convertite nel tracciato unico del preadvising con il nuovo canale `EUD_INVIOSYSTEM` e immesse nella catena di preadvising esistente, che le valida, le arricchisce e le crea su PDB; SDA restituisce infine a EURODIS le tracce delle spedizioni prese in carico. Le regole funzionali sono descritte nella Specifica Funzionale dell'iniziativa (allegato SF_136596_Eurodis_autoproduttore, versione 0.6).
 
 ## Business Architecture – Preadvising EURODIS autoproduttore
 
@@ -22,8 +23,9 @@ L'iniziativa ha lo scopo di prendere in carico le spedizioni del consorzio EUROD
 | Processo | Fase | Sistema Applicativo (AP) / Applicazione (PK) | Ruolo dell'Applicativo | Impatto Applicativo (S/N) | Applicativo esistente o nuovo |
 |---|---|---|---|---|---|
 | Preadvising | Acquisizione spedizioni | EURODIS / API `receive-pan` | Piattaforma del partner: espone le spedizioni affidate a SDA | N | Esistente (esterno) |
-| Preadvising | Acquisizione e storicizzazione | CE (AP-00988) / `ce-dichiarato-eurodis-in` (PK-03089) | Scarica periodicamente le spedizioni da `receive-pan`, le appoggia su un'area locale, ne salva lo storico su PostgreSQL, pubblica gli eventi di stato della presa in carico su `preadvising.evensource` e una spedizione per messaggio su `preadvising.eud.pre.build` | S | Nuovo |
-| Preadvising | Trasformazione nel tracciato unico | CE (AP-00988) / `ce-dichiarato-eurodis-mapper` (PK-03089) | Converte la spedizione EURODIS nel tracciato unico (ICD v11, canale `EUD_INVIOSYSTEM`), ricava i codici nazione da `ce-anagrafica` e pubblica su `preadvising.pre-enrichment` | S | Nuovo |
+| Preadvising | Acquisizione e storicizzazione | CE (AP-00988) / `ce-dichiarato-eurodis-in` (PK-03089) | Scarica periodicamente le spedizioni da `receive-pan`, le appoggia su un'area locale, ne salva lo storico su PostgreSQL, registra il file fittizio dello scarico nella collection MongoDB `preadvising_file`, pubblica gli eventi di stato della presa in carico su `preadvising.evensource` e una spedizione per messaggio su `preadvising.eud.pre.build` | S | Nuovo |
+| Preadvising | Trasformazione nel tracciato unico | CE (AP-00988) / `ce-dichiarato-eurodis-mapper` (PK-03089) | Converte la spedizione EURODIS nel tracciato unico (ICD v11, canale `EUD_INVIOSYSTEM`, solo LDV PDB), ricava i codici nazione da `ce-anagrafica` e i dati del cliente dalla postazione del seme LDV (`ce-vendite`, registrata nella tabella `eurodis_postazioni`), pubblica su `preadvising.pre-enrichment` | S | Nuovo |
+| Preadvising | Postazione del seme LDV | CE (AP-00988) / `ce-vendite` (PK-03089) | Restituisce la configurazione della postazione (contratto, centro di costo, dati anagrafici) a partire dal seme LDV | N | Esistente |
 | Preadvising | Codici nazione | CE (AP-00988) / `ce-anagrafica` (PK-03089) | Restituisce i codici ISO3, ISO4 Poste e ISO2 della nazione di mittente e destinatario | N | Esistente |
 | Preadvising | Validazione del tracciato unico | CE (AP-00988) / `ce-dichiarato-validatore` (PK-03089) | Consuma il tracciato da `preadvising.pre-enrichment` e lo valida con le regole del canale `EUD_INVIOSYSTEM` (riuso delle regole `PDB_INVIOSYSTEM`); deve accettare i valori oltre le dimensioni ICD (vincolo 2 della SF) | S | Esistente |
 | Preadvising | Orchestrazione | CE (AP-00988) / `ce-dichiarato-orchestratore` (PK-03089) | Per il canale `EUD_INVIOSYSTEM` esegue normalizzazione, arricchimento BEP e creazione su PDB, poi pubblica su `preadvising.completed` | S | Esistente |
@@ -31,15 +33,17 @@ L'iniziativa ha lo scopo di prendere in carico le spedizioni del consorzio EUROD
 | Preadvising | Propagazione verso PDB | CE (AP-00988) / `ce-dichiarato-ldv-pdb` (PK-03089) | Converte il tracciato unico nella richiesta PDB e crea la spedizione con `waybillCreate`. Nessuno sviluppo previsto: verifica delle osservazioni della SF, eventuali correzioni a carico del responsabile | N | Esistente |
 | Preadvising | Creazione spedizione | PDB (AP DA DEFINIRE) / servizio `waybillCreate` | Crea la spedizione con la LDV assegnata da EURODIS | N | Esistente |
 | Preadvising | Smistamento | CE (AP-00988) / `ce-dichiarato-smistatore` (PK-03089) | Instrada il tracciato completato del canale `EUD_INVIOSYSTEM` tra i canali Poste | S | Esistente |
+| Preadvising | Chiusura del file | CE (AP-00988) / `ce-dichiarato-state-machine-handler` (PK-03089) | Chiude il file fittizio dello scarico come i file del preadvising | N | Esistente |
+| Preadvising | Monitoraggio | CE (AP-00988) / `ce-event-handler-monitoring` (PK-03089) | Ammette il canale `EUD_INVIOSYSTEM` (modifica di configurazione) | S | Esistente |
 | Preadvising | Ricezione LDV | BEP (AP DA DEFINIRE) | Riceve la LDV dal tracciato unico | N | Esistente |
-| Tracciamento | Invio tracce al partner | CE (AP-00988) / `ce-eurodis-send-tracking` (PK-03089) | Traduce gli stati SDA nei codici evento EURODIS e li invia a EURODIS | S | Nuovo |
+| Tracciamento | Invio tracce al partner | CE (AP-00988) / `ce-eurodis-send-tracking` (PK-03089) | Legge le tracce SDA da `PACCHI.TRACKING`, seleziona quelle delle spedizioni EURODIS (LDV PDB con seme EURODIS registrato in `eurodis_postazioni`, tracciato `EUD_INVIOSYSTEM` in `dichiarato_events`), traduce gli stati SDA nei codici evento EURODIS e li invia a EURODIS | S | Nuovo |
 | Tracciamento | Ricezione tracce | EURODIS / API `send-tracking` | Piattaforma del partner: riceve gli eventi di tracciamento | N | Esistente (esterno) |
 
 Tabella 1: Business Architecture – Preadvising EURODIS autoproduttore
 
 ## Information System Architecture
 
-Il dato nasce sulla piattaforma EURODIS e viene letto da `ce-dichiarato-eurodis-in`, che lo scrive su un'area di appoggio locale, lo storicizza su PostgreSQL, pubblica gli eventi di stato della presa in carico e lo invia, una spedizione per messaggio, sul topic `preadvising.eud.pre.build`. `ce-dichiarato-eurodis-mapper` lo converte nel tracciato unico, consultando `ce-anagrafica`, e lo pubblica su `preadvising.pre-enrichment`, da cui la catena di preadvising esistente lo valida, lo orchestra fino a `ce-dichiarato-ldv-pdb` e PDB e lo pubblica completato su `preadvising.completed`. Le tracce SDA tornano a EURODIS tramite `ce-eurodis-send-tracking`.
+Il dato nasce sulla piattaforma EURODIS e viene letto da `ce-dichiarato-eurodis-in`, che lo scrive su un'area di appoggio locale, lo storicizza su PostgreSQL, pubblica gli eventi di stato della presa in carico e lo invia, una spedizione per messaggio, sul topic `preadvising.eud.pre.build`. `ce-dichiarato-eurodis-mapper` lo converte nel tracciato unico, consultando `ce-anagrafica`, e lo pubblica su `preadvising.pre-enrichment`, da cui la catena di preadvising esistente lo valida, lo orchestra fino a `ce-dichiarato-ldv-pdb` e PDB e lo pubblica completato su `preadvising.completed`. Le tracce SDA tornano a EURODIS tramite `ce-eurodis-send-tracking`, che le legge dal topic `PACCHI.TRACKING`. I flussi dal 19 in poi, aggiunti con la versione 0.4, non sono ancora riportati nella Figura 2.
 
 ![Figura 2: Information System Architecture – Preadvising EURODIS autoproduttore](fig-2-flussi-dati.png)
 
@@ -61,8 +65,13 @@ Il dato nasce sulla piattaforma EURODIS e viene letto da `ce-dichiarato-eurodis-
 | Flusso dati 14 | `ce-dichiarato-ldv-pdb` crea la spedizione su PDB invocando il servizio sincrono `waybillCreate`. |
 | Flusso dati 15 | `ce-dichiarato-orchestratore` pubblica il tracciato completato sul topic `preadvising.completed`. |
 | Flusso dati 16 | `ce-dichiarato-smistatore` consuma il tracciato da `preadvising.completed` e lo instrada tra i canali Poste. |
-| Flusso dati 17 | `ce-eurodis-send-tracking` acquisisce le tracce SDA delle spedizioni EURODIS da una sorgente DA DEFINIRE (proposta: il topic degli esiti SDA indicato da SDA). |
+| Flusso dati 17 | `ce-eurodis-send-tracking` consuma le tracce SDA dal topic Kafka `PACCHI.TRACKING` e considera solo quelle delle spedizioni EURODIS (flussi 22 e 23). |
 | Flusso dati 18 | `ce-eurodis-send-tracking` invia le tracce a EURODIS tramite l'API `send-tracking` (`POST /event/parcel/v1` e variante a lotti), con la stessa chiave API del partner e lo stato SDA tradotto nel codice evento EURODIS. |
+| Flusso dati 19 | `ce-dichiarato-eurodis-in` registra il file fittizio dello scarico nella collection MongoDB `preadvising_file`, letta da `ce-dichiarato-state-machine-handler` per la chiusura del file. |
+| Flusso dati 20 | `ce-dichiarato-eurodis-mapper` invoca `ce-vendite` (`GET /vendite/configurazione-postazione-da-seme`) per la postazione del seme LDV, quando non è già registrata o va riverificata. |
+| Flusso dati 21 | `ce-dichiarato-eurodis-mapper` legge e aggiorna la tabella `eurodis_postazioni` (PostgreSQL `ce_eud_api_in`), una riga per seme LDV con la postazione e l'indicazione se appartiene al contratto EURODIS. |
+| Flusso dati 22 | `ce-eurodis-send-tracking` legge in sola lettura la tabella `eurodis_postazioni` per verificare che il seme della LDV sia una postazione EURODIS. |
+| Flusso dati 23 | `ce-eurodis-send-tracking` legge la collection MongoDB `dichiarato_events` per verificare che la LDV appartenga a un tracciato `EUD_INVIOSYSTEM` e ricavarne `edReference`. |
 
 Tabella 2: Information System Architecture – Flussi dati
 
@@ -80,9 +89,13 @@ I nuovi microservizi seguono lo stack standard dei microservizi `ce-` del preadv
 | `preadvising.eud.pre.build` | Topic Kafka | 1.0 | Integration | Nuovo |
 | `preadvising.pre-enrichment` | Topic Kafka | Non applicabile | Integration | Esistente (nuovo produttore) |
 | `preadvising.evensource` | Topic Kafka | Non applicabile | Integration | Esistente (nuovo produttore) |
-| `ce_eud_api_in` (tabelle `eurodis_scarichi`, `eurodis_spedizioni`, `eurodis_richieste_manuali`, `shedlock`) | PostgreSQL | Non applicabile | Data | Nuovo (database e tabelle) |
+| `ce_eud_api_in` (tabelle `eurodis_scarichi`, `eurodis_spedizioni`, `eurodis_richieste_manuali`, `shedlock`, `eurodis_postazioni`) | PostgreSQL | Non applicabile | Data | Nuovo (database e tabelle) |
 | Area di appoggio locale di `ce-dichiarato-eurodis-in` | Volume OpenShift `emptyDir` (1 Gi, montato su `/buffer`) | Non applicabile | Data | Nuovo |
 | `ce-anagrafica` | Microservizio | DA DEFINIRE | Application | Esistente |
+| `ce-vendite` | Microservizio | DA DEFINIRE | Application | Esistente |
+| `ce-event-handler-monitoring` | Microservizio | DA DEFINIRE | Application | Esistente (configurazione del nuovo canale) |
+| `PACCHI.TRACKING` | Topic Kafka | Non applicabile | Integration | Esistente (nuovo consumatore) |
+| MongoDB preadvising (collection `preadvising_file`, `dichiarato_events`) | MongoDB | Non applicabile | Data | Esistente (nuovo produttore e nuovo lettore) |
 | `ce-dichiarato-validatore` | Microservizio | DA DEFINIRE | Application | Esistente (nuovo canale) |
 | `ce-dichiarato-orchestratore` | Microservizio | DA DEFINIRE | Application | Esistente (nuovo canale) |
 | `ce-dichiarato-ldv-pdb` | Microservizio | DA DEFINIRE | Application | Esistente |
@@ -113,8 +126,13 @@ Tabella 3: Preadvising EURODIS autoproduttore – dettaglio applicativi
 | Flusso 14 | DA DEFINIRE | `ce-dichiarato-ldv-pdb` | PDB `waybillCreate` | Sincrona | A evento, una chiamata per spedizione | DA DEFINIRE (volumi) | DA DEFINIRE | DA DEFINIRE | Esistente |
 | Flusso 15 | Kafka | `ce-dichiarato-orchestratore` | Topic `preadvising.completed` | Asincrona | A evento | DA DEFINIRE (volumi) | stima: 3-4 KB | DA DEFINIRE | Esistente (nuovo canale) |
 | Flusso 16 | Kafka | Topic `preadvising.completed` | `ce-dichiarato-smistatore` | Asincrona | A evento | DA DEFINIRE (volumi) | stima: 3-4 KB | DA DEFINIRE | Esistente (nuovo canale) |
-| Flusso 17 | DA DEFINIRE (proposta: Kafka) | Sorgente delle tracce SDA (DA DEFINIRE) | `ce-eurodis-send-tracking` | DA DEFINIRE | DA DEFINIRE | DA DEFINIRE | DA DEFINIRE | DA DEFINIRE | Nuovo |
-| Flusso 18 | https | `ce-eurodis-send-tracking` | EURODIS `send-tracking` | Sincrona | DA DEFINIRE | DA DEFINIRE | DA DEFINIRE | DA DEFINIRE | Nuovo |
+| Flusso 17 | Kafka | Topic `PACCHI.TRACKING` | `ce-eurodis-send-tracking` | Asincrona | A evento; in produzione circa 114 eventi/s del Corriere Espresso, di cui solo quelli EURODIS vengono inviati | DA DEFINIRE | stima: inferiore a 1 KB | DA DEFINIRE | Nuovo (consumatore) |
+| Flusso 18 | https | `ce-eurodis-send-tracking` | EURODIS `send-tracking` | Sincrona | A evento, una chiamata per traccia EURODIS | DA DEFINIRE (volumi) | stima: inferiore a 1 KB | DA DEFINIRE | Nuovo |
+| Flusso 19 | MongoDB | `ce-dichiarato-eurodis-in` | Collection `preadvising_file` | Sincrona | Un documento per scarico con spedizioni | Come il Flusso 1 | stima: inferiore a 1 KB | stima: inferiore a 1 KB | Nuovo |
+| Flusso 20 | http | `ce-dichiarato-eurodis-mapper` | `ce-vendite` | Sincrona | Al primo uso di un seme LDV e alla riverifica periodica | Pochi semi | stima: inferiore a 1 KB | stima: inferiore a 1 KB | Nuovo |
+| Flusso 21 | JDBC | `ce-dichiarato-eurodis-mapper` | PostgreSQL `ce_eud_api_in`, tabella `eurodis_postazioni` | Sincrona | Al primo uso di un seme LDV e alla riverifica periodica (risultato in cache) | Pochi semi | stima: inferiore a 1 KB | stima: inferiore a 1 KB | Nuovo |
+| Flusso 22 | JDBC | `ce-eurodis-send-tracking` | PostgreSQL `ce_eud_api_in`, tabella `eurodis_postazioni` | Sincrona | Per seme LDV, con risultato in cache | Pochi semi | stima: inferiore a 1 KB | stima: inferiore a 1 KB | Nuovo |
+| Flusso 23 | MongoDB | `ce-eurodis-send-tracking` | Collection `dichiarato_events` | Sincrona | Una ricerca per traccia EURODIS | DA DEFINIRE (volumi) | stima: 3-4 KB | DA DEFINIRE | Nuovo |
 
 Tabella 4: Preadvising EURODIS autoproduttore – dettaglio flussi
 
@@ -186,7 +204,7 @@ Tabella 10: Openshift Cloud
 
 | Codice Documento | Nome |
 |---|---|
-| SF_136596_Eurodis_autoproduttore | Specifica Funzionale dell'iniziativa 136596 - EURODIS Autoproduttore, versione 0.3 |
+| SF_136596_Eurodis_autoproduttore | Specifica Funzionale dell'iniziativa 136596 - EURODIS Autoproduttore, versione 0.6 |
 | ICD_PREADVISING_LDV_EVENT_SOURCE_v11 | ICD v11 del tracciato unico preadvising, con il mapping EURODIS |
 | eurodis-receive-pan-swagger-v1 | Specifica OpenAPI dell'API EURODIS `receive-pan`, Release v1 |
 | eurodis-send-tracking-swagger-v1 | Specifica OpenAPI dell'API EURODIS `send-tracking`, Release v1 |

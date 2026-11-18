@@ -9,6 +9,10 @@ Serve a non reinventare il significato di un campo a ogni campagna.
 |---|---|
 | **LDV** | Lettera di Vettura. Documento che accompagna la spedizione; `id_ldv` è la chiave funzionale del dominio. |
 | **LDV madre** | LDV che raggruppa più LDV figlie (spedizione multi-collo aggregata). Il campo `id_ldv_madre` esiste in alcune tabelle e non in altre: verificarlo per campagna, non assumerlo. |
+| **LDV PDB** | LDV con semantica `PPTT` di ce-ldv (`LdvSemanticaUtil`): 13 caratteri, `[1-8]U` + seme (5) + progressivo (6); seme = `substring(2,7)`. Il collo figlio di un multicollo PDB ha 22 caratteri (9 del figlio + 13 della madre). |
+| **Seme LDV** | Parte dell'LDV che identifica chi la emette (postazione o contratto). `ce-ldv` `GET /ldv/seme/{ldv}` restituisce seme e tipo seme. |
+| **Autoproduttore** | Cliente che genera da sé le LDV (es. EURODIS, canale `EUD_INVIOSYSTEM`). Per BEP canale `INVIOSYSTEM` i codici sono "staccati da range prestabiliti" (ICD Mediation v2.5): prefisso `4U` con contrassegno, `3U` senza (indicazione Poste; `1U` → errore 131); seme = `pds_code` del contratto per canale di prenotazione (`contract_ps_data.pds`: `pds_code`, `contract_code`, `cdc_code`, `auc_code`, `booking_channel`). Un seme di postazione di `sfa_postazioni_ou` non va bene (131). |
+| **Errori BEP** | Utili da riconoscere: `101` country non valida, `131` "Barcode non utilizzabile" (prefisso o seme non ammessi), `142` barcode duplicato. |
 | **Collo** | Unità fisica. Una LDV può avere più colli (`numero_colli`). |
 | **Preadvising** | Preavviso di consegna: notifica al destinatario prima del tentativo. Il perimetro di 144208. |
 | **Preavviso online** | Canale di preadvising verso il destinatario via web/app. |
