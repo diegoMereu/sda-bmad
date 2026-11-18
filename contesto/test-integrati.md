@@ -28,7 +28,7 @@ gli artefatti stanno in `iniziative/<id>/test/`.
 
 ## Strumenti
 
-- venv Python nello scratchpad con `kafka-python`; script di lettura degli ultimi N messaggi per
+- venv Python nello scratchpad con `kafka-python` e `lz4` (alcuni topic svil sono compressi lz4: senza il pacchetto `UnsupportedCodecError`); script di lettura degli ultimi N messaggi per
   topic (stampa solo campi non personali).
 - Database e cluster spesso non raggiungibili dalla postazione: vedi [ambienti.md](ambienti.md).
 
