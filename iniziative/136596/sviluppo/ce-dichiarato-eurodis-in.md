@@ -1,10 +1,10 @@
 # `ce-dichiarato-eurodis-in` — Documento funzionale per lo sviluppo
 
-**Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.7.1 (nome dello scarico negli eventi, senza link al file) · **Data**: 2026-11-12
+**Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.8 (file fittizio in `preadvising_file` su Mongo, come il builder) · **Data**: 2026-11-18
 **Autore**: Mary (analyst) · **Destinatario**: Amelia (dev) e team di sviluppo
 **Repository**: https://posteitaliane.ghe.com/SVILUPPO/CORRIERE-ESPRESSO_PREADVISING_ce-dichiarato-eurodis-in
 **Generato da**: [prompt-ce-dichiarato-eurodis-in.md](prompt-ce-dichiarato-eurodis-in.md)
-**Implementazione**: branch `develop`, commit `3c01ba2` e seguenti (10-11, 74 test verdi): PostgreSQL (`9acdd77`, script in `sql/ddl/`), Helm (`bb61d50`), eventi di stato (`3c01ba2`). Scostamento: salvataggio delle spedizioni con `UPDATE` seguito da `INSERT` invece di `INSERT ... ON CONFLICT`, per poterlo provare su H2; stesso risultato. Mai avviato contro PostgreSQL e Kafka veri. Prima implementazione su Mongo: `a53398c` (04-11).
+**Implementazione**: branch `develop`, commit `3c01ba2` e seguenti (10-11, 74 test verdi): PostgreSQL (`9acdd77`, script in `sql/ddl/`), Helm (`bb61d50`), eventi di stato (`3c01ba2`), file fittizio in `preadvising_file` (`8ce7666`, 18-11, 108 test verdi). Scostamento: salvataggio delle spedizioni con `UPDATE` seguito da `INSERT` invece di `INSERT ... ON CONFLICT`, per poterlo provare su H2; stesso risultato. Mai avviato contro PostgreSQL e Kafka veri. Prima implementazione su Mongo: `a53398c` (04-11).
 Assessment: [assessment-ce-dichiarato-eurodis-in-2026-11-04.md](assessment-ce-dichiarato-eurodis-in-2026-11-04.md)
 
 Etichette usate nel documento:
@@ -218,8 +218,48 @@ Il secondo evento è identico, tranne `idStato`/`eventType` `ST_F0005`, `stato`
 | `metadata.source` | `spring.application.name` | |
 | `metadata.replay` | `false` | |
 
-Gli stati finali del file (`ST_F0006` `FILE_ELABORATO_CON_SUCCESSO`, `ST_F0008`
-`FILE_COMPLETAMENTE_SCARTATO`) **non** si inviano: non richiesti (domanda 4).
+Gli stati finali del file **non** li invia `-in`: dal 18-11 il file fittizio è registrato in
+`preadvising_file` (sezione 3.3.1) e lo chiude `ce-dichiarato-state-machine-handler`, come i file del
+builder.
+
+### 3.3.1 In uscita: il file fittizio nella collection Mongo `preadvising_file`
+
+**[DECISO 18-11, Diego]** Insieme a `ST_F0002`, `-in` registra il file fittizio nella collection
+`preadvising_file`, come fa `ce-dichiarato-builder` per i file caricati (`FileDigest.fromDto`,
+`FileDigestService`). È l'unico uso di Mongo in `-in`: la persistenza propria resta su PostgreSQL
+(sezione 3.4).
+
+Chi legge la collection, e cosa usa (verificato sul codice il 18-11):
+
+| Servizio | Uso | Campi |
+|---|---|---|
+| `ce-dichiarato-state-machine-handler` (`ChiusuraFileService`) | ogni ciclo prende i file con `stato = 0`, cerca i record di `dichiarato_events` con lo stesso `id_file`; quando sono tutti OK o KO invia l'evento di chiusura su `preadvising.evensource` e scrive `stato` 1 (successo), 3 (con scarti) o 4 (errore di chiusura) | `stato`, `idFile`, `clientId`, `channelId` (obbligatorio: con `null` l'evento di chiusura non parte), `fileName`, `partitaIva`, `nominativoCliente`, `ragioneSociale`, `linkFileFisicoInviato`, `uploadTime` (solo per la metrica end-to-end) |
+| `ce-preadvising-chiudi-file-stale` | porta a `stato = 1`, senza evento, i file con `stato = 0` caricati da più di 30 giorni | `stato`, `uploadTime` (stringa ISO-8601), `fileName`, `clientId` |
+| `ce-event-handler-nodo` | cerca il file per `idFile` per lo stato verso il NODO | `idFile`, `fileName` e dati del cliente |
+| `ce-dichiarato-bff` | ricerca dei file per la console | `idFile`, `fileName`, `clientId`, `channelId`, `stato`, `uploadTime` |
+| `ce-event-handler-monitoring`, `ce-dichiarato-event-handler-ttrepo` | repository presente ma non usato per leggere | — |
+
+Il file EURODIS si chiude quindi come gli altri: le spedizioni portano `id_file` nel tracciato
+(header `idFile`, sezione 3.2), il validatore lo scrive in `dichiarato_events`, la state machine
+chiude il file quando tutti i record sono OK o KO. Un file fittizio con sole spedizioni non
+identificabili non ha record a valle: resta `stato = 0` e lo chiude dopo 30 giorni
+`ce-preadvising-chiudi-file-stale`.
+
+| Campo | Valore | Note |
+|---|---|---|
+| `idFile` | `idFile` dello scarico | chiave dell'upsert |
+| `fileName` | `nomeFile` dello scarico (`SCARICO_EURODIS_<ts>`, `RILETTURA_EURODIS_<ts>_<edReference>`) | come negli eventi |
+| `uploadTime` | `ricevuto_il` dello scarico, stringa ISO-8601 con offset Europe/Rome (`2026-11-18T10:00:02.123+01:00`) | formato letto da state machine e chiudi-file-stale |
+| `stato` | `0` | file aperto |
+| `digest` | sha256 esadecimale di `idFile` | **[DECISO 18-11]** la collection ha un indice unique su `digest`. Il builder usa l'md5 del file; lo sha256 del grezzo collide (EURODIS TEST restituisce corpi identici) e un grezzo con più file fittizi non esiste: l'`idFile` è univoco per file fittizio e stabile fra i tentativi |
+| `clientId` | `eurodis.in.file.codice-login-cliente` (`cli_c49353`) | come `codiceLoginCliente` degli eventi |
+| `channelId` | `eurodis.in.file.canale` (`EUD_INVIOSYSTEM`) | |
+| `ragioneSociale`, `partitaIva`, `nominativoCliente` | `eurodis.in.file.*`; vuoti = omessi | oggi solo `EURODIS GmbH` |
+| `linkFileFisicoInviato` | omesso | nessun file fisico, come negli eventi |
+
+Scrittura: upsert per `idFile` con soli `$setOnInsert`. Alla ripresa non duplica e non riscrive
+niente, in particolare non riapre un file già chiuso. `-in` non crea indici
+(`auto-index-creation: false`): la collection e i suoi indici sono del builder.
 
 ### 3.4 Persistenza
 
@@ -405,9 +445,10 @@ sequenceDiagram
    come sono arrivati; un oggetto (rilettura) è una spedizione sola; altro → `NON_ELABORABILE`;
    array vuoto → `NESSUNA_SPEDIZIONE`. In questi due casi nessun file fittizio e nessun evento;
 4. con almeno una spedizione: assegna `idFile` e `nomeFile` se lo scarico non li ha già, poi
-   invia `ST_F0002` e `ST_F0005`, ciascuno solo se non risulta già inviato (RF-20). Se un evento
-   non parte, lo scarico torna `DA_ELABORARE` con l'errore e **nessuna spedizione viene inviata**:
-   riprova il ciclo successivo (RF-21);
+   registra il file in `preadvising_file` e invia `ST_F0002` (RF-27), poi `ST_F0005`, ciascuno
+   solo se non risulta già inviato (RF-20). Se Mongo o un evento non parte, lo scarico torna
+   `DA_ELABORARE` con l'errore e **nessuna spedizione viene inviata**: riprova il ciclo successivo
+   (RF-21);
 5. per ogni spedizione estrae `edReference`:
    - assente o non valido → record `NON_IDENTIFICABILE` con il motivo, nessun invio;
    - valido → record `DA_INVIARE`, invio sincrono con header `idFile`, poi `INVIATA` con `inviataIl`, oppure resta
@@ -444,6 +485,7 @@ sequenceDiagram
 | RF-23 | Il file si cancella solo dopo il salvataggio del corpo confermato dal database. Se il salvataggio fallisce il file resta. Un errore di cancellazione non fa fallire lo scarico. | `ScaricoService` (`cc5d01a`) |
 | RF-24 | Il job di recupero (ogni 2 minuti, file più vecchi di `eta-minima`, senza ShedLock: ogni pod il suo volume) ricarica i file pendenti in modo idempotente: corpo già salvato → cancella; scarico senza corpo → salva e porta a `DA_ELABORARE`; scarico assente → inserisce `DA_ELABORARE` con lo stesso id; poi cancella. Database giù → riprova. | `RecuperoBufferService`, `EurodisScheduler` (`5be0d21`) |
 | RF-25 | Un file illeggibile o con `sha256` diverso dai metadati si sposta in `scartati/`, mai cancellato, con log e metrica. | `BufferGrezzo.scarta` (`5be0d21`) |
+| RF-27 | **File fittizio in `preadvising_file`** [DECISO 18-11]: insieme a `ST_F0002`, e prima di esso, il file si registra nella collection Mongo `preadvising_file` (sezione 3.3.1) con upsert idempotente per `idFile`. Se Mongo non risponde vale RF-21: scarico `DA_ELABORARE`, nessun evento, nessuna spedizione; alla ripresa si ripete l'upsert (nessun duplicato), poi l'evento. | `PreadvisingFileService`, `ElaborazioneService` (`8ce7666`) |
 | RF-26 | Il buffer non blocca: se la scrittura del file fallisce lo scarico prosegue con il salvataggio a database (log ERROR, metrica). Il contenuto dei file non va mai nei log. | `BufferGrezzo` (`6d50b70`) |
 
 ## 6. Stati
@@ -496,6 +538,7 @@ finestra in cui si possono perdere spedizioni (I1).
 | Spedizione senza `edReference` valido | record `NON_IDENTIFICABILE`, scarico `INVIO_PARZIALE` | `eurodis_spedizioni` | Analisi con EURODIS |
 | Risposta molto grande | grezzo sempre in `corpo` (`text`, fino a 1 GB); warning e metrica sopra 100 MB | metrica | Limiti da chiarire con EURODIS (PA-27) |
 | `preadvising.evensource` non disponibile, o utente senza permesso di scrittura | scarico di nuovo `DA_ELABORARE` con errore, nessuna spedizione inviata (RF-21) | `eurodis_scarichi.errore`, metrica `eurodis_in_evento_total{esito="ko"}`, span in errore | Automatico al ciclo successivo; gli eventi già confermati non si rimandano |
+| Mongo (`preadvising_file`) non disponibile | scarico di nuovo `DA_ELABORARE` con errore `File o evento di stato non registrato: ...`, nessun evento e nessuna spedizione (RF-27) | `eurodis_scarichi.errore`, metrica `eurodis_in_preadvising_file_total{esito="ko"}`, span `mongo preadvising_file upsert` in errore | Automatico al ciclo successivo, upsert idempotente |
 | Pod caduto tra un evento e le spedizioni | scarico rimasto `IN_ELABORAZIONE` | `eurodis_scarichi` | Ripresa dopo 15 minuti con lo stesso `idFile`: si inviano solo gli eventi mancanti, poi le spedizioni |
 
 
@@ -528,6 +571,7 @@ Variabili d'ambiente (Helm) → proprietà `eurodis.in.*` in `application.yaml`.
 | `DATASOURCE_USERNAME` / `DATASOURCE_PASSWORD` | `spring.datasource.*` | secret `ce-postgres`, chiavi `datasource-name` / `data-source-password` | stesso secret di `ce-db-sync` [DECISO 10-11] |
 | `DATASOURCE_HIKARI_MINIMUM_IDLE` / `_MAXIMUM_POOL_SIZE` / `_IDLE_TIMEOUT` | `spring.datasource.hikari.*` | 1 / 5 / 30000 | |
 | `KAFKA_SCRAM_USERNAME` / `_PASSWORD` | SASL | secret | |
+| `MONGO_STRING_CONNECTION` | `spring.data.mongodb.uri` | secret `ce-dichiarato-eurodis-in-secret`, chiave `mongo-string-connection` | solo per `preadvising_file` (RF-27): deve puntare allo **stesso database** del builder (`MONGODB_CONNECTION_URI` del secret `ce-mongodb-dichiarato-builder`). La chiave **resta** nel secret: non va più tolta |
 | `EURODIS_BUFFER_ABILITATO` | `buffer.abilitato` | `true` | RF-22 |
 | `EURODIS_BUFFER_DIR` | `buffer.dir` | `/buffer/eurodis-in` (volume `emptyDir`); in locale la cartella temporanea | sezione 3.5 |
 | `EURODIS_BUFFER_RECUPERO_CRON` | `buffer.recupero.cron` | `15 */2 * * * *` | job di recupero (RF-24) |
@@ -555,6 +599,7 @@ invariante: l'instrumentation non manda mai in errore la lavorazione (`TraceUtil
 | `eurodis.elaborazione.scarico` | INTERNAL, figlio | `id_scarico`, `stato_scarico`, `spedizioni`, `inviate` | esito diverso da `INVIATO_TUTTO` / `NESSUNA_SPEDIZIONE` |
 | `preadvising.eud.pre.build send` | PRODUCER | `topic_output`, `ed_reference` | invio fallito |
 | `preadvising.evensource send` | PRODUCER, figlio di `eurodis.elaborazione.scarico` | `id_file`, `id_stato` | invio fallito |
+| `mongo preadvising_file upsert` | CLIENT, figlio di `eurodis.elaborazione.scarico` | `id_file` | errore Mongo |
 | `eurodis.ripubblicazione` | INTERNAL, radice | `spedizioni` | — |
 | `eurodis.richieste_manuali` | INTERNAL, radice | — | — |
 | `eurodis.buffer.scrittura` | INTERNAL, figlio di `eurodis.scarico` / `eurodis.rilettura` | `id_scarico`, `esito`, `dimensione_byte` | scrittura fallita |
@@ -648,6 +693,8 @@ Criteri da verificare anche end-to-end contro `mock-eurodis` (`../mock-eurodis/`
 | AC-18 | Coda vuota, oppure array vuoto | scarico + elaborazione | nessun evento | da fare |
 | AC-19 | `preadvising.evensource` non disponibile | elaborazione, poi il topic torna | primo ciclo: scarico `DA_ELABORARE` con errore, nessuna spedizione inviata; ciclo dopo: eventi e spedizioni inviati, stesso `idFile` | da fare |
 | AC-20 | Kill del pod dopo `ST_F0002` | ripresa dopo 15 minuti | `ST_F0002` non ripetuto, `ST_F0005` e spedizioni inviati con lo stesso `idFile` | da fare |
+| AC-29 | 1 spedizione in coda | scarico + elaborazione | in `preadvising_file` un documento con l'`idFile` degli eventi, `stato` 0, `channelId` `EUD_INVIOSYSTEM`, `clientId` `cli_c49353`; quando il record è OK a valle la state machine porta `stato` a 1 e invia la chiusura del file | unitario ✅, in ambiente da provare |
+| AC-30 | Mongo giù, poi torna | elaborazione | primo ciclo: scarico `DA_ELABORARE`, nessun evento né spedizione; ciclo dopo: un solo documento, poi eventi e spedizioni | unitario ✅, in ambiente da provare |
 | AC-21 | Spedizione in `eurodis.in.ripubblica.ed-references` | job richieste manuali | messaggio con l'header `idFile` dello scarico d'origine, nessun nuovo evento | da fare |
 | AC-22 | 3 spedizioni in coda | scarico | file `.grezzo` scritto prima del salvataggio e cancellato dopo; buffer vuoto | unitario ✅, in ambiente da provare |
 | AC-23 | Database giù al salvataggio del corpo | scarico, poi il database torna, poi il job di recupero | primo giro: file pendente, scarico `CHIAMATA_IN_CORSO`; dopo: corpo salvato identico (`sha256` uguale), scarico `DA_ELABORARE`, file cancellato, spedizioni poi inviate dall'elaborazione | unitario ✅, in ambiente da provare |
@@ -678,7 +725,8 @@ Criteri da verificare anche end-to-end contro `mock-eurodis` (`../mock-eurodis/`
 | Versione Spring Boot | **DECISO 04-11**: 3.5.14, come blueprint e mapper | assessment AS-17 |
 | Eventi di stato del file fittizio | **DECISO 06-11**: `ST_F0002` e `ST_F0005` su `preadvising.evensource`, `idFile` propagato al mapper (sezione 3.3, RF-19..RF-21) | — |
 | Nome del topic degli eventi | APERTO: default `preadvising.evensource`, il nome in uso | domanda 1 |
-| Stati finali del file (`ST_F0006`, `ST_F0008`) | APERTO: non inviati | domanda 4 |
+| Stati finali del file (`ST_F0006`, `ST_F0008`) | **DECISO 18-11**: li invia `ce-dichiarato-state-machine-handler`, che chiude il file registrato da `-in` in `preadvising_file` (sezione 3.3.1) | domanda 4 |
+| Database Mongo di `preadvising_file` | APERTO: verificare che `mongo-string-connection` di `-in` punti allo stesso database del builder (il nome è solo nei secret) | sezione 8 |
 | Credenziali del database | **DECISO 10-11**: secret `ce-postgres` di `ce-db-sync` | — |
 | Conservazione dei dati | APERTO: proposta di job di pulizia (DDL, sezione 4) | — |
 | Alert Datadog | APERTO, da fare più avanti (sezione 9) | assessment AS-19 |
@@ -723,6 +771,9 @@ Criteri da verificare anche end-to-end contro `mock-eurodis` (`../mock-eurodis/`
   (`6d50b70`..`b169912`, 99 test verdi; Amelia).
 - 0.7.1 (12-11): negli eventi di stato `nomeFile` dichiara lo scarico (`SCARICO_EURODIS_<ts>`,
   `RILETTURA_EURODIS_<ts>_<edReference>`) e `linkFileFisicoInviato` non si valorizza (Diego).
+- 0.8 (18-11): il file fittizio si registra in `preadvising_file` su Mongo insieme a `ST_F0002`, come
+  nel builder, e lo chiude la state machine (sezione 3.3.1, RF-27). `digest` = sha256 di `idFile`.
+  `mongo-string-connection` resta nel secret (Diego; `8ce7666`, Amelia).
   Implementata su `develop` (`b6158be`; Amelia).
 
 ## Domande per Diego (0.5)
