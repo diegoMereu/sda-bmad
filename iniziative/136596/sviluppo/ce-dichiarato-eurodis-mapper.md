@@ -279,7 +279,7 @@ usa al posto del destinatario: è l'indirizzo di rientro.
 
 | Campo ICD | Sorgente | Regola | Rif. |
 |---|---|---|---|
-| `id_ldv` | `deliveryPartnerBarcode` | diretto; `""` se assente, con metrica (RF-07) | **[DECISO 10-11, Diego]**: supera `consignorsColloBarcode` (decisione del 22-10). `consignorsColloBarcode` non si mappa; `europlateBarcode` non sostituisce la LDV: va solo in `internazionale.id_ldv_itz`. Il campo è dello schema non referenziato (sezione 3.1): domanda 5 |
+| `id_ldv` | `deliveryPartnerBarcode` | diretto; `""` se assente, con metrica (RF-07) | **[DECISO 10-11, Diego]**: supera `consignorsColloBarcode` (decisione del 22-10). `consignorsColloBarcode` non si mappa; `europlateBarcode` non sostituisce la LDV: va solo in `internazionale.id_ldv_itz`. Il campo è dello schema non referenziato (sezione 3.1): domanda 5. **Formato atteso (18-11):** LDV PDB di 13 caratteri, `[1-8]U` + seme EURODIS (5) + 6 di progressivo, semantica `PPTT` di `ce-ldv`; il seme deve essere di una postazione EURODIS in `sfa_postazioni_ou` (svil: `W0008`, `W0009`, `W0019`, `W0029`, `W0039`), altrimenti `ce-dichiarato-ldv` scarta con `144`/`134`. Il mapper non lo valida: lo passa così com'è |
 | `numero_colli_parz` | posizione | 1..n | |
 | `peso` | `weightOfUnit` | ×1000 (RF-10); `0` se assente | |
 | `lunghezza` | `length` | diretto, cm; `0` se assente | |

@@ -32,7 +32,13 @@ corrispondente di `wiremock-receive-pan.yaml`. Dopo una modifica alla ConfigMap 
     spedizione in `-in`;
   - `dispatchPartnersDomesticShipmentNumber` = `30` + 6 cifre: `spedizione.id_ldv_partner_master`;
   - `collis[].europlateBarcode` = `12345` + 19 cifre: `internazionale.id_ldv_itz`;
-  - `collis[].deliveryPartnerBarcode` = `JVGTCRDS` + 14 cifre: la LDV, `collo[].id_ldv`;
+  - `collis[].deliveryPartnerBarcode` = `1UW0008` + 6 cifre: la LDV, `collo[].id_ldv` (dal 18-11; prima
+    `JVGTCRDS` + 14 cifre, che `ce-ldv` non riconosce). È una LDV PDB di 13 caratteri: `[1-8]U` + seme
+    di 5 + progressivo di 6 (semantica `PPTT` di `ce-ldv`). `W0008` è il seme della postazione EURODIS più
+    recente in `sfa_postazioni_ou` di svil (contratto `SFA-00633620`; le altre: `W0009`, `W0019`,
+    `W0029`, `W0039`). Con un seme estraneo `ce-dichiarato-ldv` scarta con `144` o `134`. Un collo
+    figlio PDB ha invece 22 caratteri (9 del figlio + 13 della madre): non usare 22 caratteri per un
+    collo singolo;
   - `referencedEurodisShipmentNumber`, non mappato.
 
   Ogni scarico produce quindi una spedizione nuova (ogni 2 minuti in svil).

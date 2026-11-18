@@ -60,6 +60,15 @@ Entrambi i canali usano il contratto `SFA-00633620` e il centro di costo `CDC-00
    `waybill/create` (`channel = WEBSERVICES`). La catena attuale passa da ldv-pdb su Kafka
    (`INVIOSYSTEM`). Da riallineare con la decisione o da confermare.
 
+## LDV del mock (18-11)
+
+Le prove in svil finora usavano `deliveryPartnerBarcode` = `JVGTCRDS` + 14 cifre (22 caratteri):
+`ce-ldv` non lo riconosce, `ce-dichiarato-ldv` ripiegava sul seme della postazione configurata, e
+`ldv-pdb` lo mandava a BEP come `code` (canale `INVIOSYSTEM`). Lo scarto `101 country` arriva prima e
+non dice se BEP accetta quel `code`. Il mock ora genera LDV PDB `1UW0008` + 6 cifre (seme della
+postazione EURODIS in `sfa_postazioni_ou`): dopo la correzione della nazione la prova verso BEP va
+rifatta con questo formato. Resta da capire se BEP verifica che la numerazione appartenga al contratto.
+
 ## Altri riferimenti utili dallo stesso documento
 
 - **Tabella di transcodifica ISO2 → codice BEP**, "resta come riferimento" per un futuro
