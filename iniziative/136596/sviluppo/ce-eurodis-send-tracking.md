@@ -44,8 +44,8 @@ Etichette usate nel documento:
 >
 > **18-11, postazione da `eurodis_postazioni` invece di `ce-vendite`** (`develop` `438c1fe`, 197 test
 > verdi). Decisione di Diego: send-tracking **non chiama più `ce-vendite`**. Il passo 3 del filtro
-> legge la tabella `eurodis_postazioni` (PostgreSQL `ce_eud_api_in`) che `ce-dichiarato-eurodis-in`
-> riempie con la postazione di ogni seme LDV ricevuto: passa solo una LDV **entrata da questo flusso**
+> legge la tabella `eurodis_postazioni` (PostgreSQL `ce_eud_api_in`) che `ce-dichiarato-eurodis-mapper`
+> riempie con la postazione di ogni seme LDV che mappa: passa solo una LDV **entrata da questo flusso**
 > con `eurodis = true`. Prerequisito: lo script `sql/ddl/07_ddl_eurodis_postazioni.sql` di -in eseguito
 > dal DBA in ogni ambiente. Regola in 3.2, configurazione in 8 e 14.5, metriche in 9.
 
@@ -243,8 +243,8 @@ validità dell'evento e prima della ricerca su Mongo; ogni passo scarta senza fa
    select eurodis from eurodis_postazioni where id_seme_ldv = ? and id_tipo_seme_ldv = 'PPTT'
    ```
 
-   La tabella la scrive `ce-dichiarato-eurodis-in`: una riga per seme LDV (chiave `id_seme_ldv`,
-   `id_tipo_seme_ldv`) con la postazione, il contratto e il flag `eurodis` deciso da -in. Passa se la
+   La tabella la scrive `ce-dichiarato-eurodis-mapper` (cache → tabella → ce-vendite → upsert): una riga per seme LDV (chiave `id_seme_ldv`,
+   `id_tipo_seme_ldv`) con la postazione, il contratto e il flag `eurodis` deciso dal mapper. Passa se la
    riga esiste con `eurodis = true`. Riga con `eurodis = false` → scarto (`postazione_non_eurodis` nel
    filtro, esito `postazione_non_eurodis`); **riga assente** → scarto (`postazione_non_registrata`): la
    LDV non è entrata dal flusso EURODIS. Del record si legge solo `eurodis`: ragione sociale, partita
@@ -269,10 +269,10 @@ già con Mongo giù.
 **Spegnimento**: `EURODIS_TRACKING_POSTAZIONE_ABILITATO=false` toglie il filtro (resta la ricerca su
 Mongo).
 
-**Dipendenza da -in**: la tabella `eurodis_postazioni` va creata dal DBA con lo script
+**Dipendenza dal mapper**: la tabella `eurodis_postazioni` va creata dal DBA con lo script
 `sql/ddl/07_ddl_eurodis_postazioni.sql` del repo `ce-dichiarato-eurodis-in`, in ogni ambiente, prima
 di accendere il filtro; senza tabella ogni evento PDB che arriva al passo 3 resta in retry. Un seme
-entra in tabella solo quando -in riceve da EURODIS una spedizione con quel seme: le tracce di semi mai
+entra in tabella solo quando il mapper elabora una spedizione EURODIS con quel seme: le tracce di semi mai
 ricevuti si scartano.
 
 ### 3.3 Correlazione con la spedizione EURODIS [DECISO 12-11]
@@ -958,7 +958,7 @@ client EURODIS con server finto.
   condiviso.
 - Indice su Mongo (V-06) e permesso di lettura su `PACCHI.TRACKING`.
 - Tabella `eurodis_postazioni` creata dal DBA (script `07_ddl_eurodis_postazioni.sql` di -in) e
-  riempita da -in prima di accendere il filtro postazione; utenza `ce-postgres` con lettura sulla tabella.
+  riempita dal mapper prima di accendere il filtro postazione; utenza `ce-postgres` con lettura sulla tabella.
 - `acceptorName` per `1100` (V-02): senza, le consegne si scartano salvo un default concordato.
 - Doppioni dopo un riavvio (ST-07): se diventano un problema, serve uno storico minimo.
 
