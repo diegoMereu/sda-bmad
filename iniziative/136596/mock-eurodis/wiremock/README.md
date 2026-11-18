@@ -25,25 +25,26 @@ corrispondente di `wiremock-receive-pan.yaml`. Dopo una modifica alla ConfigMap 
 - **Path.** `-in` chiama `EURODIS_BASE_URL + /shipments/v1` (scarico) e `+ /shipment/{edReference}/v1`
   (rilettura). Dal 17-11 `-in` chiama `/shipments/v2` (configurabile con `EURODIS_PATH_SCARICO`) e la mappatura risponde sia su `/receive-pan/shipments/v1` sia su `v2` (`urlPathPattern`). La rilettura puntuale
   non è mappata: WireMock risponde 404.
-- **Contenuto (17-11).** Una spedizione per chiamata, con destinatario e mittente valorizzati e date di
-  oggi (`{{now}}`). Sono casuali a ogni chiamata (`response-template`) tutti gli identificativi che finiscono
-  nel tracciato:
+- **Contenuto (18-11).** Due spedizioni per chiamata, uguali tranne che per il contrassegno: la prima
+  ha `cashOnDeliveryService` valorizzato, la seconda `null`. Destinatario e mittente sono valorizzati e
+  le date sono di oggi (`{{now}}`). Sono casuali a ogni chiamata (`response-template`) tutti gli
+  identificativi che finiscono nel tracciato:
   - `edReference` = `88` + 11 cifre: è `spedizione.rif_spedizione`, la chiave Kafka e la chiave della
     spedizione in `-in`;
   - `dispatchPartnersDomesticShipmentNumber` = `30` + 6 cifre: `spedizione.id_ldv_partner_master`;
   - `collis[].europlateBarcode` = `12345` + 19 cifre: `internazionale.id_ldv_itz`;
-  - `collis[].deliveryPartnerBarcode` = `3UW2308` + 6 cifre: la LDV, `collo[].id_ldv` (dal 18-11; prima
-    `JVGTCRDS` + 14 cifre, che `ce-ldv` non riconosce). È una LDV PDB di 13 caratteri: `[1-8]U` + seme
-    di 5 + progressivo di 6 (semantica `PPTT` di `ce-ldv`). Il seme è il `pds_code` del contratto
+  - `collis[].deliveryPartnerBarcode`: la LDV, `collo[].id_ldv`. È una LDV PDB di 13 caratteri:
+    prefisso + seme di 5 + 6 cifre casuali (semantica `PPTT` di `ce-ldv`). Il prefisso è `4U` con il
+    contrassegno e `3U` senza (regola indicata da Poste il 18-11). Quindi `4UW2308` + 6 cifre nella
+    prima spedizione e `3UW2308` + 6 cifre nella seconda. Il seme è il `pds_code` del contratto
     `SFA-00633620` per il canale di prenotazione (`contract_ps_data.pds`): `W2308` = `INVIOSYSTEM`
-    (gli altri: `W2306` INVIOEASY, `W2307` INVIOFILE, `W2309` WEB, `W2319` WEBSERVICES). Il primo
-    tentativo con `W0008` (seme di postazione in `sfa_postazioni_ou`) è stato rifiutato da BEP come
-    "barcode non utilizzabile", e così anche `1UW2308` (errore BEP `131`). Il prefisso è `3U`,
-    indicato da Poste il 18-11 e coerente con le LDV che BEP restituisce. Un collo figlio PDB ha invece 22 caratteri (9 del figlio + 13 della
-    madre): non usare 22 caratteri per un collo singolo;
+    (gli altri: `W2306` INVIOEASY, `W2307` INVIOFILE, `W2309` WEB, `W2319` WEBSERVICES). Tentativi
+    rifiutati da BEP con `131` "Barcode non utilizzabile": `JVGTCRDS` + 14 cifre, `1UW0008` (seme di
+    postazione in `sfa_postazioni_ou`), `1UW2308`. Un collo figlio PDB ha invece 22 caratteri (9 del
+    figlio + 13 della madre): non usare 22 caratteri per un collo singolo;
   - `referencedEurodisShipmentNumber`, non mappato.
 
-  Ogni scarico produce quindi una spedizione nuova (ogni 2 minuti in svil).
+  Ogni scarico produce quindi due spedizioni nuove (ogni 2 minuti in svil).
 - **Consegna una volta sola.** EURODIS restituisce ogni spedizione una volta e poi `404`. Questa
   mappatura statica restituisce sempre la stessa risposta: per simulare il consumo servono gli scenari
   di WireMock (`scenarioName`, `requiredScenarioState`, `newScenarioState`) o una seconda mappatura

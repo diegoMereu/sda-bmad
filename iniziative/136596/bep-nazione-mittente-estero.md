@@ -62,13 +62,15 @@ Entrambi i canali usano il contratto `SFA-00633620` e il centro di costo `CDC-00
 
 ## LDV del mock (18-11)
 
-Le prove in svil finora usavano `deliveryPartnerBarcode` = `JVGTCRDS` + 14 cifre (22 caratteri):
-`ce-ldv` non lo riconosce, `ce-dichiarato-ldv` ripiegava sul seme della postazione configurata, e
-`ldv-pdb` lo mandava a BEP come `code` (canale `INVIOSYSTEM`). Lo scarto `101 country` arriva prima e
-non dice se BEP accetta quel `code`. Con `1UW0008` + 6 cifre (seme di postazione in
-`sfa_postazioni_ou`) BEP ha risposto "barcode non utilizzabile": BEP verifica che la numerazione
-appartenga al contratto. Il seme corretto è il `pds_code` del contratto per il canale di prenotazione
-(`contract_ps_data.pds`, `SFA-00633620`, `CDC-00000014`, AUC `1335062583`):
+**Esito: con `4UW2308` + 6 cifre su una spedizione con contrassegno il giro verso BEP funziona
+(Diego, 18-11).**
+
+Regola della LDV PDB per `INVIOSYSTEM` (13 caratteri):
+
+- prefisso `4U` se la spedizione ha il contrassegno, `3U` se non lo ha (indicazione di Poste);
+- seme = `pds_code` del contratto per il canale di prenotazione (`contract_ps_data.pds`,
+  `SFA-00633620`, `CDC-00000014`, AUC `1335062583`);
+- 6 cifre (nel mock casuali).
 
 | `booking_channel` | `pds_code` |
 |---|---|
@@ -78,10 +80,20 @@ appartenga al contratto. Il seme corretto è il `pds_code` del contratto per il 
 | WEB | `W2309` |
 | WEBSERVICES | `W2319` |
 
-Anche `1UW2308` + 6 cifre è stato rifiutato con `131` (18-11, `1UW2308638917`). Il prefisso giusto è `3U`, indicato da Poste. Per `INVIOSYSTEM` l'ICD Mediation v2.5 richiede codici "staccati da range prestabiliti". Il mock ora genera `3UW2308` + 6 cifre. Se si passa a `waybill/create` REST (`WEBSERVICES`, minuta
-29/07), il seme diventa `W2319`. Da verificare: `ce-dichiarato-ldv` ricava la postazione dal seme della
-LDV (`ce-vendite`, `cen_postazioni` poi `sfa_postazioni_ou`); se `W2308` non è un `id_seme_ldv` lì,
-scarta con `144` "Postazione non ricavata da seme".
+Tentativi rifiutati da BEP con `131` "Barcode non utilizzabile", tutti su una spedizione con
+contrassegno:
+
+- `JVGTCRDS` + 14 cifre (22 caratteri, non riconosciuto da `ce-ldv`);
+- `1UW0008` + 6 cifre (seme di postazione in `sfa_postazioni_ou`, non `pds_code`);
+- `1UW2308` + 6 cifre (`1UW2308638917`: seme giusto, prefisso sbagliato).
+
+Il `131` dipendeva quindi dal prefisso e dal seme, non da un range di numerazione: con le cifre casuali
+BEP accetta. Il mock ora restituisce due spedizioni per scarico, una con contrassegno (`4U`) e una senza
+(`3U`). Il caso `3U` va ancora visto passare. Se si passa a `waybill/create` REST (`WEBSERVICES`,
+minuta 29/07), il seme diventa `W2319`.
+
+In produzione la LDV la assegna EURODIS (`deliveryPartnerBarcode`): da confermare con EURODIS che
+segua questa regola (prefisso secondo il contrassegno, seme `W2308`).
 
 ## Altri riferimenti utili dallo stesso documento
 
