@@ -25,26 +25,29 @@ corrispondente di `wiremock-receive-pan.yaml`. Dopo una modifica alla ConfigMap 
 - **Path.** `-in` chiama `EURODIS_BASE_URL + /shipments/v1` (scarico) e `+ /shipment/{edReference}/v1`
   (rilettura). Dal 17-11 `-in` chiama `/shipments/v2` (configurabile con `EURODIS_PATH_SCARICO`) e la mappatura risponde sia su `/receive-pan/shipments/v1` sia su `v2` (`urlPathPattern`). La rilettura puntuale
   non è mappata: WireMock risponde 404.
-- **Contenuto (18-11).** Due spedizioni per chiamata, uguali tranne che per il contrassegno: la prima
-  ha `cashOnDeliveryService` valorizzato, la seconda `null`. Destinatario e mittente sono valorizzati e
-  le date sono di oggi (`{{now}}`). Sono casuali a ogni chiamata (`response-template`) tutti gli
-  identificativi che finiscono nel tracciato:
+- **Contenuto (19-11).** Due spedizioni per chiamata, mittente con `countryCode: IT` (come la ConfigMap del
+  cluster del 18-11), date di oggi (`{{now}}`):
+  1. con contrassegno, 1 collo, LDV `4UW2308` + 6 cifre;
+  2. senza contrassegno (`cashOnDeliveryService: null`), **3 colli** (`numberOfHandlingUnits: 3`, peso 45):
+     il primo collo ha la LDV madre `3UW2308` + 6 cifre (13 caratteri), gli altri due il barcode figlio di
+     22 caratteri = 9 caratteri alfanumerici casuali + la stessa madre (regola dell'ICD BEP Mediation v2.5
+     per INVIOSYSTEM: "in caso di multicollo il primo conterra' il barcode a 13 digit della madre, mentre i
+     successivi conterranno i barcode a 22 digit dei figli"). La madre e' una sola per spedizione grazie a
+     `{{#assign 'madre'}}`. Il formato dei 9 caratteri del figlio non e' documentato: e' inventato.
+
+  Identificativi casuali a ogni chiamata (`response-template`):
   - `edReference` = `88` + 11 cifre: è `spedizione.rif_spedizione`, la chiave Kafka e la chiave della
     spedizione in `-in`;
   - `dispatchPartnersDomesticShipmentNumber` = `30` + 6 cifre: `spedizione.id_ldv_partner_master`;
   - `collis[].europlateBarcode` = `12345` + 19 cifre: `internazionale.id_ldv_itz`;
-  - `collis[].deliveryPartnerBarcode`: la LDV, `collo[].id_ldv`. È una LDV PDB di 13 caratteri:
-    prefisso + seme di 5 + 6 cifre casuali (semantica `PPTT` di `ce-ldv`). Il prefisso è `4U` con il
-    contrassegno e `3U` senza (regola indicata da Poste il 18-11). Quindi `4UW2308` + 6 cifre nella
-    prima spedizione e `3UW2308` + 6 cifre nella seconda. Il seme è il `pds_code` del contratto
-    `SFA-00633620` per il canale di prenotazione (`contract_ps_data.pds`): `W2308` = `INVIOSYSTEM`
-    (gli altri: `W2306` INVIOEASY, `W2307` INVIOFILE, `W2309` WEB, `W2319` WEBSERVICES). Tentativi
-    rifiutati da BEP con `131` "Barcode non utilizzabile": `JVGTCRDS` + 14 cifre, `1UW0008` (seme di
-    postazione in `sfa_postazioni_ou`), `1UW2308`. Un collo figlio PDB ha invece 22 caratteri (9 del
-    figlio + 13 della madre): non usare 22 caratteri per un collo singolo;
+  - `collis[].deliveryPartnerBarcode`: la LDV, `collo[].id_ldv`. LDV PDB di 13 caratteri: prefisso + seme
+    di 5 + 6 cifre (semantica `PPTT` di `ce-ldv`). Prefisso `4U` con il contrassegno, `3U` senza (Poste,
+    18-11). Seme = `pds_code` del contratto `SFA-00633620` per canale (`contract_ps_data.pds`): `W2308` =
+    `INVIOSYSTEM` (`W2306` INVIOEASY, `W2307` INVIOFILE, `W2309` WEB, `W2319` WEBSERVICES). Rifiutati da BEP
+    con `131`: `JVGTCRDS` + 14 cifre, `1UW0008` (seme di postazione), `1UW2308`;
   - `referencedEurodisShipmentNumber`, non mappato.
 
-  Ogni scarico produce quindi due spedizioni nuove (ogni 2 minuti in svil).
+  Ogni scarico produce quindi due spedizioni nuove, quattro colli (ogni 2 minuti in svil).
 - **Consegna una volta sola.** EURODIS restituisce ogni spedizione una volta e poi `404`. Questa
   mappatura statica restituisce sempre la stessa risposta: per simulare il consumo servono gli scenari
   di WireMock (`scenarioName`, `requiredScenarioState`, `newScenarioState`) o una seconda mappatura
