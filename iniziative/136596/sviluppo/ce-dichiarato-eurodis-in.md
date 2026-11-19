@@ -571,7 +571,7 @@ Variabili d'ambiente (Helm) → proprietà `eurodis.in.*` in `application.yaml`.
 | `DATASOURCE_USERNAME` / `DATASOURCE_PASSWORD` | `spring.datasource.*` | secret `ce-postgres`, chiavi `datasource-name` / `data-source-password` | stesso secret di `ce-db-sync` [DECISO 10-11] |
 | `DATASOURCE_HIKARI_MINIMUM_IDLE` / `_MAXIMUM_POOL_SIZE` / `_IDLE_TIMEOUT` | `spring.datasource.hikari.*` | 1 / 5 / 30000 | |
 | `KAFKA_SCRAM_USERNAME` / `_PASSWORD` | SASL | secret | |
-| `MONGO_STRING_CONNECTION` | `spring.data.mongodb.uri` | secret `ce-dichiarato-eurodis-in-secret`, chiave `mongo-string-connection` | solo per `preadvising_file` (RF-27): deve puntare allo **stesso database** del builder (`MONGODB_CONNECTION_URI` del secret `ce-mongodb-dichiarato-builder`). La chiave **resta** nel secret: non va più tolta |
+| `MONGO_STRING_CONNECTION` | `spring.data.mongodb.uri` | secret `ce-dichiarato-validatore-secret`, chiave `mongo-string-connection` | solo per `preadvising_file` (RF-27): stessa stringa di ce-dichiarato-validatore (Diego, 19-11, `8995ae8`) |
 | `EURODIS_BUFFER_ABILITATO` | `buffer.abilitato` | `true` | RF-22 |
 | `EURODIS_BUFFER_DIR` | `buffer.dir` | `/buffer/eurodis-in` (volume `emptyDir`); in locale la cartella temporanea | sezione 3.5 |
 | `EURODIS_BUFFER_RECUPERO_CRON` | `buffer.recupero.cron` | `15 */2 * * * *` | job di recupero (RF-24) |
@@ -726,7 +726,7 @@ Criteri da verificare anche end-to-end contro `mock-eurodis` (`../mock-eurodis/`
 | Eventi di stato del file fittizio | **DECISO 06-11**: `ST_F0002` e `ST_F0005` su `preadvising.evensource`, `idFile` propagato al mapper (sezione 3.3, RF-19..RF-21) | — |
 | Nome del topic degli eventi | APERTO: default `preadvising.evensource`, il nome in uso | domanda 1 |
 | Stati finali del file (`ST_F0006`, `ST_F0008`) | **DECISO 18-11**: li invia `ce-dichiarato-state-machine-handler`, che chiude il file registrato da `-in` in `preadvising_file` (sezione 3.3.1) | domanda 4 |
-| Database Mongo di `preadvising_file` | APERTO: verificare che `mongo-string-connection` di `-in` punti allo stesso database del builder (il nome è solo nei secret) | sezione 8 |
+| Database Mongo di `preadvising_file` | DECISO 19-11: stessa stringa di ce-dichiarato-validatore (`ce-dichiarato-validatore-secret`, `mongo-string-connection`) | sezione 8 |
 | Credenziali del database | **DECISO 10-11**: secret `ce-postgres` di `ce-db-sync` | — |
 | Conservazione dei dati | APERTO: proposta di job di pulizia (DDL, sezione 4) | — |
 | Alert Datadog | APERTO, da fare più avanti (sezione 9) | assessment AS-19 |

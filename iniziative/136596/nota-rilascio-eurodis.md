@@ -22,7 +22,7 @@
 
 | **Namespace**                     | **Microservizio**                 | **Commit develop** | **Note**                                              |
 |-----------------------------------|-----------------------------------|--------------------|-------------------------------------------------------|
-| **corriere-espresso-preadvising** | ce-dichiarato-eurodis-in          | 8ce7666            | include 27bbe54 (ragione sociale) e ad4e5d8 (DDL 07)  |
+| **corriere-espresso-preadvising** | ce-dichiarato-eurodis-in          | 8995ae8            | include 27bbe54 (ragione sociale), ad4e5d8 (DDL 07), 8ce7666 (preadvising_file) |
 | **corriere-espresso-preadvising** | ce-dichiarato-eurodis-mapper      | 507736a            | include 5a5faf1; rilasciare dopo lo script 07         |
 | **corriere-espresso-preadvising** | ce-eurodis-send-tracking          | 438c1fe            | include c592058; rilasciare dopo il mapper            |
 | **corriere-espresso-preadvising** | ce-event-handler-monitoring       | 4f85f74            | solo values                                           |
@@ -46,7 +46,7 @@ Repository di certificazione e produzione: da indicare (i tre servizi EURODIS so
    - Mapper e send-tracking si collegano con lo stesso `ce_user` del secret `ce-postgres`: nessun grant aggiuntivo. Con un altro utente: `SELECT, INSERT, UPDATE` su `eurodis_postazioni` per il mapper, `SELECT` per il send-tracking.
 2. **Secret**:
    - `ce-postgres` (`datasource-name`, `data-source-password`) e `ssl-secrets` disponibili anche per ce-dichiarato-eurodis-mapper e ce-eurodis-send-tracking;
-   - `ce-dichiarato-eurodis-in-secret`, chiave `mongo-string-connection`: deve puntare allo stesso database Mongo di ce-dichiarato-builder (collection `preadvising_file`).
+   - ce-dichiarato-eurodis-in legge Mongo (collection `preadvising_file`) dal secret di ce-dichiarato-validatore: `ce-dichiarato-validatore-secret`, chiave `mongo-string-connection`. Nessun secret nuovo.
 3. **Network policy**: ce-dichiarato-eurodis-mapper → `ce-vendite.corriere-espresso-preadvising.svc.cluster.local:8080`.
 4. **Values per ambiente**: `DATASOURCE_URL` verso `ce_eud_api_in` per mapper e send-tracking (in `deploy-config/values_TEMPLATE.yaml` è un segnaposto); `EURODIS_TRACKING_SEMI` del send-tracking con i `pds_code` INVIOSYSTEM del contratto EURODIS dell'ambiente (svil: `W2308`).
 

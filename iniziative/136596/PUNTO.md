@@ -18,7 +18,6 @@ La catena EURODIS `EUD_INVIOSYSTEM` arriva fino a BEP in svil: con la LDV PDB `4
 - Network policy `ce-dichiarato-eurodis-mapper` → `ce-vendite` — piattaforma — prima del rilascio del mapper
 - Deploy di mapper e send-tracking (dopo `-in` e script 07), monitoraggio indipendente — Diego — appena pronto lo script
 - Verificare in svil l'upsert in `eurodis_postazioni` (riga `W2308` con `eurodis = true`) e il file fittizio in `preadvising_file` chiuso dalla state machine — Diego / Amelia — dopo il deploy
-- Verificare che `mongo-string-connection` di `-in` punti allo stesso Mongo del builder (`MONGODB_CONNECTION_URI` di `ce-mongodb-dichiarato-builder`) — Diego / piattaforma — prima del deploy di `-in`
 - Decidere dove applicare `ITA1` (ldv-pdb per i canali `EUD_*`, o mapper e builder) e provare il caso `3U` senza contrassegno — Diego / SDA — da definire
 - Chiedere a EURODIS conferma che in produzione `deliveryPartnerBarcode` segua la regola 4U/3U + `W2308` — Paolo — alla call
 - Call con Chiapponi/EURODIS: errori e rifiuti (A03.2), rimando dei dati, rollout ibrido — Paolo — da fissare
@@ -46,7 +45,7 @@ La catena EURODIS `EUD_INVIOSYSTEM` arriva fino a BEP in svil: con la LDV PDB `4
 ## Decisioni prese
 - 2026-11-18 — LDV del collo: solo LDV PDB (le altre si scartano nel mapper); per BEP INVIOSYSTEM prefisso `4U` con contrassegno e `3U` senza, seme = `pds_code` del contratto per canale di prenotazione.
 - 2026-11-18 — Dati del cliente dalla postazione del seme LDV (`ce-vendite`, tabella `eurodis_postazioni` scritta dal mapper), configurazione solo come riserva; `codice_login_cliente` e `codice_auc` restano di configurazione. Send-tracking legge `eurodis_postazioni` e non chiama `ce-vendite`.
-- 2026-11-18 — `-in` registra il file fittizio in `preadvising_file` come il builder (il secret `mongo-string-connection` resta); ragione sociale `EURODIS GmbH` negli eventi di stato.
+- 2026-11-18 — `-in` registra il file fittizio in `preadvising_file` come il builder (Mongo dal secret di ce-dichiarato-validatore, `8995ae8`); ragione sociale `EURODIS GmbH` negli eventi di stato.
 - 2026-11-12 — Send-tracking su `PACCHI.TRACKING`, senza storico; filtro su status e spedizione `EUD_INVIOSYSTEM`. ADR fuori perimetro.
 - 2026-11-10 — Persistenza di `-in` su **PostgreSQL** (database `ce_eud_api_in`, JDBC senza JPA né Flyway, script DDL eseguiti dal DBA), con gli stessi secret di `ce-db-sync` (`ce-postgres`, `ssl-secrets`).
 - 2026-11-10 — Frequenza: in produzione scarico ed elaborazione ogni 10 minuti (EURODIS consiglia 15-20), in svil e coll restano 2 minuti. LDV del collo = `deliveryPartnerBarcode`. Stati di tracking tradotti con il foglio "Decodifica Eurodis IN-BOUND", eventi di collo.

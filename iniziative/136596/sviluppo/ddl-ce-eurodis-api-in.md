@@ -375,10 +375,9 @@ le crea il DBA con gli script.
 | `MONGO_STRING_CONNECTION` | `.helm/values.yaml`, `env` | **resta** (18-11): serve per `preadvising_file`; deve puntare allo stesso database Mongo del builder |
 | `TRUSTSTORE_PASSWORD`, `TRUSTSTORE_CA_POSTE_LOCATION`, volume `sslsecrets` (`ssl.trustore.sslsecretname: ssl-secrets`) | `.helm/values.yaml` | già presenti in `-in` (servono a Kafka): nessuna modifica |
 
-Nel secret `ce-dichiarato-eurodis-in-secret` restano `api-key`, le chiavi di Kafka e
-`mongo-string-connection`, che serve di nuovo dal 18-11 (file fittizio in `preadvising_file`). Da
-verificare che punti allo stesso database Mongo del builder (`MONGODB_CONNECTION_URI` del secret
-`ce-mongodb-dichiarato-builder`). Il secret `ce-postgres` esiste già nel namespace
+Nel secret `ce-dichiarato-eurodis-in-secret` restano `api-key` e le chiavi di Kafka. Mongo (file
+fittizio in `preadvising_file`, dal 18-11) si legge dal secret di ce-dichiarato-validatore
+(`ce-dichiarato-validatore-secret`, chiave `mongo-string-connection`; Diego, 19-11). Il secret `ce-postgres` esiste già nel namespace
 `corriere-espresso-preadvising` (lo usano `ce-db-sync`, `ce-anagrafica`, `ce-ldv`).
 
 Rete: `ce-anagrafica` e `ce-db-sync`, nello stesso namespace, raggiungono già entrambi i server;
@@ -453,9 +452,8 @@ da una ripresa concorrente.
    solo se le tabelle le crea un altro utente).
 3. Conferma che l'utente nel secret `ce-postgres` (chiave `datasource-name`) è `ce_user`, cioè il
    proprietario del nuovo database.
-4. ~~Togliere la chiave `mongo-string-connection`~~ (superato il 18-11): la chiave resta e deve puntare
-   allo stesso database Mongo di `ce-dichiarato-builder` (`MONGODB_CONNECTION_URI` del secret
-   `ce-mongodb-dichiarato-builder`), da verificare.
+4. ~~Togliere la chiave `mongo-string-connection`~~ (superato): Mongo di `preadvising_file` dal secret
+   `ce-dichiarato-validatore-secret`, chiave `mongo-string-connection` (19-11).
 5. **Script 7 (18-11)** come `ce_user` su `ce_eud_api_in`, in svil e collaudo: dove gli script 1-6
    sono già stati eseguiti si esegue solo questo (e la riga di `eurodis_postazioni` dello script 6,
    se le tabelle non le crea `ce_user`). Serve prima del rilascio del mapper che la scrive.
