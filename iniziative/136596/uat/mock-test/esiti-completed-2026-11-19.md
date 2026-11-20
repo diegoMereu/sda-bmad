@@ -1,4 +1,4 @@
-# Esiti preadvising.completed del 2026-11-19 (25 su 43 scenari)
+# Esiti preadvising.completed del 2026-11-19 (25 su 43 scenari completed, più S22 e S05 in errore atteso)
 
 Estratto compatto dei campi rilevanti. Chiave scenario = `rif_spedizione` (edReference del mock, vedi `configmap-wiremock-tutti.yaml`).
 Base comune a tutti: numero_colli 1, mittente IT/Berlin "Demo street", destinatario Roma normalizzato OK, valore 0, assicurata S/0, id_partner EURODIS, flag_stampa_ldv N, ora_spedizione 00:00:00, peso collo "15.000", dimensioni "33"/"55"/"44", cliente DECORATION GROUP piva 08890561007.
@@ -32,3 +32,15 @@ Base comune a tutti: numero_colli 1, mittente IT/Berlin "Demo street", destinata
 | S11 | f491428b-4491-41b4-af4c-b23289021691 | 4400000000011 | PBE/582 | +APT000911 | N | SER / SR0\|GSP | 24 cifre | sera (E) |
 
 "base" = APT000916|920|921|923|924|925|927|931|932|933|934|935|936|937|950|951|952|953|954|APT001014.
+
+## Scenari che restituiscono errore: esito atteso (confermato)
+
+Questi due scenari non arrivano a `preadvising.completed`: l'errore è il comportamento corretto, non un difetto.
+
+| Scenario | Mock | Input | Esito | Motivo |
+|---|---|---|---|---|
+| S22 | `S22.json` | contrassegno con `amount` = 0 | errore: **atteso, OK** | un contrassegno a importo 0 non è valido (il CSV vuole `amount` > 0, vedi `accessori-eurodis-pdb-proposta.md` S6) |
+| S05 | `S05.json` | valori al limite: civico 4, citta 30, ragione sociale 40 | errore: **atteso, OK** | i valori al limite non sono accettati a valle |
+
+Da completare: codice/messaggio d'errore effettivo e punto della catena in cui si ferma (non riportati qui, non verificati).
+Gli altri 16 scenari dei 43 non sono ancora censiti in questo esito.
