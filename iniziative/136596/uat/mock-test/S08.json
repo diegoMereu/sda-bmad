@@ -1,5 +1,5 @@
 {
-  "edReference": "4400000000008",
+  "edReference": "5500000000008",
   "referencedEurodisShipmentNumber": "{{randomValue length=13 type='NUMERIC'}}",
   "initiatingPartnerId": 1,
   "shipmentTypeIndicator": "N",

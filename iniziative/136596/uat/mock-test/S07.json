@@ -1,5 +1,5 @@
 {
-  "edReference": "88{{randomValue length=11 type='NUMERIC'}}",
+  "edReference": "600000000007",
   "referencedEurodisShipmentNumber": "{{randomValue length=13 type='NUMERIC'}}",
   "initiatingPartnerId": 1,
   "shipmentTypeIndicator": "N",
@@ -51,7 +51,7 @@
     "streetNumber": "1",
     "region": null,
     "city": "Wien",
-    "zipcode": "1010",
+    "zipcode": "10100",
     "countryCode": "IT",
     "additionalConsigneeInfo": null,
     "gatewayAssigned": "GET"
