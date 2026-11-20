@@ -193,7 +193,7 @@ def s06():
 
 def s07():
     s = spedizione()
-    s["shipperAddress"].update(city="Wien", zipcode="1010", street="Teststrasse")
+    s["shipperAddress"].update(city="Wien", zipcode="10100", street="Teststrasse")
     return s
 
 
@@ -240,7 +240,7 @@ def s45():
 
 def dogana(valuta):
     s = spedizione()
-    s["shipperAddress"].update(city="Zurich", zipcode="8001", street="Teststrasse")
+    s["shipperAddress"].update(city="Zurich", zipcode="80010", street="Teststrasse")
     s["customsService"] = {
         "commercialValueOfGoods": 500.0, "currency": valuta, "dutyCode": "9876543210",
         "sign": "AA11-00001", "number": 1, "descriptionOfGoods": "MERCE DI PROVA",
