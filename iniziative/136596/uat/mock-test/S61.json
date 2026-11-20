@@ -52,7 +52,7 @@
     "region": null,
     "city": "Zurich",
     "zipcode": "8001",
-    "countryCode": "CH",
+    "countryCode": "IT",
     "additionalConsigneeInfo": null,
     "gatewayAssigned": "GET"
   },

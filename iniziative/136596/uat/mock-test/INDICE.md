@@ -8,9 +8,9 @@ Un file per scenario, stesso formato del mock base. Generati da `../genera_mock_
 | S02.json | Multi-collo (3 colli, pesi 3/5/7) |
 | S03.json | Multi-collo, pesi decimali 1.5/2.25/0.4 |
 | S04.json | Senza contatti (telefono, SMS, e-mail) su mittente e destinatario |
-| S05.json | Valori lunghi (civico 11, citta e ragione sociale 40+) |
+| S05.json | Valori al limite (civico 4, citta 30, ragione sociale 40) |
 | S06.json | Peso 0, senza dimensioni |
-| S07.json | Mittente estero (AT) |
+| S07.json | Mittente con citta e CAP austriaci (countryCode IT: BEP rifiuta altrimenti) |
 | S08.json | Preavviso destinatario (SMS, e-mail, telefono) |
 | S09-C.json | shipmentTypeIndicator = C |
 | S09-X.json | shipmentTypeIndicator = X |
@@ -46,5 +46,5 @@ Un file per scenario, stesso formato del mock base. Generati da `../genera_mock_
 | S43.json | Multi-collo, primo europlate vuoto |
 | S44.json | Multi-collo, consignor ed europlate vuoti |
 | S45.json | entranceTimestamp assente |
-| S60.json | Dogana 500.00 EUR, mittente CH |
-| S61.json | Dogana 500.00 CHF, mittente CH |
+| S60.json | Dogana 500.00 EUR, mittente con citta e CAP svizzeri (countryCode IT) |
+| S61.json | Dogana 500.00 CHF, mittente con citta e CAP svizzeri (countryCode IT) |

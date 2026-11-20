@@ -144,9 +144,19 @@ def spedizione(pesi=(15,), servizio=None, contrassegno=None, **kw):
         c["europlateBarcode"] = "12345" + RND % 19
         c["consignorsColloBarcode"] = "CONS%d" % i + RND % 8
         c["dispatchPartnerBarcode"] = "5120000022505913640000003100%d" % i
-        c["deliveryPartnerBarcode"] = prefisso + "W2308" + RND % 6
+        if i == 1:
+            # multicollo (ICD BEP, INVIOSYSTEM): il primo collo ha la madre a 13 caratteri,
+            # gli altri il figlio a 22 = 9 caratteri casuali + la stessa madre
+            madre = prefisso + "W2308" + RND % 6
+            c["deliveryPartnerBarcode"] = ("{{#assign 'madre'}}%s{{/assign}}{{madre}}" % madre
+                                           if len(pesi) > 1 else madre)
+        else:
+            c["deliveryPartnerBarcode"] = "{{randomValue length=9 type='ALPHANUMERIC' uppercase=true}}{{madre}}"
         colli.append(c)
     s["collis"] = colli
+    if servizio and servizio["deliveryService"] in ("M", "F"):
+        # entro le 12/10: BEP rifiuta il CAP del mittente se non e' un CAP italiano valido
+        s["shipperAddress"].update(street="Via Montenapoleone", city="Milano", zipcode="20121", region="MI")
     s.update(kw)
     return s
 
@@ -166,10 +176,11 @@ def s04():
 def s05():
     s = spedizione()
     a = s["consigneeAddress"]
-    a["streetNumber"] = "12345/A-bis"
-    a["city"] = "Citta Fittizia di Prova Con Nome Molto Lungo"
-    a["companyName"] = "Azienda Fittizia di Prova Con Ragione Sociale Lunga"
-    assert len(a["streetNumber"]) >= 10 and len(a["city"]) >= 40 and len(a["companyName"]) >= 40
+    # al limite dei campi del validatore: ragione sociale 40, civico 4, localita 30
+    a["streetNumber"] = "12/B"
+    a["city"] = "Citta Fittizia Di Prova Estesa"
+    a["companyName"] = "Azienda Fittizia Di Prova Con Nome Lungo"
+    assert len(a["streetNumber"]) == 4 and len(a["city"]) == 30 and len(a["companyName"]) == 40
     return s
 
 
@@ -182,7 +193,7 @@ def s06():
 
 def s07():
     s = spedizione()
-    s["shipperAddress"].update(countryCode="AT", city="Wien", zipcode="1010", street="Teststrasse")
+    s["shipperAddress"].update(city="Wien", zipcode="1010", street="Teststrasse")
     return s
 
 
@@ -229,7 +240,7 @@ def s45():
 
 def dogana(valuta):
     s = spedizione()
-    s["shipperAddress"].update(countryCode="CH", city="Zurich", zipcode="8001", street="Teststrasse")
+    s["shipperAddress"].update(city="Zurich", zipcode="8001", street="Teststrasse")
     s["customsService"] = {
         "commercialValueOfGoods": 500.0, "currency": valuta, "dutyCode": "9876543210",
         "sign": "AA11-00001", "number": 1, "descriptionOfGoods": "MERCE DI PROVA",
@@ -251,9 +262,9 @@ add("S01", "Standard, un collo", spedizione())
 add("S02", "Multi-collo (3 colli, pesi 3/5/7)", spedizione(M3))
 add("S03", "Multi-collo, pesi decimali 1.5/2.25/0.4", spedizione((1.5, 2.25, 0.4)))
 add("S04", "Senza contatti (telefono, SMS, e-mail) su mittente e destinatario", s04())
-add("S05", "Valori lunghi (civico 11, citta e ragione sociale 40+)", s05())
+add("S05", "Valori al limite (civico 4, citta 30, ragione sociale 40)", s05())
 add("S06", "Peso 0, senza dimensioni", s06())
-add("S07", "Mittente estero (AT)", s07())
+add("S07", "Mittente con citta e CAP austriaci (countryCode IT: BEP rifiuta altrimenti)", s07())
 add("S08", "Preavviso destinatario (SMS, e-mail, telefono)", s08())
 add("S09-C", "shipmentTypeIndicator = C", spedizione(shipmentTypeIndicator="C"))
 add("S09-X", "shipmentTypeIndicator = X", spedizione(shipmentTypeIndicator="X"))
@@ -288,8 +299,8 @@ add("S42", "europlateBarcode = \"0\"", barcode((15,), c0=("europlateBarcode", "0
 add("S43", "Multi-collo, primo europlate vuoto", barcode(M3, c0=("europlateBarcode", "")))
 add("S44", "Multi-collo, consignor ed europlate vuoti", s44())
 add("S45", "entranceTimestamp assente", s45())
-add("S60", "Dogana 500.00 EUR, mittente CH", dogana("EUR"))
-add("S61", "Dogana 500.00 CHF, mittente CH", dogana("CHF"))
+add("S60", "Dogana 500.00 EUR, mittente con citta e CAP svizzeri (countryCode IT)", dogana("EUR"))
+add("S61", "Dogana 500.00 CHF, mittente con citta e CAP svizzeri (countryCode IT)", dogana("CHF"))
 
 out = Path(sys.argv[1])
 out.mkdir(parents=True, exist_ok=True)
