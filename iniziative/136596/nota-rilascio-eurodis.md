@@ -23,7 +23,7 @@
 | **Namespace**                     | **Microservizio**                 | **Commit develop** | **Note**                                              |
 |-----------------------------------|-----------------------------------|--------------------|-------------------------------------------------------|
 | **corriere-espresso-preadvising** | ce-dichiarato-eurodis-in          | 8995ae8            | include 27bbe54 (ragione sociale), ad4e5d8 (DDL 07), 8ce7666 (preadvising_file) |
-| **corriere-espresso-preadvising** | ce-dichiarato-eurodis-mapper      | aac007f | include 5a5faf1, 507736a, 253fd0d, 97242eb, 8a796f4; rilasciare dopo lo script 07 |
+| **corriere-espresso-preadvising** | ce-dichiarato-eurodis-mapper      | 7d613c6 | include 5a5faf1, 507736a, 253fd0d, 97242eb, 8a796f4; rilasciare dopo lo script 07 |
 | **corriere-espresso-preadvising** | ce-eurodis-send-tracking          | b472297            | include c592058, 438c1fe; rilasciare dopo il mapper   |
 | **corriere-espresso-preadvising** | ce-event-handler-monitoring       | 4f85f74            | solo values                                           |
 
