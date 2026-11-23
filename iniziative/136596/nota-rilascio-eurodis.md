@@ -5,7 +5,7 @@
 ### Lista iniziative
 
 **ce-dichiarato-eurodis-in**: ragione sociale del cliente (`EURODIS GmbH`) negli eventi di stato del file; file fittizio registrato nella collection Mongo `preadvising_file` come ce-dichiarato-builder (chiusura del file dalla state machine); script DDL 07 della tabella `eurodis_postazioni`
-**ce-dichiarato-eurodis-mapper**: solo LDV PDB (le altre si scartano); cliente, contratto, centro di costo, ragione sociale, partita IVA e codice fiscale dalla postazione del seme LDV (cache → tabella `eurodis_postazioni` → ce-vendite → upsert), configurazione solo come fallback
+**ce-dichiarato-eurodis-mapper**: solo LDV PDB (le altre si scartano); cliente, contratto, centro di costo, ragione sociale, partita IVA e codice fiscale dalla postazione del seme LDV (cache → tabella `eurodis_postazioni` → ce-vendite → upsert), configurazione solo come fallback; un record per collo verso il pre-enrichment (`id_record_multicollo` comune, `id_ldv_madre` dal secondo collo), figli LDV PDB a 22 caratteri accettati
 **ce-eurodis-send-tracking**: filtro EURODIS prima dell'invio: LDV PDB, seme in lista, postazione registrata in `eurodis_postazioni` con `eurodis = true`
 **ce-event-handler-monitoring**: canale `EUD_INVIOSYSTEM` tra i canali ammessi dal filtro di monitoraggio
 
@@ -23,7 +23,7 @@
 | **Namespace**                     | **Microservizio**                 | **Commit develop** | **Note**                                              |
 |-----------------------------------|-----------------------------------|--------------------|-------------------------------------------------------|
 | **corriere-espresso-preadvising** | ce-dichiarato-eurodis-in          | 8995ae8            | include 27bbe54 (ragione sociale), ad4e5d8 (DDL 07), 8ce7666 (preadvising_file) |
-| **corriere-espresso-preadvising** | ce-dichiarato-eurodis-mapper      | 507736a            | include 5a5faf1; rilasciare dopo lo script 07         |
+| **corriere-espresso-preadvising** | ce-dichiarato-eurodis-mapper      | 253fd0d            | include 5a5faf1, 507736a; rilasciare dopo lo script 07 |
 | **corriere-espresso-preadvising** | ce-eurodis-send-tracking          | 438c1fe            | include c592058; rilasciare dopo il mapper            |
 | **corriere-espresso-preadvising** | ce-event-handler-monitoring       | 4f85f74            | solo values                                           |
 
