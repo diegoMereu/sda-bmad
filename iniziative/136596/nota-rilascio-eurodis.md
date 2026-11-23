@@ -5,7 +5,7 @@
 ### Lista iniziative
 
 **ce-dichiarato-eurodis-in**: ragione sociale del cliente (`EURODIS GmbH`) negli eventi di stato del file; file fittizio registrato nella collection Mongo `preadvising_file` come ce-dichiarato-builder (chiusura del file dalla state machine); script DDL 07 della tabella `eurodis_postazioni`
-**ce-dichiarato-eurodis-mapper**: solo LDV PDB (le altre si scartano); cliente, contratto, centro di costo, ragione sociale, partita IVA e codice fiscale dalla postazione del seme LDV (cache → tabella `eurodis_postazioni` → ce-vendite → upsert), configurazione solo come fallback; un record per collo verso il pre-enrichment (`id_record_multicollo` comune), figli LDV PDB a 22 caratteri accettati e divisi in madre e figlio come nel validatore, `id_collo` = LDV; prodotto BEP (`rif_prodotto_cliente`) dalla LDV madre: ce-rules, poi regole locali sul prefisso, poi configurazione (`APT000901`)
+**ce-dichiarato-eurodis-mapper**: solo LDV PDB (le altre si scartano); cliente, contratto, centro di costo, ragione sociale, partita IVA e codice fiscale dalla postazione del seme LDV (cache → tabella `eurodis_postazioni` → ce-vendite → upsert), configurazione solo come fallback; un record per collo verso il pre-enrichment (`id_record_multicollo` comune), figli LDV PDB a 22 caratteri accettati e divisi in madre e figlio come nel validatore, `id_collo` = LDV; prodotto BEP (`rif_prodotto_cliente`) dalla LDV madre: ce-rules (spento di default), poi regole locali sul prefisso, poi configurazione (`APT000901`)
 **ce-eurodis-send-tracking**: filtro EURODIS prima dell'invio: LDV PDB, seme in lista, postazione registrata in `eurodis_postazioni` con `eurodis = true`; LDV figlia a 22 caratteri riconosciuta dalla madre
 **ce-event-handler-monitoring**: canale `EUD_INVIOSYSTEM` tra i canali ammessi dal filtro di monitoraggio
 
@@ -23,7 +23,7 @@
 | **Namespace**                     | **Microservizio**                 | **Commit develop** | **Note**                                              |
 |-----------------------------------|-----------------------------------|--------------------|-------------------------------------------------------|
 | **corriere-espresso-preadvising** | ce-dichiarato-eurodis-in          | 8995ae8            | include 27bbe54 (ragione sociale), ad4e5d8 (DDL 07), 8ce7666 (preadvising_file) |
-| **corriere-espresso-preadvising** | ce-dichiarato-eurodis-mapper      | 8a796f4            | include 5a5faf1, 507736a, 253fd0d, 97242eb; rilasciare dopo lo script 07 |
+| **corriere-espresso-preadvising** | ce-dichiarato-eurodis-mapper      | aac007f | include 5a5faf1, 507736a, 253fd0d, 97242eb, 8a796f4; rilasciare dopo lo script 07 |
 | **corriere-espresso-preadvising** | ce-eurodis-send-tracking          | b472297            | include c592058, 438c1fe; rilasciare dopo il mapper   |
 | **corriere-espresso-preadvising** | ce-event-handler-monitoring       | 4f85f74            | solo values                                           |
 
@@ -47,7 +47,7 @@ Repository di certificazione e produzione: da indicare (i tre servizi EURODIS so
 2. **Secret**:
    - `ce-postgres` (`datasource-name`, `data-source-password`) e `ssl-secrets` disponibili anche per ce-dichiarato-eurodis-mapper e ce-eurodis-send-tracking;
    - ce-dichiarato-eurodis-in legge Mongo (collection `preadvising_file`) dal secret di ce-dichiarato-validatore: `ce-dichiarato-validatore-secret`, chiave `mongo-string-connection`. Nessun secret nuovo.
-3. **Network policy**: ce-dichiarato-eurodis-mapper → `ce-vendite.corriere-espresso-preadvising.svc.cluster.local:8080` e → `ce-rules.corriere-espresso-core.svc.cluster.local:8080` (come ce-dichiarato-adapter). Senza la seconda il mapper usa le regole locali: nessun blocco, ma metrica `eurodis_mapper_prodotto_errori_total{componente="ce_rules"}` in crescita.
+3. **Network policy**: ce-dichiarato-eurodis-mapper → `ce-vendite.corriere-espresso-preadvising.svc.cluster.local:8080`. Verso `ce-rules.corriere-espresso-core.svc.cluster.local:8080` solo se si accende `PRODOTTO_CE_RULES_ABILITATO` (spento di default).
 4. **Values per ambiente**: `DATASOURCE_URL` verso `ce_eud_api_in` per mapper e send-tracking (in `deploy-config/values_TEMPLATE.yaml` è un segnaposto); `EURODIS_TRACKING_SEMI` del send-tracking con i `pds_code` INVIOSYSTEM del contratto EURODIS dell'ambiente (svil: `W2308`).
 
 ### Modalità di rilascio microservizi
@@ -75,7 +75,7 @@ Ordine: script DB → ce-dichiarato-eurodis-in → ce-dichiarato-eurodis-mapper 
 ### Verifiche dopo il rilascio
 
 - dopo il primo scarico: riga del seme INVIOSYSTEM in `eurodis_postazioni` con `eurodis = true` (verifica dell'upsert, non provato su PostgreSQL);
-- `rif_prodotto_cliente` coerente con il prefisso della LDV (3U/4U → `APT000901`) e `eurodis_mapper_prodotto_total{sorgente="ce_rules"}` in crescita;
+- `rif_prodotto_cliente` coerente con il prefisso della LDV (3U/4U → `APT000901`) e `eurodis_mapper_prodotto_total{sorgente="regole"}` in crescita;
 - spedizione multicollo: un record per collo nel pre-enrichment, nessuno scarto 317;
 - documento del file fittizio in `preadvising_file` con `stato` 0, poi chiuso dalla state machine;
 - tracce delle LDV EURODIS inviate a EURODIS; tracce di altre LDV scartate (`postazione_non_eurodis`, `ldv_non_pdb`).
