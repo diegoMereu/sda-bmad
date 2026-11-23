@@ -21,7 +21,7 @@ Sviluppo completato su BE (shipment-info, API `/preavviso/{ldv}` sul T&T-Repo, 7
 - Allinearsi con Umberto Pellegrino sul suo branch `144216_preadvising` (mock FE): quale branch prosegue — Diego — prossimo passo
 - Deploy in svil dei due branch e prova integrata — Diego / Amelia — dopo l'allineamento
 - Verifica pagina per pagina di SF e DP (export PDF da Word) e consegna a Poste — Diego — prima della consegna
-- Chiudere con l'infrastruttura i DA DEFINIRE del DP (cluster di collaudo e produzione, tipologia, codice AP di SiteMinder) — Diego — da definire
+- Chiudere con l'infrastruttura i DA DEFINIRE del DP (cluster di collaudo e produzione, tipologia) — Diego — da definire
 - Prova integrata in svil (BE + FE, LdV di test con preavviso da file con scarto, da file ok, da web service) — Amelia / Diego — dopo il push
 - Confermare con Poste le assunzioni AS-02…AS-05 (numero ordine, canale del preavviso non da file, formato di `preadv_errori`, data stato del file) — Diego — da definire
 

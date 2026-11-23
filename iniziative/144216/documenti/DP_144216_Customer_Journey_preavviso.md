@@ -20,7 +20,6 @@ L'iniziativa ha lo scopo di rendere consultabili agli operatori dell'assistenza 
 
 | Processo | Fase | Sistema Applicativo (AP) / Applicazione (PK) | Ruolo dell'Applicativo | Impatto Applicativo (S/N) | Applicativo esistente o nuovo |
 |---|---|---|---|---|---|
-| Assistenza clienti | Accesso al portale | SiteMinder (AP DA DEFINIRE) | Autentica l'operatore e propaga a OneTracking gli header dell'utente; nessuna nuova funzionalità di profilazione | N | Esistente |
 | Assistenza clienti | Consultazione del dettaglio LV | CE (AP-00988) / OneTracking `portal-pages` (PK-02401) | Front-end di OneTracking: mostra la nuova sottosezione "Informazioni preavviso" nel tab "Mittente/Destinatario" del dettaglio LV e inoltra la richiesta a `shipment-info` tramite il proprio proxy `/api` | S | Esistente |
 | Assistenza clienti | Recupero del preavviso | CE (AP-00988) / OneTracking `shipment-info` (PK-02400) | Back-end di OneTracking: espone il nuovo servizio `GET /preavviso/{ldv}`, legge il T&T-Repo, sceglie il preavviso da mostrare e decodifica stati, date ed errori | S | Esistente |
 | Assistenza clienti | Lettura dei dati di preavviso | T&T2.0 (AP-00960) / T&T repo (PK-03985), collection `pacchi_anagrafica` e `pacchi_file` tramite AppGW | Fornisce in lettura il documento della LdV, i documenti di preavviso e il documento del file di preavviso | N | Esistente |
@@ -36,7 +35,7 @@ Il dato nasce nella catena di preadvising, che ne pubblica gli eventi sul topic 
 
 | Flusso dati | Descrizione |
 |---|---|
-| Flusso dati 1 | All'apertura del tab "Mittente/Destinatario" del dettaglio LV, il browser dell'operatore, autenticato tramite SiteMinder, invoca `GET /api/preavviso/{ldv}` su `portal-pages`, in parallelo e indipendentemente dalla chiamata esistente dei dati di mittente e destinatario. |
+| Flusso dati 1 | All'apertura del tab "Mittente/Destinatario" del dettaglio LV, il browser dell'operatore invoca `GET /api/preavviso/{ldv}` su `portal-pages`, in parallelo e indipendentemente dalla chiamata esistente dei dati di mittente e destinatario. |
 | Flusso dati 2 | Il proxy di `portal-pages` toglie il prefisso `/api` e inoltra la richiesta a `shipment-info` (`GET /preavviso/{ldv}`) sul servizio interno del namespace `onetracking`; la risposta JSON (preavviso, file, errori) torna al browser per la stessa via. |
 | Flusso dati 3 | `shipment-info` legge in `pacchi_anagrafica` il documento della LdV (query `id:"<ldv>"`, un documento, campi `id`, `stato_LdV`, `id_preadvising`), da cui ricava lo stato del preavviso (`stato_LdV`). |
 | Flusso dati 4 | `shipment-info` legge in `pacchi_anagrafica` i documenti di preavviso della LdV (query `ldv:"<ldv>"`, ordinati per `event_ts` decrescente, al massimo `onetracking.preavviso.max-preavvisi`, default 50; solo i campi della sottosezione) e sceglie il preavviso da mostrare secondo la regola della SF. |
@@ -60,7 +59,6 @@ Le modifiche restano nello stack esistente di OneTracking: `shipment-info` è un
 | `pacchi_anagrafica` | Collection Solr del T&T-Repo | Non applicabile | Data | Esistente (nuove query in lettura) |
 | `pacchi_file` | Collection Solr del T&T-Repo | Non applicabile | Data | Esistente (nuovo consumatore in lettura: `shipment-info`) |
 | `preadvising.evensource` | Topic Kafka | Non applicabile | Integration | Esistente (non modificato) |
-| SiteMinder | Autenticazione degli operatori | Non applicabile | Integration | Esistente (non modificato) |
 
 Tabella 3: Consultazione del preavviso in OneTracking – dettaglio applicativi
 
@@ -68,7 +66,7 @@ Tabella 3: Consultazione del preavviso in OneTracking – dettaglio applicativi
 
 | Flusso dati | Protocollo | Origine | Destinazione | Tipologia | Frequenza | Frequenza di picco | Dimensione media dei messaggi | Dimensione massima dei messaggi | Flusso nuovo o esist. |
 |---|---|---|---|---|---|---|---|---|---|
-| Flusso 1 | https | Browser dell'operatore (tramite SiteMinder) | `portal-pages` | Sincrona | Una chiamata per apertura del tab "Mittente/Destinatario" del dettaglio LV; nessun nuovo tentativo automatico | DA DEFINIRE (aperture del dettaglio LV) | stima: circa 1 KB di risposta (esempio della SF, caso 1) | DA DEFINIRE (cresce con il numero di errori del preavviso) | Nuovo |
+| Flusso 1 | https | Browser dell'operatore | `portal-pages` | Sincrona | Una chiamata per apertura del tab "Mittente/Destinatario" del dettaglio LV; nessun nuovo tentativo automatico | DA DEFINIRE (aperture del dettaglio LV) | stima: circa 1 KB di risposta (esempio della SF, caso 1) | DA DEFINIRE (cresce con il numero di errori del preavviso) | Nuovo |
 | Flusso 2 | http (servizio interno del namespace) | `portal-pages` (proxy `/api`) | `shipment-info` | Sincrona | Come il Flusso 1 | Come il Flusso 1 | stima: circa 1 KB di risposta | DA DEFINIRE (cresce con il numero di errori del preavviso) | Nuovo |
 | Flusso 3 | https | `shipment-info` | T&T-Repo (AppGW), collection `pacchi_anagrafica` | Sincrona | Una chiamata per richiesta del Flusso 2 | Come il Flusso 1 | DA DEFINIRE (un documento LdV, restituito intero) | DA DEFINIRE (un documento) | Nuovo (nuova query su collection già consultata) |
 | Flusso 4 | https | `shipment-info` | T&T-Repo (AppGW), collection `pacchi_anagrafica` | Sincrona | Una chiamata per richiesta del Flusso 2 | Come il Flusso 1 | DA DEFINIRE (stima: un documento di preavviso per LdV, di più se il preavviso è stato ritrasmesso) | DA DEFINIRE (al massimo 50 documenti di preavviso, proprietà `onetracking.preavviso.max-preavvisi`) | Nuovo |

@@ -88,7 +88,7 @@ La soluzione è riportata nella figura successiva e nell'allegato 1.
 
 ![Figura 1: Soluzione architetturale della sezione "Informazioni preavviso" in OneTracking](fig-1-architettura.png)
 
-La figura mostra la sequenza: l'operatore, autenticato tramite SiteMinder, apre il dettaglio di una LdV nel front-end di OneTracking (`portal-pages`); il front-end invoca il nuovo servizio di recupero del preavviso esposto dal back-end di OneTracking (`shipment-info`); il servizio legge dal T&T-Repo, tramite AppGW, il documento della LdV e i documenti di preavviso nella collection `pacchi_anagrafica` e, se il preavviso proviene da file, il documento del file nella collection `pacchi_file`. Le due collection sono alimentate, senza modifiche, dagli eventi della catena di preadvising (topic `preadvising.evensource`, iniziativa 138975).
+La figura mostra la sequenza: l'operatore apre il dettaglio di una LdV nel front-end di OneTracking (`portal-pages`); il front-end invoca il nuovo servizio di recupero del preavviso esposto dal back-end di OneTracking (`shipment-info`); il servizio legge dal T&T-Repo, tramite AppGW, il documento della LdV e i documenti di preavviso nella collection `pacchi_anagrafica` e, se il preavviso proviene da file, il documento del file nella collection `pacchi_file`. Le due collection sono alimentate, senza modifiche, dagli eventi della catena di preadvising (topic `preadvising.evensource`, iniziativa 138975).
 
 ## DREQ0062862 – Dati di preavviso nel dettaglio LV
 
@@ -304,7 +304,7 @@ Ulteriori dettagli: gli errori sono interpretati dal ms `shipment-info` e mostra
 | T&T-Repo (Solr) | Collection `pacchi_anagrafica` | Consultazione in lettura, nessuna modifica | Esistente |
 | T&T-Repo (Solr) | Collection `pacchi_file` | Consultazione in lettura, nessuna modifica | Esistente |
 | Catena di preadvising | Alimentazione del T&T-Repo (topic `preadvising.evensource`) | Nessuna modifica | Esistente |
-| SiteMinder / profilazione OneTracking | Funzionalità di profilazione | Nessuna nuova funzionalità (assunzione 2) | Esistente |
+| Profilazione OneTracking | Funzionalità di profilazione | Nessuna nuova funzionalità (assunzione 2) | Esistente |
 
 # Allegati
 
