@@ -6,9 +6,9 @@
 ## In una riga
 La fase 1 (Account Key per spedizione, Product ID per articolo, Declaration ID predisposto) ha
 nomi, regola, errori e colonne SEW decisi da Diego. Lo sviluppo del primo passo è in corso:
-- validatore su `develop` (`090d037`); orchestratore, smistatore e bff su `develop`, ripartono oggi;
-- `sda-ldv-preadv-consumer` (`consumer-sew_sped`, `producer-sew-sped`) sul branch dedicato (`990503a`,
-  pubblicato), da correggere per scrivere solo su `sew_spedizioni_work` e da compilare in Eclipse.
+- validatore su `develop` (`090d037`, `43f5cbe`); orchestratore, smistatore e bff su `develop`, ripartono oggi;
+- `sda-ldv-preadv-consumer` (`consumer-sew_sped`, `producer-sew-sped`) sul branch dedicato (`990503a` + `ef0a5ce`,
+  pubblicati), scrive solo su `sew_spedizioni_work`; da compilare in Eclipse.
 
 Adapter e consumer Poste sono rimandati al punto 2 della fase 1. Da Poste servono ancora l'elenco
 dei prodotti CRONO INTERNAZIONALE e i nomi dei campi nelle sorgenti.
@@ -24,13 +24,12 @@ dei prodotti CRONO INTERNAZIONALE e i nomi dei campi nelle sorgenti.
 - 2026-11-24 — Funzionali e prompt alla versione 0.2 con le decisioni del 23 e 24-11, Mary. Adapter e `consumer-sew-sped-poste` hanno in testa la nota "rimandato al punto 2 della fase 1".
 - 2026-11-24 — DDL 0.2 (`ddl-sew-146073.md`) con le colonne `zonos_*` `char` con default `''`, Mary.
 - 2026-11-24 — Validatore su `develop`, commit `090d037`: campi `zonos_*`, regola ed errori `1320`…`1323`, verifica spenta di default. I 153 test `regoledrools/Invio*Test` falliscono già su `develop`: sono preesistenti, da sistemare a parte.
-- 2026-11-24 — `sda-ldv-preadv-consumer` sul branch `146073_compliance_usa_fase1`, commit `990503a`, pubblicato. Correzione "solo `sew_spedizioni_work`" in arrivo. Mai compilato con le librerie reali: serve un build in Eclipse con i jar di `L:` prima del rilascio.
+- 2026-11-24 — `sda-ldv-preadv-consumer` sul branch `146073_compliance_usa_fase1`, commit `990503a` e `ef0a5ce` (colonne solo su `sew_spedizioni_work`), pubblicati. Mai compilato con le librerie reali: serve un build in Eclipse con i jar di `L:` prima del rilascio.
+- 2026-11-24 — Validatore: chiavi `zonos_*` anche su Mongo (`@Field`), commit `43f5cbe` su `develop`.
 - 2026-11-24 — Documenti aggiornati con le decisioni del giorno (Mary): analisi 0.4, DDL 0.3 (script 2 su `sew_spedizioni_work_2` eliminato), funzionali 0.3 di `consumer-sew_sped`, `producer-sew-sped`, validatore e orchestratore; note su bff ed event store; prompt.
 
 ## Prossimi passi
 - Completare orchestratore, smistatore e bff su `develop`, con le chiavi `zonos_*` su Mongo — Amelia — da oggi
-- Validatore: aggiungere `@Field("zonos_…")` ai campi camelCase di `090d037`, così su Mongo le chiavi sono `zonos_*` — Amelia — subito
-- `consumer-sew_sped`: colonne nuove solo su `sew_spedizioni_work` (non `_2` né `sew_spedizioni`) — Amelia — in arrivo
 - Build in Eclipse di `consumer-sew_sped` e `producer-sew-sped` con i jar di `L:` — Diego — prima del rilascio
 - Sistemare a parte i 153 test `regoledrools/Invio*Test` già rotti su `develop` del validatore — da assegnare — fuori dalla 146073
 - Chiedere a Poste la conferma dell'elenco CRONO INTERNAZIONALE (PA-12) — Diego — prossimo passo
