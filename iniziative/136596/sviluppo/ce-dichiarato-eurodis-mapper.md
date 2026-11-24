@@ -144,7 +144,7 @@ sequenceDiagram
 
 | # | Regola |
 |---|---|
-| RF-01 | Un messaggio in ingresso produce **al più un** messaggio in uscita. |
+| RF-01 | Un messaggio in ingresso produce **al più un** messaggio in uscita. Il multicollo è **un solo record con tutti i colli** in `spedizione[0].collo[]` **[DECISO 24-11, Diego, OP-03]**: `EUD_INVIOSYSTEM` è della famiglia PDB (un `rif_spedizione`, un `id_preadvising`; ldv-pdb fa una waybill con N colli e `APT000945`). La divisione per collo del 20-11 faceva scartare dal validatore i colli dal secondo in poi con l'errore 1162. |
 | RF-02 | `edReference` si legge come numero esatto (`BigDecimal`), mai `double`. `7319003746401.0` vale `7319003746401`. Una parte decimale diversa da zero (`…401.5`) rende il messaggio **non mappabile** (risolve MAP-5: oggi si tronca in silenzio). |
 | RF-03 | Il corpo si legge con DTO tolleranti: proprietà sconosciute ignorate, oggetti e liste `null` gestiti senza eccezioni. `collis: null` dà `collo: []`, non NullPointerException (bug della verifica del 04-11). |
 | RF-04 | Nessun troncamento **[DECISO 22-10, PA-16]**: ogni valore passa intero, anche oltre la dimensione ICD. |
@@ -159,7 +159,7 @@ sequenceDiagram
 | RF-13 | Nessun riferimento a PA/DF o a documenti di analisi nei commenti del codice (MAP-7): le regole aperte stanno in questo documento. |
 | RF-14 | **Il destinatario deve essere presente** **[DECISO 06-11, Diego, DF-30; confermato 10-11: in produzione il destinatario è in `consigneeAddress`, il TEST non è rappresentativo]**: `consigneeAddress` assente, oppure `zipcode` o `city` vuoti (obbligatori per ICD e BEP) → messaggio **non mappabile**, motivo `destinatario_assente`. `returnAddress` non lo sostituisce. |
 | RF-16 | Cliente, contratto e centro di costo si ricavano dalla **postazione della LDV del collo** (sezione 6.2.1). Se la postazione non si ricava (LDV vuota, postazione non trovata, risposta incompleta, errore di `ce-vendite` o del database) **non si scarta**: si pubblica con i valori di configurazione, con avviso e metrica. **[DECISO 18-11, Diego]** |
-| RF-17 | **Nel flusso entrano solo LDV PDB** **[DECISO 18-11, Diego]**: una `collis[].deliveryPartnerBarcode` valorizzata che non è una LDV PDB (regola della sezione 6.2.1, passo 1) rende il messaggio **non mappabile**, motivo `ldv_non_pdb`, con le posizioni dei colli nel campo dello scarto; metrica dedicata `eurodis_mapper_ldv_non_pdb_total`. Nessuna chiamata esterna. La LDV vuota non scarta: è un campo mancante (RF-07) e il cliente va in fallback (RF-16). |
+| RF-17 | **Nel flusso entrano solo LDV PDB** **[DECISO 18-11, Diego]**: una `collis[].deliveryPartnerBarcode` valorizzata che non è una LDV PDB (regola della sezione 6.2.1, passo 1) rende il messaggio **non mappabile**, motivo `ldv_non_pdb`, con le posizioni dei colli nel campo dello scarto; metrica dedicata `eurodis_mapper_ldv_non_pdb_total`. Nessuna chiamata esterna. È PDB anche il **figlio di un multicollo**, 22 caratteri: 9 del figlio seguiti dalla LDV madre PDB di 13 (ICD Mediation BEP); il seme è quello della madre. La LDV vuota non scarta: è un campo mancante (RF-07) e il cliente va in fallback (RF-16). |
 | RF-15 | Errore o risposta vuota di `ce-anagrafica` non blocca: si pubblica, con errore sullo span e avviso `anagrafica_ko`. Se il codice paese è IT, ITA o ITA1 si usano le codifiche italiane di configurazione (`mapper.nazione.italia.*`: IT / ITA / ITA1) con l'avviso `nazione_default_italia`; per gli altri paesi ISO3 e ISO4 restano vuoti. Gli errori non entrano in cache (sezione 6.4). **[DECISO 10-11, Diego]** |
 
 ## 6. Regole di mapping
@@ -334,7 +334,9 @@ usa al posto del destinatario: è l'indirizzo di rientro.
 | `altezza` | `height` | diretto | |
 | `profondita` | `width` | diretto | |
 | `codice_imballo` | `identifierPalletOrCollo` | `P`, `P+` → `"PL"`; `C`, `C+` → `"CL"`; altro → `""` | proposta del foglio |
-| `tipo_collo`, `id_ldv_madre`, `id_ldv_figlio`, `id_collo` | — | `""` | [DA DECIDERE PA-11, DF-03] |
+| `id_collo` | `deliveryPartnerBarcode` | LDV intera, sempre (anche quella del figlio a 22 caratteri) | ldv-pdb la passa a BEP come `parcelLabel` e abbina la risposta al collo del record |
+| `id_ldv_madre`, `id_ldv_figlio` | `deliveryPartnerBarcode` | LDV di 22 caratteri: `id_ldv` = primi 9, `id_ldv_madre` = ultimi 13, `id_ldv_figlio` = LDV intera di 22 (`id_ldv` + madre). LDV di 13 caratteri con più colli: madre = la LDV stessa, figlio assente. Monocollo: assenti | come il multicollo `PDB_INVIOSYSTEM` **[24-11, OP-04]**, regole in [`regole-ldv-multicollo-pdb.md`](../regole-ldv-multicollo-pdb.md) |
+| `tipo_collo` | `deliveryPartnerBarcode` | multicollo: `M` sulla madre (13), `F` sul figlio (22); monocollo: assente | come `PDB_INVIOSYSTEM` **[24-11, OP-04]** |
 
 ### 6.7 Internazionale (`spedizione.internazionale`)
 
@@ -641,7 +643,8 @@ non mappabile, motivo `destinatario_assente`, nessuna pubblicazione (RF-14).
 | AC-06 | `deliveryService` `6` + contrassegno | elaborazione | `codici_servizi` = `APT000910\|APT000918` |
 | AC-07 | `deliveryService` `Z`, `A`, `D`, `7`, `T` senza contrassegno | elaborazione | `codici_servizi` = `""` |
 | AC-08 | `mapper.codici-servizi.abilitati=false` | elaborazione | `codici_servizi` = `""` sempre |
-| AC-09 | 3 colli, il primo con `europlateBarcode` `"0"` | elaborazione | 3 elementi `collo`, `numero_colli_parz` 1..3, `id_ldv_itz` dal secondo collo |
+| AC-09 | 3 colli, il primo con `europlateBarcode` `"0"` | elaborazione | un solo record pubblicato con 3 elementi `collo`, `numero_colli` 3, `numero_colli_parz` 1..3, `id_ldv_itz` dal secondo collo |
+| AC-09c | 3 colli: madre a 13 caratteri, poi due figli a 22 | elaborazione | un solo record con 3 colli; `id_ldv` madre, poi i 9 caratteri di ciascun figlio; `id_ldv_madre` = madre su tutti; `id_ldv_figlio` = LDV intera di 22 sui colli 2 e 3; `tipo_collo` `M`, `F`, `F`; `id_collo` = LDV intera |
 | AC-09b | `europlateBarcode` `"0"` o vuoto su tutti i colli | elaborazione | `id_ldv_itz` = `""`, nessun avviso |
 | AC-10 | `edReference` `7319003746401.0` / `7319003746401.5` / assente | elaborazione | `"7319003746401"` / non mappabile / non mappabile, nessuna pubblicazione |
 | AC-11 | corpo non JSON | elaborazione | non mappabile, offset avanti, DLT se configurata |
@@ -661,7 +664,6 @@ non mappabile, motivo `destinatario_assente`, nessuna pubblicazione (RF-14).
 | Contrassegno: valuta e tipo | si mappa tutto, warning | eventuale scarto | DF-24 |
 | Messaggi non mappabili | DLT disattivata, log ERROR | si configura il topic | PA-32 |
 | Duplicati e `id_preadvising` | UUID casuale, deduplica a valle | eventuale id deterministico | MAP-2 |
-| Multicollo madre/figlio, `id_collo` | vuoti | regola LDV | PA-11, DF-03 |
 | Dogana, ADR | non mappati | fase 2 | PA-13 |
 | `progressivo` | `1` | allineare il foglio | MAP-1 |
 

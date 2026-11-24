@@ -7,6 +7,8 @@ Distinguo ciò che è **verificato** (letto nei messaggi o nei log) da ciò che 
 |---|---|---|---|
 | OP-01 | BEP non accetta indirizzi esteri | S60: `BEP:101` "Dati non conformi: zipCode" | come trattare i mittenti fuori Italia |
 | OP-02 | LDV madre e figlia nel multicollo | S02: scartato dal mapper, `ldv_non_pdb` | formato valido dei figli e regola RF-17 |
+| OP-03 | Multicollo diviso per collo, scarto 1162 | 24-11: colli 2 e 3 scartati dal validatore, "Numero Riferimento Spedizione già utilizzato" | deciso 24-11: un record per spedizione con tutti i colli (mapper `6a6a042`); da riprovare dopo il deploy |
+| OP-04 | Multicollo, BEP 101 sul barcode | 24-11: S02 `1110000000002`, `BEP:101` "Dati non conformi: barcode" su tutti e 3 i colli | figli del mock non nel formato PDB: corretti i mock; mapper allineato a PDB_INVIOSYSTEM (`506d71d`); da riprovare |
 
 ## OP-01 · BEP non accetta indirizzi esteri
 
@@ -35,6 +37,30 @@ Distinguo ciò che è **verificato** (letto nei messaggi o nei log) da ciò che 
   3. Come si valorizzano madre e figlio nel tracciato (`id_ldv_madre`, `id_ldv_figlio`, `tipo_collo`, `id_collo`)?
 - **Collegato:** DF-03 e PA-11 (multicollo), RF-17 (decisione del 18-11).
 - **Stato del mock:** invariato; non lo cambio per non nascondere il difetto.
+
+## OP-03 · Multicollo diviso per collo: colli 2 e N scartati con 1162
+
+- **Evidenza (24-11, `ed_reference` `7700000000002`, 3 colli):** il mapper pubblica 3 record (log "collo 1/3 … 3/3"), con lo stesso `rif_spedizione`, tre `id_preadvising` diversi e `id_record_multicollo` comune. Su Mongo `dichiarato_events` il collo 1 (madre `3UW2308675840`) è a `stato` 3; i colli 2 e 3 (figli a 22 caratteri) sono a `stato` 2 con `errori` `1162` "Numero Riferimento Spedizione già utilizzato".
+- **Verificato nel codice del validatore:**
+  - la regola `pdb_1162` (`rules/pdb/generated/ce-pdb-rules.drl:1078`) chiama il gateway di `PdbPreadvisingHandler` (righe 106-123): è un duplicato se in `PreadvisingHistory` esiste lo stesso `numeroOrdine` (= `rif_spedizione`) con un `id_preadvising` **diverso** e `stato != 2`. Non considera `id_ldv`, madre/figlio né `id_record_multicollo`. Il primo collo registra il riferimento, gli altri lo trovano già usato;
+  - `EUD_INVIOSYSTEM` passa da `PdbPreadvisingHandler` con le regole di `PDB_INVIOSYSTEM` (`PdbChannel.canaleRegole`, commit `0db4ca6` del 10-11), non da `SdaFlussoHandler`. Le regole logic (fra cui E225, errore 317) e il multicollo `002` per questo canale non si applicano.
+- **Verificato nel codice di ldv-pdb:** `BepRequestMapper` (righe 234-245, 301-309) fa una waybill per spedizione con un `declared` per collo, e aggiunge il servizio multicollo `APT000945` solo se il record ha più di un collo. Per la famiglia PDB il multicollo è **un solo record con N colli**. Anche la regola PDB 2037 (oggi solo per i file `.csv`) controlla `numero_colli` = colli del record.
+- **Dove si dividono i colli, flusso SDA e flusso PDB a confronto:**
+  - flusso SDA (`IF`, `IS`, `IE`): la divisione per collo la fa il validatore (`SdaFlussoHandler`, multicollo `002`), dopo la validazione;
+  - flusso PDB (`PDB_*`, `EUD_*`): nel validatore e in ldv-pdb i colli restano in un solo record (verificato). `PdbPreadvisingHandler` non divide; ldv-pdb fa una waybill con N `declared`, abbina la risposta di BEP al collo con `parcelLabel` e scrive madre e figlio sui colli dello stesso record (`BepResponseMapper.applyMulticolloIds`, righe 231-253). Il legame madre-figlio esiste dentro un record, non tra record diversi;
+  - a valle: `ce-event-handler-monitoring` produce un `Record` per collo verso il monitoraggio (dalla nostra documentazione, codice non riletto), ma è una vista di monitoraggio e non tocca la creazione della spedizione. Smistatore e state machine: **non verificati**;
+  - la regola 1162 funziona come previsto: nel modello PDB un `rif_spedizione` corrisponde a un solo `id_preadvising`. Il mapper invece divide in partenza come il flusso SDA, e il validatore vede tre spedizioni con lo stesso riferimento. Madre e figlio calcolati dal mapper non bastano: la regola non li legge.
+- **Causa:** la divisione per collo (`DivisioneColli`, commit `253fd0d` del 20-11) copia il multicollo `002` del flusso SDA, ma `EUD_INVIOSYSTEM` è un canale della famiglia PDB. La nota di rilascio la motivava con "nessuno scarto 317", un errore che su questo canale non scatta.
+- **Dedotto:** anche senza 1162, ldv-pdb manderebbe a BEP 3 waybill di un collo con lo stesso `shipmentRefNumber` e senza `APT000945`.
+- **Proposta:** nel mapper un record per spedizione con tutti i colli, cioè togliere `DivisioneColli.perCollo` da `EurodisMapperServiceImpl.java:78`. Restano `id_collo` = LDV su ogni collo e madre/figlio calcolati dal mapper (`97242eb`), che servono a ldv-pdb (`parcelLabel`) e a send-tracking; `id_record_multicollo` non serve più. Vanno aggiornati `DivisioneColliTest`, il test del service, la nota di rilascio (riga "un record per collo nel pre-enrichment, nessuno scarto 317") e la specifica del mapper.
+- **Scartata:** far ignorare a 1162 i record con lo stesso `id_record_multicollo`. Tocca un componente condiviso da tutti i canali PDB, la regola sta in un DRL generato fuori dal repo, e ldv-pdb produrrebbe comunque 3 waybill separate.
+- **Rischi da verificare:**
+  1. il ritorno di BEP con 3 colli su un record fino in fondo alla catena per `EUD_INVIOSYSTEM` (dal codice sì: `BepResponseMapper` lavora per collo, l'adapter unisce gli esiti per `code_externalId`; non provato);
+  2. il collo 1 di questo test è passato con `numero_colli` 3 e un solo collo, senza `APT000945`: verificare cosa ha creato BEP per `3UW2308675840` (probabile LDV monocollo da annullare o ignorare).
+- **[DECISO 24-11, Diego]:** correzione nel mapper, annulla la scelta del 20-11. Commit `6a6a042` del mapper: tolti `DivisioneColli` e `id_record_multicollo`, un solo invio per spedizione; restano `id_collo` = LDV e madre/figlio. Specifica (RF-01, RF-17, 6.6, AC-09/AC-09c) e nota di rilascio aggiornate. `ce-dichiarato-eurodis-in` non cambia: manda già un messaggio per spedizione con tutti i colli (`SpedizioneProducer.invia`).
+- **Evidenza (24-11, 13:58, S02, `ed_reference` `9900000000002`):** ancora 3 record con `id_record_multicollo` e log "collo 1/3 … 3/3" dallo stesso offset `934`. In svil girava l'immagine precedente: `6a6a042` non era ancora pushato.
+- **Da verificare dopo il deploy:** S02 di nuovo; nel pre-enrichment un solo record con 3 colli, a valle nessun 1162, in BEP una LDV con `APT000945`.
+- **Collegato:** OP-02, PA-11, DF-03.
 
 ## Altri punti dai test del 20-11 (da fare o da chiarire)
 

@@ -106,6 +106,9 @@ BASE = json.loads(r"""
 """)
 
 RND = "{{randomValue length=%d type='NUMERIC'}}"
+POSTAZIONE = "W2308"
+# id_ldv del figlio: postazione senza il primo carattere + contatore di 4 lettere + primo carattere
+FIGLIO = POSTAZIONE[1:] + "{{randomValue length=4 type='ALPHABETIC' uppercase=true}}" + POSTAZIONE[0]
 PUDO = "PUDO-IT-00144-ROMA-0001"
 
 
@@ -145,13 +148,13 @@ def spedizione(pesi=(15,), servizio=None, contrassegno=None, **kw):
         c["consignorsColloBarcode"] = "CONS%d" % i + RND % 8
         c["dispatchPartnerBarcode"] = "5120000022505913640000003100%d" % i
         if i == 1:
-            # multicollo (ICD BEP, INVIOSYSTEM): il primo collo ha la madre a 13 caratteri,
-            # gli altri il figlio a 22 = 9 caratteri casuali + la stessa madre
-            madre = prefisso + "W2308" + RND % 6
+            # multicollo (come PDB_INVIOSYSTEM, regole-ldv-multicollo-pdb.md): il primo collo ha la madre
+            # a 13 caratteri, gli altri il figlio a 22 = id_ldv del figlio (9) + la stessa madre
+            madre = prefisso + POSTAZIONE + RND % 6
             c["deliveryPartnerBarcode"] = ("{{#assign 'madre'}}%s{{/assign}}{{madre}}" % madre
                                            if len(pesi) > 1 else madre)
         else:
-            c["deliveryPartnerBarcode"] = "{{randomValue length=9 type='ALPHANUMERIC' uppercase=true}}{{madre}}"
+            c["deliveryPartnerBarcode"] = FIGLIO + "{{madre}}"
         colli.append(c)
     s["collis"] = colli
     if servizio and servizio["deliveryService"] in ("M", "F"):

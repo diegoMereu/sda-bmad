@@ -5,7 +5,7 @@
 ### Lista iniziative
 
 **ce-dichiarato-eurodis-in**: ragione sociale del cliente (`EURODIS GmbH`) negli eventi di stato del file; file fittizio registrato nella collection Mongo `preadvising_file` come ce-dichiarato-builder (chiusura del file dalla state machine); script DDL 07 della tabella `eurodis_postazioni`
-**ce-dichiarato-eurodis-mapper**: solo LDV PDB (le altre si scartano); cliente, contratto, centro di costo, ragione sociale, partita IVA e codice fiscale dalla postazione del seme LDV (cache → tabella `eurodis_postazioni` → ce-vendite → upsert), configurazione solo come fallback; un record per collo verso il pre-enrichment (`id_record_multicollo` comune), figli LDV PDB a 22 caratteri accettati e divisi in madre e figlio come nel validatore, `id_collo` = LDV; prodotto BEP (`rif_prodotto_cliente`) dalla LDV madre: ce-rules (spento di default), poi regole locali sul prefisso, poi configurazione (`APT000901`)
+**ce-dichiarato-eurodis-mapper**: solo LDV PDB (le altre si scartano); cliente, contratto, centro di costo, ragione sociale, partita IVA e codice fiscale dalla postazione del seme LDV (cache → tabella `eurodis_postazioni` → ce-vendite → upsert), configurazione solo come fallback; multicollo in un solo record con tutti i colli verso il pre-enrichment (famiglia PDB: una waybill BEP con N colli), figli LDV PDB a 22 caratteri accettati, campi del collo come il multicollo PDB_INVIOSYSTEM (`id_ldv` 13/9, `id_ldv_madre`, `id_ldv_figlio` a 22, `tipo_collo` M/F), `id_collo` = LDV; prodotto BEP (`rif_prodotto_cliente`) dalla LDV madre: ce-rules (spento di default), poi regole locali sul prefisso, poi configurazione (`APT000901`)
 **ce-eurodis-send-tracking**: filtro EURODIS prima dell'invio: LDV PDB, seme in lista, postazione registrata in `eurodis_postazioni` con `eurodis = true`; LDV figlia a 22 caratteri riconosciuta dalla madre
 **ce-event-handler-monitoring**: canale `EUD_INVIOSYSTEM` tra i canali ammessi dal filtro di monitoraggio
 
@@ -23,7 +23,7 @@
 | **Namespace**                     | **Microservizio**                 | **Commit develop** | **Note**                                              |
 |-----------------------------------|-----------------------------------|--------------------|-------------------------------------------------------|
 | **corriere-espresso-preadvising** | ce-dichiarato-eurodis-in          | 8995ae8            | include 27bbe54 (ragione sociale), ad4e5d8 (DDL 07), 8ce7666 (preadvising_file) |
-| **corriere-espresso-preadvising** | ce-dichiarato-eurodis-mapper      | 7d613c6 | include 5a5faf1, 507736a, 253fd0d, 97242eb, 8a796f4; rilasciare dopo lo script 07 |
+| **corriere-espresso-preadvising** | ce-dichiarato-eurodis-mapper      | 506d71d | include 5a5faf1, 507736a, 97242eb, 8a796f4, 7d613c6, 6a6a042 (annulla la divisione per collo di 253fd0d), 4e13124, 506d71d (`id_ldv_figlio` a 22, `tipo_collo`); rilasciare dopo lo script 07 |
 | **corriere-espresso-preadvising** | ce-eurodis-send-tracking          | b472297            | include c592058, 438c1fe; rilasciare dopo il mapper   |
 | **corriere-espresso-preadvising** | ce-event-handler-monitoring       | 4f85f74            | solo values                                           |
 
@@ -76,6 +76,6 @@ Ordine: script DB → ce-dichiarato-eurodis-in → ce-dichiarato-eurodis-mapper 
 
 - dopo il primo scarico: riga del seme INVIOSYSTEM in `eurodis_postazioni` con `eurodis = true` (verifica dell'upsert, non provato su PostgreSQL);
 - `rif_prodotto_cliente` coerente con il prefisso della LDV (3U/4U → `APT000901`) e `eurodis_mapper_prodotto_total{sorgente="regole"}` in crescita;
-- spedizione multicollo: un record per collo nel pre-enrichment, nessuno scarto 317;
+- spedizione multicollo: un solo record con tutti i colli nel pre-enrichment (log del mapper "pubblicata", non "collo 1/N"), nessuno scarto 1162 sui figli, una sola LDV BEP con il servizio `APT000945`; figli nel formato PDB (`regole-ldv-multicollo-pdb.md`), altrimenti BEP risponde 101 "Dati non conformi: barcode";
 - documento del file fittizio in `preadvising_file` con `stato` 0, poi chiuso dalla state machine;
 - tracce delle LDV EURODIS inviate a EURODIS; tracce di altre LDV scartate (`postazione_non_eurodis`, `ldv_non_pdb`).
