@@ -1,6 +1,6 @@
 # `ce-dichiarato-validatore` — Documento funzionale per lo sviluppo (Compliance USA, fase 1)
 
-**Iniziativa**: 146073 — Compliance USA Entry Type 13 (AP-00988 Corriere Espresso / PK-03089 ce-dichiarato) · **Versione**: 0.2 · **Data**: 2026-11-24
+**Iniziativa**: 146073 — Compliance USA Entry Type 13 (AP-00988 Corriere Espresso / PK-03089 ce-dichiarato) · **Versione**: 0.3 · **Data**: 2026-11-24
 **Autrice**: Mary (analyst) · **Destinatario**: sviluppatore del validatore (Amelia)
 **Intervento HLD**: 01 della fase 1, stima TOW 1.2 di 0,80
 **Repository**: `gitlab.alm.poste.it/CORRIERE-ESPRESSO/PREADVISING/ce-dichiarato-validatore` (in locale `gitposte/SDA/preadvising/ce-dichiarato-validatore`)
@@ -19,6 +19,11 @@ Etichette usate nel documento:
 > `zonos_*` dei campi, regola senza la condizione "cliente business", prodotti su `codice_prodotto` o
 > `id_servizio`, descrizioni degli errori. I buchi e le incoerenze trovati nel codice sono fra le assunzioni
 > (VAL-AS-10 e seguenti) e le domande aperte.
+>
+> **Versione 0.3 (Diego, 2026-11-24).** Su MongoDB (`dichiarato_events`) i campi si salvano con i
+> nomi del tracciato `zonos_account_key`, `zonos_declaration_id`, `zonos_product_id`, non camelCase
+> (RV-05, VAL-AS-20). Il commit `090d037` su `develop` dichiara campi Java camelCase con il solo
+> `@JsonProperty`: su Mongo andrebbero come `zonosAccountKey`…, quindi va aggiunto `@Field` (3.1).
 
 ---
 
@@ -89,9 +94,9 @@ aggiunti ai DTO, tutti questi punti li riportano senza altre modifiche.
 
 | Classe (`kafka/dto/`) | Cosa c'è oggi | Cosa si fa |
 |---|---|---|
-| `SpedizioneDTO` | testata della spedizione: campi snake_case con getter Lombok (es. `id_servizio`, `codice_prodotto`, `tipo_merce`), `importiDto` (`@JsonProperty("importi")`), `destinatario`, `List<ColloDTO> collo` | `private String zonos_account_key;` e `private String zonos_declaration_id;`, oppure campi camelCase con `@JsonProperty("zonos_account_key")` e `@JsonProperty("zonos_declaration_id")` |
+| `SpedizioneDTO` | testata della spedizione: campi snake_case con getter Lombok (es. `id_servizio`, `codice_prodotto`, `tipo_merce`), `importiDto` (`@JsonProperty("importi")`), `destinatario`, `List<ColloDTO> collo` | `private String zonos_account_key;` e `private String zonos_declaration_id;`, oppure campi camelCase con **sia** `@JsonProperty` **sia** `@Field` (`org.springframework.data.mongodb.core.mapping.Field`) con il nome del tracciato: `@JsonProperty("zonos_account_key") @Field("zonos_account_key")`, idem per `zonos_declaration_id` (RV-05) |
 | `ColloDTO` | `@Valid List<ArticoloDTO> articolo` | nessuna modifica |
-| `ArticoloDTO` | `posizione` (`@Size(max = 1)`), `codice_taric`, `valore`, `quantita`, `peso_totale`, `paese_origine`, `english_descr`, `ita_descr`, `valuta` | `private String zonos_product_id;` (oppure `@JsonProperty("zonos_product_id")`) |
+| `ArticoloDTO` | `posizione` (`@Size(max = 1)`), `codice_taric`, `valore`, `quantita`, `peso_totale`, `paese_origine`, `english_descr`, `ita_descr`, `valuta` | `private String zonos_product_id;` (oppure camelCase con `@JsonProperty("zonos_product_id") @Field("zonos_product_id")`) |
 | `DichiaratoDTO` | `errors` (`Map<String,String>`, chiave = codice), `warnings`, `canale`, `spedizione` | nessuna modifica |
 
 Regole per i campi nuovi:
@@ -105,6 +110,13 @@ Regole per i campi nuovi:
 - Lombok `@Data` mette i campi nel `toString()`. Il DTO finisce nei log in più punti, per esempio
   `salvaErroreRegole` lo logga **a WARN** (`payload: {}`). L'Account Key è una chiave del cliente e
   non deve finire nei log: si annota `@ToString.Exclude` su `zonos_account_key` (VAL-AS-11).
+- **Nomi su MongoDB** [DECISO, Diego 2026-11-24]: il salvataggio su `dichiarato_events` passa dal
+  `MongoConverter` di Spring Data (`FlussoHandler`, `mongoTemplate.getConverter()`, `upsert` di
+  `PreadvisingEvents`), che usa il **nome del campo Java** e ignora `@JsonProperty`. Con campi
+  camelCase e il solo `@JsonProperty` le chiavi su Mongo sarebbero `zonosAccountKey`,
+  `zonosDeclarationId`, `zonosProductId`. Le chiavi devono essere `zonos_account_key`,
+  `zonos_declaration_id`, `zonos_product_id`, come le legge il bff (`@Field("zonos_…")`) e come le
+  scrive l'orchestratore.
 
 ### 3.2 Come sono organizzate le regole oggi
 
@@ -198,6 +210,7 @@ validazione: i cloni ereditano `zonos_account_key` e, collo per collo, gli artic
 | RV-02 | I tre campi sono opzionali: un messaggio senza campi (eventi storici, canali non adeguati) si comporta esattamente come oggi (R-05) |
 | RV-03 | I valori escono su `preadvising.enrichment`, nell'evento dell'event store e su Mongo **identici a come sono entrati**: niente `trim`, maiuscole o troncamenti (R-04). Ogni `zonos_product_id` resta sul suo articolo |
 | RV-04 | `zonos_declaration_id` non ha regole in fase 1: qualunque valore (tipicamente assente o `null`) passa così com'è |
+| RV-05 | [DECISO, Diego 2026-11-24] Su MongoDB (`dichiarato_events`, anche `dichiarato_ldv_history` se contiene la spedizione) le chiavi sono `zonos_account_key`, `zonos_declaration_id` (testata di `spedizione[]`) e `zonos_product_id` (articolo): i nomi del tracciato, non camelCase |
 
 ### 5.2 Riconoscimento delle spedizioni soggette [DECISO, AS-02, Diego 2026-11-23]
 
@@ -486,7 +499,7 @@ Nessun secret nuovo. Le regole DRL e la configmap **non cambiano** (3.4).
 | AC-01 | Dato il messaggio 6.1 con flag acceso, quando il validatore lo lavora, allora su `preadvising.enrichment` esce un messaggio con `zonos_account_key`, `zonos_declaration_id` e ogni `zonos_product_id` identici e nelle stesse posizioni dell'ingresso |
 | AC-02 | Dato 6.1 con flag **spento**, l'uscita è la stessa di AC-01 (la propagazione non dipende dal flag) |
 | AC-03 | Dato un messaggio senza campi nuovi (6.5), l'uscita è uguale a quella di oggi tranne i campi nuovi a `null`, e nessuna regola esistente cambia esito |
-| AC-04 | L'evento `PREAD_EMESSO` su `preadvising.evensource` e il documento in `dichiarato_events` contengono i tre campi |
+| AC-04 | L'evento `PREAD_EMESSO` su `preadvising.evensource` e il documento in `dichiarato_events` contengono i tre campi, su Mongo con le chiavi `zonos_account_key`, `zonos_declaration_id`, `zonos_product_id` (nessuna chiave camelCase) |
 | AC-05 | Dato UC-03, il preavviso è scartato con `errori` = `{"1320": "zonos_account_key: Campo obbligatorio mancante"}` ed evento `ST_R0006`; nulla esce su `preadvising.enrichment` |
 | AC-06 | Dato UC-04 con 51 e con 53 caratteri, l'errore è `1321`; con 52 caratteri, spazi compresi, nessun errore |
 | AC-07 | Dato UC-05, l'errore è `1322` con la descrizione `zonos_product_id: Campo obbligatorio mancante (collo <n> articolo <posizione>)` dell'articolo mancante |
@@ -503,7 +516,7 @@ Nessun secret nuovo. Le regole DRL e la configmap **non cambiano** (3.4).
 | AC-18 | Una spedizione non soggetta con `zonos_product_id` di 300 caratteri passa senza errori: nessuna annotazione Bean Validation sui campi nuovi |
 | AC-19 | Nei log (anche a DEBUG e nel WARN di `salvaErroreRegole`) non compare il valore di `zonos_account_key`; nei log a INFO e WARN non compare `zonos_product_id` |
 | AC-20 | La metrica `business_compliance_usa_verifiche_total` si incrementa con `esito` `ok`, `ko` e `non_soggetta` nei casi attesi e non si incrementa con il flag spento |
-| AC-21 | Tutti i test esistenti (`regoledrools/*`, `handler/*`) restano verdi |
+| AC-21 | Tutti i test esistenti (`regoledrools/*`, `handler/*`) restano verdi. Eccezione nota: i 153 test `regoledrools/Invio*Test` falliscono già su `develop` prima della 146073 (verificato il 24-11): sono preesistenti e si sistemano a parte; la 146073 non deve aggiungerne altri |
 
 ## 11. Casi di test
 
@@ -532,6 +545,7 @@ mano su `preadvising.pre-enrichment` (AS-05). Tutti i dati sono inventati.
 | TC-17 | unit (MeterRegistry semplice) | ok, ko, non soggetta, flag spento | contatori attesi | AC-20 |
 | TC-18 | regressione | suite esistente | verde | AC-21 |
 | TC-19 | integrato svil | 4 messaggi a mano su `preadvising.pre-enrichment`: 6.1 su `IF`, 6.2 su `PDB_INVIOFILE`, 6.4, 6.5 | uscite su `preadvising.enrichment` ed eventi su `preadvising.evensource` come in AC-01, AC-05, AC-11, AC-03 | AC-01…AC-05 |
+| TC-20 | unit | `MongoConverter` (`mongoTemplate.getConverter().write`) su un `PreadvisingEvents` con i tre campi valorizzati | il `Document` ha le chiavi `zonos_account_key`, `zonos_declaration_id`, `zonos_product_id`; nessuna chiave `zonosAccountKey`, `zonosDeclarationId`, `zonosProductId` | AC-04 |
 
 Per il canale `IF` il messaggio deve avere un cliente e una postazione di test configurati in
 `ce-vendite`, altrimenti si ferma all'errore 143 prima delle regole logic. Lo scarto di compliance
@@ -569,6 +583,7 @@ Nuove (Mary, 16-11):
 | VAL-AS-17 | Codici `1320`…`1323`, liberi nella catena, dopo l'ultimo codice PDB (`1311`) | **[DECISO, Diego 23-11]** codici e descrizioni di 5.4 | chiusa |
 | VAL-AS-18 | In uscita i campi assenti diventano `null` espliciti, perché l'`ObjectMapper` serializza i null come per tutti gli altri campi | nessun `@JsonInclude(NON_NULL)` | Diego (impatto a valle nullo: gli altri DTO li accettano come opzionali) |
 | VAL-AS-19 | Flag spento di default in tutti gli ambienti finché il builder non manda i campi; in svil si accende solo per i test integrati | come 8 | Diego |
+| VAL-AS-20 | Nomi delle chiavi su MongoDB per i campi nuovi | **[DECISO, Diego 24-11]** `zonos_account_key`, `zonos_declaration_id`, `zonos_product_id` (RV-05): con campi Java camelCase serve `@Field` oltre a `@JsonProperty` | chiusa |
 
 Domande aperte:
 

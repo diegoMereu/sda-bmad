@@ -1,6 +1,6 @@
 # `producer-sew-sped` — Documento funzionale per lo sviluppo (int. 09, fase 1)
 
-**Iniziativa**: 146073 — Compliance USA Entry Type 13 · **Fase**: 1 · **Versione**: 0.2 · **Data**: 2026-11-24
+**Iniziativa**: 146073 — Compliance USA Entry Type 13 · **Fase**: 1 · **Versione**: 0.3 · **Data**: 2026-11-24
 **Autrice**: Mary (analyst) · **Destinatario**: sviluppatore del batch
 **Repository**: `gitlab.alm.poste.it/esiti/sda-ldv-preadv-consumer`, modulo `producer-sew-sped` (lo stesso repo di `consumer-sew_sped`)
 **Branch**: `146073_compliance_usa_fase1` da **`origin/dev202508_preadvising`**. Il repo non ha
@@ -22,6 +22,11 @@ Etichette: **[FATTO]**, **[DECISO]**, **[ASSUNTO]** (ID e default, sezione 10).
 > **Aggiornamento 0.2 (2026-11-24).** Nomi dei campi `zonos_account_key`, `zonos_product_id`,
 > `zonos_declaration_id` (Diego, 23-11); colonne SEW con gli stessi nomi (Diego, 24-11); branch
 > `develop` (Diego, 24-11).
+>
+> **Aggiornamento 0.3 (2026-11-24).** [DECISO, Diego 24-11] Le colonne `zonos_*` lato SDA stanno solo
+> su `sew_spedizioni_work`, non su `sew_spedizioni_work_2` (PRD-03). Confermato che il producer toglie
+> gli spazi di riempimento a destra dei campi `char` e che un valore vuoto o di soli spazi vale come
+> campo assente (PRD-02).
 
 ---
 
@@ -81,7 +86,7 @@ flusso continuo. Il **topic** sta nelle properties (`kafka.topic`). Ci si aspett
 |---|---|
 | `dto/SpedizioneDTO.java` | `String zonos_account_key`, `String zonos_declaration_id`, con getter e setter |
 | `dto/ArticoloDTO.java` | `String zonos_product_id`, con getter e setter, per simmetria del contratto. In fase 1 resta `null` (PRD-04) |
-| `dao/QueriesManagerDao.mapSpedizione` | lettura delle colonne `zonos_account_key` e `zonos_declaration_id` se presenti nel ResultSet, con una variante di `setTextIfColumnPresent` che lascia **`null`** il valore `NULL`, vuoto o di soli spazi (non `""`), così il campo resta fuori dal JSON (R-05). Le colonne sono `char(52)` e `char(13)` con default `''` [DECISO, Diego 23-11]: Informix le completa con spazi, quindi si tolgono solo gli spazi finali di riempimento, nessun'altra trasformazione (PRD-02) |
+| `dao/QueriesManagerDao.mapSpedizione` | lettura delle colonne `zonos_account_key` e `zonos_declaration_id` se presenti nel ResultSet, con una variante di `setTextIfColumnPresent` che lascia **`null`** il valore `NULL`, vuoto o di soli spazi (non `""`), così il campo resta fuori dal JSON (R-05). Le colonne sono `char(52)` e `char(13)` con default `''` [DECISO, Diego 23-11]: Informix le completa con spazi, quindi si tolgono solo gli spazi finali di riempimento, nessun'altra trasformazione [DECISO, Diego 24-11] (PRD-02) |
 | `spedCols` di `mapSpedizione` | aggiungere `zonos_account_key` e `zonos_declaration_id` all'elenco delle colonne che "attivano" la spedizione (solo per completezza) |
 | properties `select.query.*` (fuori repo) | se la SELECT elenca le colonne, aggiungere `zonos_account_key, zonos_declaration_id`; con `SELECT *` non serve (PRD-06) |
 | `mapCollo` / `mapArticolo` | **nessuna modifica** in fase 1 (PRD-04) |
@@ -90,9 +95,9 @@ flusso continuo. Il **topic** sta nelle properties (`kafka.topic`). Ci si aspett
 
 | Tabella sorgente.colonna | Campo JSON (AS-01) | Regola |
 |---|---|---|
-| `sew_spedizioni_work.zonos_account_key`, `sew_spedizioni_work_2.zonos_account_key` (DDL int. 07) | `spedizione[0].zonos_account_key` | se la colonna c'è ed è valorizzata (non `NULL`, non vuota, non di soli spazi: il default è `''`); altrimenti il campo non si invia |
-| `….zonos_declaration_id` | `spedizione[0].zonos_declaration_id` | idem; in fase 1 è sempre vuoto, quindi il campo non c'è |
-| `cli_dati_stampa_tf(_2)`, `sew_sped_pre_adv_online_out_tot` | — | non hanno le colonne: nessun campo (PRD-03) |
+| `sew_spedizioni_work.zonos_account_key` (DDL int. 07, solo questa tabella) | `spedizione[0].zonos_account_key` | se la colonna c'è ed è valorizzata (non `NULL`, non vuota, non di soli spazi: il default è `''`); altrimenti il campo non si invia |
+| `sew_spedizioni_work.zonos_declaration_id` | `spedizione[0].zonos_declaration_id` | idem; in fase 1 è sempre vuoto, quindi il campo non c'è |
+| `sew_spedizioni_work_2`, `cli_dati_stampa_tf(_2)`, `sew_sped_pre_adv_online_out_tot` | — | non hanno le colonne: nessun campo (PRD-03) |
 | (nessuna sorgente) | `spedizione[0].collo[0].articolo[].zonos_product_id` | non inviato (PRD-04) |
 
 ## 6. Esempio [dati inventati]
@@ -117,7 +122,7 @@ La stessa riga con `zonos_account_key` al default `''`: il JSON è identico a qu
 
 ## 7. Configurazione e prerequisiti
 
-- **DDL dell'int. 07 prima del rilascio** ([ddl-sew-146073.md](ddl-sew-146073.md), script 1 e 2): sono
+- **DDL dell'int. 07 prima del rilascio** ([ddl-sew-146073.md](ddl-sew-146073.md), script 1): sono
   le stesse colonne che legge il producer. Con `SELECT *` il codice nuovo funziona anche senza DDL,
   perché la colonna è assente e il campo non si invia. Con una SELECT che elenca le colonne, invece, la
   query va aggiornata solo dopo la DDL.
@@ -134,7 +139,7 @@ La stessa riga con `zonos_account_key` al default `''`: il JSON è identico a qu
 | AC-02 | Data una riga con `zonos_account_key` `NULL`, `''` (default) o di soli spazi, il messaggio non contiene `zonos_account_key` (né `""` né `null`) |
 | AC-03 | Data una SELECT senza le colonne nuove, il messaggio è identico a quello di oggi |
 | AC-04 | Data una riga con `zonos_declaration_id = 'DECL-TEST-0003'`, il messaggio contiene `zonos_declaration_id` |
-| AC-05 | Le righe di `cli_dati_stampa_tf` (canale `IF`) e di `sew_sped_pre_adv_online_out_tot` producono messaggi identici a oggi |
+| AC-05 | Le righe di `sew_spedizioni_work_2`, di `cli_dati_stampa_tf` (canale `IF`) e di `sew_sped_pre_adv_online_out_tot` producono messaggi identici a oggi |
 | AC-06 | Canali, watermark, `flag_trasmesso_sew` e header sono invariati |
 | AC-07 | Il messaggio con `zonos_account_key` attraversa la catena in svil e arriva in `sew_spedizioni_work` con lo stesso valore (insieme a int. 07) |
 | AC-08 | Nessun log riporta il valore di `zonos_account_key` |
@@ -151,7 +156,7 @@ invio reale.
 | TC-02 | `zonos_account_key` `NULL`; `''` (default della colonna) | campo assente | AC-02 |
 | TC-03 | properties con una SELECT a colonne esplicite, senza le nuove | JSON uguale a prima | AC-03 |
 | TC-04 | `zonos_declaration_id` valorizzato a mano | campo presente | AC-04 |
-| TC-05 | sorgente `CLI_DATI_STAMPA_TF` | regressione | AC-05 |
+| TC-05 | sorgente `sew_spedizioni_work_2`; sorgente `CLI_DATI_STAMPA_TF` | regressione | AC-05 |
 | TC-06 | due esecuzioni consecutive | watermark e flag avanzano come oggi | AC-06 |
 | TC-07 | invio reale e catena svil fino alla SEW | valore conservato | AC-07 |
 
@@ -167,8 +172,8 @@ Nuove (Mary, 16-11):
 | ID | Assunzione o domanda | Default adottato | Da confermare con |
 |---|---|---|---|
 | PRD-01 | **Il batch dell'int. 09 è `producer-sew-sped`**, con certezza alta (sezione 1) | si sviluppa qui | Poste / Diego |
-| PRD-02 | I campi si leggono dalle colonne omonime della riga sorgente (`zonos_account_key`, `zonos_declaration_id`) e si inviano solo se valorizzati | come detto | — |
-| PRD-03 | Tabelle sorgente coperte: solo `sew_spedizioni_work` e `_2`, che hanno le colonne grazie alla DDL dell'int. 07. `cli_dati_stampa_tf(_2)` (canale `IF`) e `sew_sped_pre_adv_online_out_tot` no | nessuna DDL su quelle tabelle | Poste |
+| PRD-02 | I campi si leggono dalle colonne omonime della riga sorgente (`zonos_account_key`, `zonos_declaration_id`) e si inviano solo se valorizzati. Si tolgono gli spazi di riempimento a destra; un valore vuoto o di soli spazi vale come campo assente | **[DECISO, Diego 24-11]** come detto | chiusa |
+| PRD-03 | Tabelle sorgente coperte: **solo `sew_spedizioni_work`**, che ha le colonne grazie alla DDL dell'int. 07. `sew_spedizioni_work_2`, `cli_dati_stampa_tf(_2)` (canale `IF`) e `sew_sped_pre_adv_online_out_tot` no | **[DECISO, Diego 24-11]** per `sew_spedizioni_work_2`: nessuna DDL. Per `cli_dati_stampa_tf(_2)` nessuna DDL, da confermare | Poste (solo `cli_dati_stampa_tf`) |
 | PRD-04 | **Product ID senza sorgente**: le tabelle lette hanno una riga per LDV e l'articolo inviato è un segnaposto. Il producer non può inviare un `zonos_product_id` per articolo finché i portali non scrivono gli articoli da qualche parte (vedi SEW-02, variante B) | non inviato | Poste |
 | PRD-05 | **Chi scrive `zonos_account_key` nelle tabelle sorgente**: i portali e il web service, fuori perimetro. Senza di loro l'int. 09 trasporta un campo sempre vuoto | da chiedere a Poste chi adegua i portali | Poste |
 | PRD-06 | **SELECT nelle properties**: non sono nel repo. Se elencano le colonne vanno aggiornate | aggiornamento a cura di chi gestisce le properties, dopo la DDL | Diego |

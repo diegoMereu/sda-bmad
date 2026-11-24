@@ -6,7 +6,8 @@
 > Regola di progetto: un documento funzionale per microservizio.
 >
 > Aggiornato il 2026-11-24: nomi dei campi `zonos_account_key`, `zonos_product_id`,
-> `zonos_declaration_id` e colonne SEW `zonos_*` (decisioni di Diego del 23 e 24-11), branch del 24-11.
+> `zonos_declaration_id` e colonne SEW `zonos_*` (decisioni di Diego del 23 e 24-11), branch del 24-11,
+> colonne SDA solo su `sew_spedizioni_work` (Diego, 24-11).
 
 ---
 
@@ -31,7 +32,9 @@ sul branch dedicato `146073_compliance_usa_fase1`, da `origin/dev202508_preadvis
 
 **Colonne SEW (decisione di Diego del 2026-11-23)**: `zonos_account_key char(52) default ''`,
 `zonos_declaration_id char(13) default ''` sulla tabella della spedizione, `zonos_product_id char(255) default ''`
-sulla tabella articoli. Le colonne entrano nella INSERT (e nell'eventuale UPDATE) **solo se il campo
+sulla tabella articoli. **Lato SDA (decisione di Diego del 2026-11-24)** le due colonne di testata
+stanno **solo su `sew_spedizioni_work`**: non su `sew_spedizioni_work_2` né su `sew_spedizioni`, dove
+l'insert resta quello di oggi anche se i campi arrivano valorizzati. Le colonne entrano nella INSERT (e nell'eventuale UPDATE) **solo se il campo
 arriva valorizzato**: senza i campi lo statement resta identico a quello di oggi, così il consumer
 funziona anche prima delle DDL.
 
@@ -59,7 +62,8 @@ di test, assunzioni e domande aperte (prefisso SEW-).
 Approfondisci:
 
 1. quali tabelle scrive davvero l'insert (`kafka.tabella`, work, `_2`, `sew_spedizioni`, clienti BS,
-   `cli_dati_stampa_tf_2` per i non autoproduttori) e quali si toccano;
+   `cli_dati_stampa_tf_2` per i non autoproduttori) e come si limita la modifica alla sola
+   `sew_spedizioni_work` (clienti BS compresi);
 2. dove va il `zonos_product_id`, visto che il consumer non scrive nessuna tabella articoli;
 3. `null` contro `" "` (`setParam` con `campoVuoto`): i campi nuovi non si trasformano (R-04, R-05);
 4. la posizione dei parametri nuovi in un insert posizionale con 102 parametri;

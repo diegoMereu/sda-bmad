@@ -92,6 +92,10 @@ Codice di `origin/develop` @ `94bb901` [FATTO, letto il 16-11].
   stesso ordine. Gli array restano array: ogni `zonos_product_id` resta nell'elemento di `articolo[]` in
   cui è arrivato, e ogni `zonos_account_key` nel suo elemento di `spedizione[]` (cardinalità per articolo
   e per spedizione, R-04).
+- Le chiavi sono quelle del JSON dell'evento, cioè i nomi del tracciato `zonos_account_key`,
+  `zonos_declaration_id`, `zonos_product_id`: gli stessi che, per decisione di Diego del 24-11,
+  validatore e orchestratore usano su `dichiarato_events`. L'event store non legge
+  `dichiarato_events` (3.3), quindi la decisione non richiede modifiche qui.
 - I valori stringa non vengono toccati: niente `trim`, maiuscole, troncamenti (R-04). Lunghezze di
   52 e 255 caratteri non hanno limiti né in Jackson né in Mongo.
 - `zonos_declaration_id: null` si salva come `null`; un campo assente resta assente. Per la fase 1 le due

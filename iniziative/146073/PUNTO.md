@@ -5,10 +5,10 @@
 
 ## In una riga
 La fase 1 (Account Key per spedizione, Product ID per articolo, Declaration ID predisposto) ha
-nomi, regola, errori e colonne SEW decisi da Diego. Lo sviluppo del primo passo è in corso, ancora
-senza commit pubblicati:
-- validatore, orchestratore, smistatore e bff su `develop`;
-- `sda-ldv-preadv-consumer` (`consumer-sew_sped`, `producer-sew-sped`) sul branch dedicato.
+nomi, regola, errori e colonne SEW decisi da Diego. Lo sviluppo del primo passo è in corso:
+- validatore su `develop` (`090d037`); orchestratore, smistatore e bff su `develop`, ripartono oggi;
+- `sda-ldv-preadv-consumer` (`consumer-sew_sped`, `producer-sew-sped`) sul branch dedicato (`990503a`,
+  pubblicato), da correggere per scrivere solo su `sew_spedizioni_work` e da compilare in Eclipse.
 
 Adapter e consumer Poste sono rimandati al punto 2 della fase 1. Da Poste servono ancora l'elenco
 dei prodotti CRONO INTERNAZIONALE e i nomi dei campi nelle sorgenti.
@@ -23,13 +23,18 @@ dei prodotti CRONO INTERNAZIONALE e i nomi dei campi nelle sorgenti.
 - 2026-11-24 — Analisi 0.3 (contratto AS-01…AS-07 aggiornato, primo passo e punto 2, punti aperti), Mary.
 - 2026-11-24 — Funzionali e prompt alla versione 0.2 con le decisioni del 23 e 24-11, Mary. Adapter e `consumer-sew-sped-poste` hanno in testa la nota "rimandato al punto 2 della fase 1".
 - 2026-11-24 — DDL 0.2 (`ddl-sew-146073.md`) con le colonne `zonos_*` `char` con default `''`, Mary.
+- 2026-11-24 — Validatore su `develop`, commit `090d037`: campi `zonos_*`, regola ed errori `1320`…`1323`, verifica spenta di default. I 153 test `regoledrools/Invio*Test` falliscono già su `develop`: sono preesistenti, da sistemare a parte.
+- 2026-11-24 — `sda-ldv-preadv-consumer` sul branch `146073_compliance_usa_fase1`, commit `990503a`, pubblicato. Correzione "solo `sew_spedizioni_work`" in arrivo. Mai compilato con le librerie reali: serve un build in Eclipse con i jar di `L:` prima del rilascio.
+- 2026-11-24 — Documenti aggiornati con le decisioni del giorno (Mary): analisi 0.4, DDL 0.3 (script 2 su `sew_spedizioni_work_2` eliminato), funzionali 0.3 di `consumer-sew_sped`, `producer-sew-sped`, validatore e orchestratore; note su bff ed event store; prompt.
 
 ## Prossimi passi
-- Completare lo sviluppo del primo passo: validatore, orchestratore, smistatore e bff su `develop` — Amelia — in corso
-- Completare lo sviluppo di `consumer-sew_sped` e `producer-sew-sped` sul branch `146073_compliance_usa_fase1` — Amelia — in corso
-- Pubblicare i commit; GitLab non rispondeva il 23-11 — coordinatore — appena GitLab risponde
+- Completare orchestratore, smistatore e bff su `develop`, con le chiavi `zonos_*` su Mongo — Amelia — da oggi
+- Validatore: aggiungere `@Field("zonos_…")` ai campi camelCase di `090d037`, così su Mongo le chiavi sono `zonos_*` — Amelia — subito
+- `consumer-sew_sped`: colonne nuove solo su `sew_spedizioni_work` (non `_2` né `sew_spedizioni`) — Amelia — in arrivo
+- Build in Eclipse di `consumer-sew_sped` e `producer-sew-sped` con i jar di `L:` — Diego — prima del rilascio
+- Sistemare a parte i 153 test `regoledrools/Invio*Test` già rotti su `develop` del validatore — da assegnare — fuori dalla 146073
 - Chiedere a Poste la conferma dell'elenco CRONO INTERNAZIONALE (PA-12) — Diego — prossimo passo
-- Richiedere al DBA Informix gli script 1 e 2 delle DDL in svil — Diego / Winston — prima che il builder mandi i campi
+- Richiedere al DBA Informix lo script 1 delle DDL in svil, solo `sew_spedizioni_work` — Diego / Winston — prima che il builder mandi i campi
 - Test integrati in svil con messaggi costruiti a mano su `preadvising.pre-enrichment`, con il flag `compliance-usa.abilitata` acceso solo per il test — test manager — dopo lo sviluppo
 - Punto 2 della fase 1: adapter (int. 05) e `consumer-sew_sped_poste` (int. 08) — Amelia — quando arrivano i nomi dei campi sorgente e i dettagli lato Poste (PA-13)
 
@@ -39,6 +44,7 @@ dei prodotti CRONO INTERNAZIONALE e i nomi dei campi nelle sorgenti.
 - 🟡 Lato SDA il Product ID non ha una tabella articoli (né consumer né producer): va deciso con Poste.
 - 🟡 L'Account Key dei portali arriva solo se i portali, fuori perimetro, la scrivono nelle SEW.
 - 🟡 Due retry (`retry-eurodis`, `retry-pread-completo`) perderebbero i campi.
+- 🟡 `sda-ldv-preadv-consumer` non è mai stato compilato con le librerie reali (`sdaKafkaLibrary`, driver Informix): un errore di build si vedrebbe solo in Eclipse.
 - 🟡 Le DDL vanno eseguite prima che il builder mandi i campi. Prima di allora i consumer funzionano, perché le colonne entrano nello statement solo se i campi arrivano valorizzati.
 
 ## Serve dal cliente
@@ -67,3 +73,7 @@ dei prodotti CRONO INTERNAZIONALE e i nomi dei campi nelle sorgenti.
 - 2026-11-24 — Nomi `zonos_*` sia nel tracciato sia nelle colonne SEW: niente prefisso `z_` (Diego).
 - 2026-11-24 — Branch: `develop` nei repo dei servizi preadvising (validatore, orchestratore, smistatore, bff, adapter, `poste-ldv-preadv-consumer`). Solo `sda-ldv-preadv-consumer` resta sul branch dedicato `146073_compliance_usa_fase1`, da `origin/dev202508_preadvising`. Sostituisce la decisione del 16-11 (Diego).
 - 2026-11-24 — Adapter (int. 05) e `consumer-sew_sped_poste` (int. 08) rimandati al punto 2 della fase 1, perché mancano i dettagli (Diego).
+- 2026-11-24 — `consumer-sew_sped` scrive `zonos_account_key` e `zonos_declaration_id` solo su `sew_spedizioni_work`: non su `sew_spedizioni_work_2` né su `sew_spedizioni`. DDL SDA solo sulla work (SEW-01 chiusa) (Diego).
+- 2026-11-24 — Il producer toglie gli spazi di riempimento a destra dei campi `char`: un valore vuoto o di soli spazi vale come campo assente (PRD-02) (Diego).
+- 2026-11-24 — Su MongoDB validatore e orchestratore salvano i campi con i nomi del tracciato `zonos_account_key`, `zonos_declaration_id`, `zonos_product_id`, non camelCase (Diego).
+- 2026-11-24 — Orchestratore, smistatore e bff restano nel primo passo su `develop`; lo sviluppo riparte oggi (Diego).

@@ -1,6 +1,6 @@
 # `ce-dichiarato-orchestratore` — Documento funzionale per lo sviluppo (fase 1)
 
-**Iniziativa**: 146073 — Compliance USA Entry Type 13, nuovi campi sul preadvising · **Fase**: 1 · **Versione**: 0.2 · **Data**: 2026-11-24
+**Iniziativa**: 146073 — Compliance USA Entry Type 13, nuovi campi sul preadvising · **Fase**: 1 · **Versione**: 0.3 · **Data**: 2026-11-24
 **Autrice**: Mary (analyst) · **Destinataria**: sviluppatrice back-end della catena preadvising
 **Repository**: `gitlab.alm.poste.it/CORRIERE-ESPRESSO/PREADVISING/ce-dichiarato-orchestratore` (locale `gitposte/SDA/preadvising/ce-dichiarato-orchestratore`)
 **Branch**: `develop` [DECISO, Diego 2026-11-24: sostituisce il branch dedicato `146073_compliance_usa_fase1` deciso il 16-11]. Mai sviluppo su `master` né su branch di altre iniziative
@@ -17,6 +17,11 @@ Etichette usate nel documento:
 
 > **Il contratto della fase 1 (AS-01…AS-07 di `analisi.md`) non si cambia.** Questo documento lo
 > dettaglia per l'orchestratore. Buchi e incoerenze trovati sono fra le assunzioni ORC-xx.
+>
+> **Versione 0.3 (Diego, 2026-11-24).** Su MongoDB (`enrichment_events`, `dichiarato_events`) i campi si
+> salvano con i nomi del tracciato `zonos_account_key`, `zonos_declaration_id`, `zonos_product_id`, non
+> camelCase (3.3, RO-07, ORC-11). L'orchestratore resta nel primo passo, su `develop`: lo sviluppo
+> riparte il 24-11.
 
 ---
 
@@ -86,6 +91,7 @@ in `ArticoloDTO` perché passino in tutti i punti.
 |---|---|
 | `dto/SpedizioneDTO.java` | due campi `String` nuovi: `zonos_account_key`, `zonos_declaration_id` (nomi Java snake_case come gli altri campi della classe). Copre P1-P8 per la testata |
 | `dto/ArticoloDTO.java` | campo `String` nuovo: `zonos_product_id`. Copre P1-P8 per l'articolo |
+| nomi su Mongo | [DECISO, Diego 24-11] le chiavi dei documenti Mongo sono `zonos_account_key`, `zonos_declaration_id`, `zonos_product_id`. Spring Data usa il nome del campo Java (non `@JsonProperty`): con i nomi Java snake_case qui sopra le chiavi tornano da sole. Se si preferissero nomi Java camelCase, servono **sia** `@JsonProperty("zonos_…")` **sia** `@Field("zonos_…")` (RO-07) |
 | `OrchestratoreDTO`, `OrchestratoreOutputDTO`, `EnrichmentEvents`, `PreadvisingEvents` | **nessuna modifica**: contengono `List<SpedizioneDTO> spedizione` (AS-01: i campi stanno nella spedizione, non nella radice) |
 | `OrchestratoreMapper` | nessuna modifica: copia la lista `spedizione` per riferimento in `toMongoEntity` e `toOutputDTOEnrichemtEvents`. Verificarlo coi test (TC-02, TC-06) |
 | `OrchestratoreMongoService.merge` e sottometodi | **nessuna modifica di codice** (sezione 5.2). Si aggiungono solo test |
@@ -274,6 +280,7 @@ Ripartenze interne all'orchestratore:
 | RO-04 | Nessuna lavorazione della fase 1 li sovrascrive (policy 5.3, ORC-02) |
 | RO-05 | Preavvisi senza i campi (non USA, eventi storici, documenti Mongo vecchi) si lavorano come oggi e l'uscita non ha le chiavi nuove |
 | RO-06 | Nessun log del valore dei campi, nessuna metrica o attributo di span con i valori (ORC-09) |
+| RO-07 | [DECISO, Diego 24-11] Su MongoDB (`enrichment_events`, `dichiarato_events`) i campi stanno con le chiavi del tracciato `zonos_account_key`, `zonos_declaration_id` (testata di `spedizione[]`) e `zonos_product_id` (articolo), non camelCase: sono le stesse chiavi che scrive il validatore e che legge il bff |
 
 ## 7. Configurazione
 
@@ -310,6 +317,7 @@ Nessuna variabile d'ambiente, nessuna modifica Helm.
 | AC-12 | Dato un `zonos_account_key` di lunghezza diversa da 52 o un `zonos_product_id` di 300 caratteri, l'orchestratore li propaga identici, senza scarti né WARN di validazione |
 | AC-13 | Dato `zonos_declaration_id: null` in ingresso, nessun punto lo scrive come stringa `"null"` |
 | AC-14 | I test esistenti (fra cui `OrchestratoreMongoServiceMergeTest`, `OrchestratoreMapperTest`, `NuoviCampiPdwTest`) restano verdi |
+| AC-15 | Dato AC-04, i documenti di `enrichment_events` e `dichiarato_events` hanno le chiavi `zonos_account_key`, `zonos_declaration_id`, `zonos_product_id` e nessuna chiave camelCase (`zonosAccountKey`…) |
 
 ## 10. Casi di test
 
@@ -330,6 +338,7 @@ integrato in svil con un messaggio costruito a mano su `preadvising.pre-enrichme
 | TC-10 | unit | lunghezze fuori regola, `zonos_declaration_id` `null` | propagazione identica, nessuna violazione | AC-12, AC-13 |
 | TC-11 | regressione | suite esistente | verde | AC-14 |
 | TC-12 | integrato svil | preavviso USA con 2 articoli su un canale PDB e su un canale SDA | campi su `preadvising.completed` e su `dichiarato_events` | AC-04, AC-05 |
+| TC-13 | unit | `MongoConverter.write` su `EnrichmentEvents` e `PreadvisingEvents` con i tre campi | `Document` con le chiavi `zonos_*`, nessuna chiave camelCase | AC-15 |
 
 Caso da annotare per la caratterizzazione (ORC-05): ritorno con gli articoli in ordine diverso. Oggi i
 campi degli articoli si mescolano per indice; il test documenta il comportamento, non lo cambia.
@@ -353,6 +362,7 @@ Nuove (Mary, 16-11):
 | ORC-08 | **Retry `eurodis` e `pread-completo`** leggono `dichiarato_events` con un `SpedizioneDTO` proprio: ripubblicherebbero senza i campi. Sono strumenti locali, non servizi in catena | da aggiornare solo se si usano su preavvisi USA | Diego |
 | ORC-09 | Valori dei campi mai nei log, metriche, span: trattati come identificativi del cliente | come detto | — |
 | ORC-10 | Il `git fetch` del 16-11 è fallito: i riferimenti sono a `origin/develop` @ `14b0dd6` | ricontrollare dopo il fetch | sviluppatrice |
+| ORC-11 | Nomi delle chiavi su MongoDB per i campi nuovi | **[DECISO, Diego 24-11]** `zonos_account_key`, `zonos_declaration_id`, `zonos_product_id` (RO-07) | chiusa |
 
 ## 12. Riferimenti
 

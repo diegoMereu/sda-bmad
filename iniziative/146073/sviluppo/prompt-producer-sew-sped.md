@@ -33,7 +33,9 @@ sul branch dedicato `146073_compliance_usa_fase1`, da `origin/dev202508_preadvis
 **Colonne SEW (decisione di Diego del 2026-11-23)**: `zonos_account_key char(52) default ''`,
 `zonos_declaration_id char(13) default ''` sulla tabella della spedizione, `zonos_product_id char(255) default ''`
 sulla tabella articoli. Il default è la stringa vuota: un valore vuoto o di soli spazi (`char`) vale
-come campo assente e non si invia.
+come campo assente e non si invia; degli altri si tolgono solo gli spazi di riempimento a destra
+(confermato da Diego il 2026-11-24). Lato SDA le colonne stanno **solo su `sew_spedizioni_work`**, non
+su `sew_spedizioni_work_2` (Diego, 2026-11-24).
 
 # Prima: individua il producer
 

@@ -1,6 +1,6 @@
 # `consumer-sew_sped` — Documento funzionale per lo sviluppo (int. 07, fase 1)
 
-**Iniziativa**: 146073 — Compliance USA Entry Type 13 · **Fase**: 1 · **Versione**: 0.2 · **Data**: 2026-11-24
+**Iniziativa**: 146073 — Compliance USA Entry Type 13 · **Fase**: 1 · **Versione**: 0.3 · **Data**: 2026-11-24
 **Autrice**: Mary (analyst), DDL con Winston · **Destinatario**: sviluppatore del consumer
 **Repository**: `gitlab.alm.poste.it/esiti/sda-ldv-preadv-consumer`, modulo `consumer-sew_sped`
 **Branch**: `146073_compliance_usa_fase1` da **`origin/dev202508_preadvising`** [DECISO, Diego 2026-11-24: è l'unico
@@ -25,6 +25,10 @@ Etichette:
 > **Aggiornamento 0.2 (2026-11-24).** Nomi dei campi `zonos_account_key`, `zonos_product_id`,
 > `zonos_declaration_id` (Diego, 23-11); colonne SEW con gli stessi nomi (Diego, 24-11); branch
 > `develop` (Diego, 24-11).
+>
+> **Aggiornamento 0.3 (2026-11-24).** [DECISO, Diego 24-11] Le colonne `zonos_account_key` e
+> `zonos_declaration_id` si scrivono **solo su `sew_spedizioni_work`**: non su `sew_spedizioni_work_2`
+> né su `sew_spedizioni` (SEW-01 chiusa). Cambiano sezioni 4, 5, 7, 8, 9 e 10.
 >
 > Il contratto della fase 1 (AS-01…AS-07 di `analisi.md`) non si cambia. Dove il codice non torna con
 > il contratto, la differenza è segnata fra le assunzioni SEW-xx.
@@ -87,8 +91,8 @@ Nel foglio Impatti l'int. 07 non ha la voce Database. La DDL è comunque necessa
 |---|---|
 | `dto/SpedizioneDTO.java` | nuovi campi `String zonos_account_key`, `String zonos_declaration_id`, con getter e setter nello stile del file (snake_case, nessuna annotazione) |
 | `dto/ArticoloColloDTO.java` | nuovo campo `String zonos_product_id`, con getter e setter. Serve per la variante B (SEW-02) e per non perdere il campo nel DTO |
-| `constants/AppConstants.java` | `queryInsertSewSpedizioniWork` e `queryInsertSewSpedizioniWork2` **restano come sono**. `queryInsertSewSpedizioni` **non cambia** (SEW-01) |
-| `dao/QueriesManagerDao.insertSewSpedizioni` | [DECISO, Diego 23-11] solo per le tabelle work (blocco `if (!query.equals("sew_spedizioni"))`): se `zonos_account_key` è **valorizzato** si aggiungono in coda la colonna `zonos_account_key` e un `?` (parametro 103); se è valorizzato `zonos_declaration_id`, la colonna `zonos_declaration_id` e un `?` (parametro successivo). "Valorizzato" = non `null` e non `""`. Senza i campi lo statement è **identico a quello di oggi** e le colonne prendono il default `''`: il consumer funziona anche prima della DDL. I valori si passano così come sono (`Types.CHAR` o `VARCHAR`), senza trim |
+| `constants/AppConstants.java` | `queryInsertSewSpedizioniWork`, `queryInsertSewSpedizioniWork2` e `queryInsertSewSpedizioni` **restano come sono** (SEW-01) |
+| `dao/QueriesManagerDao.insertSewSpedizioni` | [DECISO, Diego 23 e 24-11] **solo quando la query scelta è `queryInsertSewSpedizioniWork`**, cioè quando la tabella effettiva è `sew_spedizioni_work` (anche per i clienti BS e per il ramo `gestisciAutoproduttore`, che finiscono lì qualunque sia `kafka.tabella`). Il controllo va fatto sulla query risolta, non sul blocco `if (!query.equals("sew_spedizioni"))`, che vale anche per `sew_spedizioni_work_2`. Con `sew_spedizioni_work_2` e `sew_spedizioni` lo statement resta quello di oggi, anche se i campi arrivano valorizzati. Su `sew_spedizioni_work`: se `zonos_account_key` è **valorizzato** si aggiungono in coda la colonna `zonos_account_key` e un `?` (parametro 103); se è valorizzato `zonos_declaration_id`, la colonna `zonos_declaration_id` e un `?` (parametro successivo). "Valorizzato" = non `null` e non `""`. Senza i campi lo statement è **identico a quello di oggi** e le colonne prendono il default `''`: il consumer funziona anche prima della DDL. I valori si passano così come sono (`Types.CHAR` o `VARCHAR`), senza trim |
 | `dao/QueriesManagerDao` (update), `CliDatiStampaTfDao` | **nessuna modifica** (SEW-01, SEW-04) |
 | log | nel log DEBUG di `insertSewSpedizioni` si può aggiungere `zonos_account_key=presente/assente`, mai il valore |
 
@@ -100,13 +104,16 @@ quindi passa l'LDV dove il metodo si aspetta il nome della tabella. Il ramo fini
 
 | Campo JSON (AS-01) | DTO | Tabella.colonna | Tipo (DDL) | Regola |
 |---|---|---|---|---|
-| `spedizione[0].zonos_account_key` | `SpedizioneDTO.zonos_account_key` | `sew_spedizioni_work.zonos_account_key`, `sew_spedizioni_work_2.zonos_account_key` | `char(52) default ''` | così com'è: niente trim, maiuscole o troncamenti (R-04). Assente, `null` o vuoto → colonna fuori dallo statement, resta `''` |
-| `spedizione[0].zonos_declaration_id` | `SpedizioneDTO.zonos_declaration_id` | `….zonos_declaration_id` | `char(13) default ''` | come sopra. In fase 1 di norma è assente, quindi resta `''` |
+| `spedizione[0].zonos_account_key` | `SpedizioneDTO.zonos_account_key` | `sew_spedizioni_work.zonos_account_key` (solo questa tabella, SEW-01) | `char(52) default ''` | così com'è: niente trim, maiuscole o troncamenti (R-04). Assente, `null` o vuoto → colonna fuori dallo statement, resta `''` |
+| `spedizione[0].zonos_declaration_id` | `SpedizioneDTO.zonos_declaration_id` | `sew_spedizioni_work.zonos_declaration_id` | `char(13) default ''` | come sopra. In fase 1 di norma è assente, quindi resta `''` |
 | `spedizione[0].collo[].articolo[].zonos_product_id` | `ArticoloColloDTO.zonos_product_id` | **nessuna** nella variante A di default (SEW-02). Variante B: `sew_spedizioni_work_art.zonos_product_id` | `char(255) default ''` | una riga per articolo, con `posizione` |
 
 "Vuoto" vale per la stringa `""`. Una stringa di soli spazi si scrive com'è: il validatore la scarta
 prima (AS-03). Le colonne sono `char`: Informix completa con spazi a destra fino alla lunghezza, quindi
 chi le legge (es. il producer) toglie gli spazi finali prima di confrontarle.
+
+Con `kafka.tabella=sew_spedizioni_work_2` o `sew_spedizioni` (clienti non BS) i campi nuovi non si
+salvano: quelle tabelle non hanno le colonne [DECISO, Diego 24-11].
 
 ## 6. Esempi [dati inventati]
 
@@ -140,7 +147,7 @@ Lo stesso messaggio senza `zonos_account_key` (spedizione non USA): lo statement
 
 ## 7. Configurazione e prerequisiti
 
-- **DDL** (vedi [ddl-sew-146073.md](ddl-sew-146073.md), script 1 e 2). Le colonne entrano nell'insert
+- **DDL** (vedi [ddl-sew-146073.md](ddl-sew-146073.md), script 1, solo `sew_spedizioni_work`). Le colonne entrano nell'insert
   solo se i campi arrivano valorizzati, quindi il codice si può rilasciare anche prima della DDL. La
   DDL deve però essere eseguita **prima** che il builder mandi i campi e che il validatore accenda la
   regola: un insert con le colonne nuove su una tabella senza colonne va in errore e, dopo i retry, il
@@ -153,11 +160,11 @@ Lo stesso messaggio senza `zonos_account_key` (spedizione non USA): lo statement
 | # | Given / When / Then |
 |---|---|
 | AC-01 | Dato il messaggio della sezione 6 con `kafka.tabella=sew_spedizioni_work`, la riga inserita ha `zonos_account_key` uguale al valore ricevuto, carattere per carattere (52), e `zonos_declaration_id` `''` (default) |
-| AC-02 | Come AC-01 con `kafka.tabella=sew_spedizioni_work_2`: stesso risultato su `sew_spedizioni_work_2` |
+| AC-02 | Come AC-01 con `kafka.tabella=sew_spedizioni_work_2` (cliente non BS): la riga va su `sew_spedizioni_work_2` con lo statement di oggi, senza colonne nuove e senza errori, anche se i campi arrivano valorizzati |
 | AC-03 | Dato un messaggio senza `zonos_account_key` né `zonos_declaration_id`, oppure con valori `null` o `""`, lo statement è identico a quello di oggi e le due colonne valgono `''` (default) |
 | AC-04 | Dato un messaggio con `zonos_declaration_id: "DECL-TEST-0001"` (caso di prova per la predisposizione), la colonna vale `DECL-TEST-0001` |
 | AC-05 | Dato un messaggio di un cliente BS, la riga va su `sew_spedizioni_work` con i nuovi campi, qualunque sia `kafka.tabella` |
-| AC-06 | Con `kafka.tabella=sew_spedizioni` l'insert funziona come prima, senza colonne nuove e senza errori |
+| AC-06 | Con `kafka.tabella=sew_spedizioni` l'insert funziona come prima, senza colonne nuove e senza errori, anche se i campi arrivano valorizzati |
 | AC-07 | Per i messaggi non autoproduttore (`cli_dati_stampa_tf_2`) e senza `id_file` (update), il comportamento è identico a prima |
 | AC-08 | Un messaggio storico, senza i campi nuovi nel JSON, viene scritto come prima (R-05), anche su una tabella su cui la DDL non è ancora stata eseguita |
 | AC-09 | Nessun log riporta i valori di `zonos_account_key` o `zonos_product_id` |
@@ -172,11 +179,11 @@ lavora su un consumer locale puntato su svil.
 | TC | Input | Atteso | AC |
 |---|---|---|---|
 | TC-01 | sezione 6, tabella work | colonne nuove valorizzate | AC-01 |
-| TC-02 | sezione 6, tabella work_2 | idem su `_2` | AC-02 |
+| TC-02 | sezione 6, `kafka.tabella=sew_spedizioni_work_2`, cliente non BS | riga su `_2` come oggi, nessun errore | AC-02 |
 | TC-03 | senza campi, con `null`, con `""`; ripetuto su una tabella senza DDL | statement di oggi, colonne `''`; nessun errore senza DDL | AC-03, AC-08 |
 | TC-04 | `zonos_declaration_id` valorizzato | salvato | AC-04 |
 | TC-05 | cliente BS con `kafka.tabella=sew_spedizioni_work_2` | riga su work | AC-05 |
-| TC-06 | `kafka.tabella=sew_spedizioni` | insert ok, nessun errore | AC-06 |
+| TC-06 | sezione 6, `kafka.tabella=sew_spedizioni` | insert ok, nessun errore | AC-06 |
 | TC-07 | non autoproduttore; messaggio senza `id_file` | regressione: come prima | AC-07 |
 | TC-08 | stesso messaggio due volte | il secondo viene saltato come duplicato | AC-10 |
 | TC-09 | log a livello DEBUG di TC-01 | nessun valore dei campi nuovi | AC-09 |
@@ -191,7 +198,7 @@ Nuove (Mary, 16-11):
 
 | ID | Assunzione o domanda | Default adottato | Da confermare con |
 |---|---|---|---|
-| SEW-01 | **Tabelle.** L'HLD cita solo `sew_spedizioni_work`. Lo stesso insert scrive anche `sew_spedizioni_work_2` (stesse colonne) e, con `kafka.tabella=sew_spedizioni`, `sew_spedizioni`. I non autoproduttori vanno su `cli_dati_stampa_tf_2` | colonne nuove su `sew_spedizioni_work` e `_2`. `sew_spedizioni` e `cli_dati_stampa_tf(_2)` non si toccano in fase 1 | Poste (owner SEW) |
+| SEW-01 | **Tabelle.** L'HLD cita solo `sew_spedizioni_work`. Lo stesso insert scrive anche `sew_spedizioni_work_2` (stesse colonne) e, con `kafka.tabella=sew_spedizioni`, `sew_spedizioni`. I non autoproduttori vanno su `cli_dati_stampa_tf_2` | **[DECISO, Diego 24-11]** colonne nuove **solo su `sew_spedizioni_work`**. `sew_spedizioni_work_2`, `sew_spedizioni` e `cli_dati_stampa_tf(_2)` non si toccano | chiusa |
 | SEW-02 | **Product ID senza tabella articoli.** AS-04 vuole `zonos_product_id` nella "tabella articoli che il consumer scrive già", ma questo consumer non ne scrive nessuna. L'HLD dice "3 campi in `sew_spedizioni_work`", che ha una riga per LDV: per R-04 il Product ID non si appiattisce sulla spedizione | **variante A**: `zonos_product_id` nel DTO, non salvato. **Variante B**, se Poste conferma: nuova tabella figlia `sew_spedizioni_work_art` (`id_ldv`, `posizione`, `zonos_product_id`, `data_ins`), DDL opzionale nello script 5 di [ddl-sew-146073.md](ddl-sew-146073.md), con una insert per articolo nella stessa transazione | Poste |
 | SEW-03 | **Lunghezza di `zonos_declaration_id`** | **[DECISO, Diego 23-11]** `char(13) default ''` | chiusa |
 | SEW-04 | **Update.** Per i messaggi senza `id_file` il consumer aggiorna solo indirizzi e telefoni. I campi nuovi in quella riga li ha già scritti chi ha creato il record (portali e web service, vedi PRD-05) | update invariati | Diego |

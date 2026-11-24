@@ -5,7 +5,8 @@
 > Regola di progetto: un documento funzionale per microservizio.
 >
 > Aggiornato il 2026-11-24: nomi dei campi `zonos_account_key`, `zonos_product_id`,
-> `zonos_declaration_id` e colonne SEW `zonos_*` (decisioni di Diego del 23 e 24-11), branch del 24-11.
+> `zonos_declaration_id` e colonne SEW `zonos_*` (decisioni di Diego del 23 e 24-11), branch del 24-11,
+> nomi delle chiavi su MongoDB (Diego, 24-11).
 
 ---
 
@@ -23,6 +24,11 @@ indica il campo e, per il Product ID, l'articolo.
 
 Il **contratto della fase 1** (`analisi.md`, AS-01…AS-06) è **vincolante**: il documento lo dettaglia,
 non lo cambia. Incoerenze e buchi vanno fra le assunzioni e le domande aperte.
+
+**Nomi su MongoDB (decisione di Diego del 2026-11-24)**: in `dichiarato_events` i campi si salvano con i
+nomi del tracciato `zonos_account_key`, `zonos_declaration_id`, `zonos_product_id`, non camelCase.
+Spring Data usa il nome del campo Java e ignora `@JsonProperty`: con nomi Java camelCase serve anche
+`@Field("zonos_…")`. Il documento lo dice nei DTO, nelle regole, nei criteri di accettazione e nei test.
 
 # Fonti
 

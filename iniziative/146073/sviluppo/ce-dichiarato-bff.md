@@ -85,6 +85,9 @@ li perdono [FATTO].
 | `dto/SpedizioneDTO` | `private String zonosDeclarationId;` | `@Field("zonos_declaration_id")` `@JsonProperty("zonos_declaration_id")` |
 | `dto/ArticoloDTO` | `private String zonosProductId;` | `@Field("zonos_product_id")` `@JsonProperty("zonos_product_id")` |
 
+- Le chiavi lette da `@Field` sono quelle decise da Diego il 24-11 per MongoDB: validatore e
+  orchestratore salvano i campi in `dichiarato_events` come `zonos_account_key`,
+  `zonos_declaration_id`, `zonos_product_id`, non camelCase.
 - Nessuna annotazione di validazione (`@Size`, `@NotNull`): il BFF legge, non valida (R-02, BFF-04).
 - Tipo `String`, senza default e senza trasformazioni (AS-01, R-04).
 - `ColloDTO` non cambia: contiene già `List<ArticoloDTO> articolo`.

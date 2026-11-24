@@ -1,7 +1,8 @@
 # 146073 — Compliance USA Entry Type 13: nuovi campi e controlli sul preadvising — analisi
 
-Versione 0.3 del 2026-11-24 (decisioni di Diego del 23 e 24-11 su nomi, regola, colonne SEW, branch e
-primo passo della fase 1).
+Versione 0.4 del 2026-11-24 (decisioni di Diego del 23 e 24-11 su nomi, regola, colonne SEW, branch e
+primo passo della fase 1; dal 24-11 anche colonne SDA solo su `sew_spedizioni_work`, spazi di
+riempimento nel producer, nomi su MongoDB e stato dello sviluppo).
 
 ## Fonti
 
@@ -103,6 +104,10 @@ con il prefisso `zonos_`. I nomi provvisori `account_key`, `product_id`, `declar
   propaga e si salva come gli altri due (è il 3° campo dell'HLD, PA-01).
 - Tutti e tre sono **opzionali** nei DTO, `String`, senza default e senza trasformazioni
   (niente trim, niente conversioni; R-04, R-05).
+- Su **MongoDB** (validatore e orchestratore: `dichiarato_events`, `enrichment_events`) si salvano
+  con gli stessi nomi del tracciato `zonos_account_key`, `zonos_declaration_id`, `zonos_product_id`,
+  non camelCase [DECISO, Diego 24-11]. Con nomi Java camelCase serve `@Field("zonos_…")` oltre a
+  `@JsonProperty`, come già nel bff.
 - Esempi di formato (inventati): `zonos_account_key` `credential_live_<uuid>` (52 caratteri),
   `zonos_declaration_id` `0rtvQg6j865xR` (13), `zonos_product_id` da 1 a 255 caratteri.
 
@@ -144,14 +149,16 @@ Il nome del campo sta sempre prima dei due punti, perché il monitoring legge co
 
 | Colonna | Tipo | Tabella |
 |---|---|---|
-| `zonos_account_key` | `char(52) default ''` | tabella della spedizione (`sew_spedizioni_work`, `_2`, `sew_spedizioni_poste`) |
+| `zonos_account_key` | `char(52) default ''` | tabella della spedizione: lato SDA **solo `sew_spedizioni_work`** (non `sew_spedizioni_work_2` né `sew_spedizioni`, Diego 24-11); lato Poste `sew_spedizioni_poste` |
 | `zonos_declaration_id` | `char(13) default ''` | tabella della spedizione |
 | `zonos_product_id` | `char(255) default ''` | **tabella articoli** che il consumer scrive già |
 
 I consumer che scrivono le SEW mettono le colonne nuove nella INSERT (e nell'eventuale
 UPDATE/MERGE) **solo se il campo arriva valorizzato**. Senza i campi lo statement resta
 identico a quello di oggi: così il consumer funziona anche prima delle DDL. Le DDL le esegue il
-DBA ([sviluppo/ddl-sew-146073.md](sviluppo/ddl-sew-146073.md)).
+DBA ([sviluppo/ddl-sew-146073.md](sviluppo/ddl-sew-146073.md)). Chi rilegge le colonne (il producer)
+toglie gli spazi di riempimento a destra dei campi `char`: un valore vuoto o di soli spazi vale come
+campo assente [DECISO, Diego 24-11].
 
 **AS-05, ingresso.** Il builder, fuori perimetro, e i canali PDB, PDW e ILP (attraverso
 l'adapter) pubblicano i campi con i nomi di AS-01. Finché il builder non è pronto, i test si
@@ -200,8 +207,11 @@ sono passati alla versione 0.2 (nomi `zonos_*`, regola, colonne SEW, branch).
 
 **Primo passo e punto 2 della fase 1 (decisione di Diego del 2026-11-24).** Nel primo passo si
 sviluppano validatore, orchestratore, smistatore e bff (su `develop`) e `sda-ldv-preadv-consumer`
-(`consumer-sew_sped` e `producer-sew-sped`, branch dedicato). Lo sviluppo è in corso, ancora senza
-commit pubblicati. L'adapter (int. 05) e `consumer-sew_sped_poste` (int. 08) sono **rimandati al
+(`consumer-sew_sped` e `producer-sew-sped`, branch dedicato). Stato al 24-11: validatore su
+`develop` (`090d037`, verifica spenta di default); `sda-ldv-preadv-consumer` su
+`146073_compliance_usa_fase1` (`990503a`, pubblicato; da allineare alla scrittura solo su
+`sew_spedizioni_work` e da compilare in Eclipse con i jar di `L:` prima del rilascio); orchestratore,
+smistatore e bff restano nel primo passo su `develop` e ripartono il 24-11. L'adapter (int. 05) e `consumer-sew_sped_poste` (int. 08) sono **rimandati al
 punto 2 della fase 1**: mancano i nomi dei campi nei messaggi sorgente PDB, PDW e ILP e i dettagli
 lato Poste (PA-13). I loro funzionali sono comunque allineati ai nomi `zonos_*`.
 
@@ -214,9 +224,9 @@ lato Poste (PA-13). I loro funzionali sono comunque allineati ai nomi `zonos_*`.
 | 04 | `ce-event-handler-monitoring` | no (variante A) | Usa solo identificativi, stato ed errori. Gli errori nuovi arrivano già alla console. Variante B (campi nel `Record`) solo se Poste la chiede |
 | 04 | `ce-dichiarato-bff` | **sì**, piccola | Le API di dettaglio e di ricerca leggono `dichiarato_events` con DTO tipizzati: si aggiungono i tre campi. Nessuna modifica al front-end |
 | 05 | `ce-dichiarato-adapter` | **sì**, **rimandato al punto 2** | Mapping nei 3 consumer, con nomi sorgente provvisori (ADA-01). Su PDB si aggiunge `productId` a `hasValidProperties()` e la testata al merge degli esiti BEP. PDW ha un solo articolo per spedizione |
-| 07 | `consumer-sew_sped` | **sì** | `zonos_account_key` e `zonos_declaration_id` su `sew_spedizioni_work` e `_2`, nell'insert solo se valorizzati. Il consumer **non scrive una tabella articoli**: `zonos_product_id` non ha dove andare (SEW-02) |
+| 07 | `consumer-sew_sped` | **sì** | `zonos_account_key` e `zonos_declaration_id` **solo su `sew_spedizioni_work`** (non su `_2` né su `sew_spedizioni`, Diego 24-11), nell'insert solo se valorizzati. Il consumer **non scrive una tabella articoli**: `zonos_product_id` non ha dove andare (SEW-02) |
 | 08 | `consumer-sew_sped_poste` | **sì**, **rimandato al punto 2** | Account Key e Declaration ID nella MERGE di `SEW_SPEDIZIONI_POSTE`. `ZONOS_PRODUCT_ID` su `SEW_SPEDIZIONI_POSTE_INTER` (e sullo scarto inter), solo nei rami internazionali PRTN |
-| 09 | `producer-sew-sped` | **sì** | Batch che rilegge le SEW dei portali (MYSDA, INVIO_WEB) e del web service (SDA_WS). Invia `zonos_account_key` solo se i portali la scrivono nelle tabelle sorgente; `zonos_product_id` non è disponibile per articolo |
+| 09 | `producer-sew-sped` | **sì** | Batch che rilegge le SEW dei portali (MYSDA, INVIO_WEB) e del web service (SDA_WS). Invia `zonos_account_key` solo se i portali la scrivono in `sew_spedizioni_work`, senza gli spazi di riempimento; `zonos_product_id` non è disponibile per articolo |
 | — | DDL (`ddl-sew-146073.md`) | Informix | `ALTER TABLE … ADD`, con query di verifica e rollback. Esegue il DBA, prima del rilascio del codice |
 
 **Rischi emersi oltre l'HLD**
@@ -286,7 +296,7 @@ Ci sono anche due punti da chiarire nel contenuto:
 | PA-02 | **Chiuso il 23-11 (Diego).** Regola R-01: niente condizione "business"; USA da `codice_nazione_iso_2` / `codice_nazione`; documenti da `tipo_merce` = `D`; prodotti `456,457,458,459,515,516` su `codice_prodotto` o `id_servizio` (resta PA-12) | Validatore |
 | PA-03 | **Chiuso il 23-11 (Diego)** per i nomi: `zonos_account_key`, `zonos_product_id`, `zonos_declaration_id`. Resta l'aggiornamento dell'ICD con il team del builder | Tutti |
 | PA-04 | **Chiuso il 23-11 (Diego).** Codici `1320`…`1323` con le descrizioni di AS-03, esito scarto | Validatore, scarti |
-| PA-05 | DDL: **colonne, tipi e nomi decisi il 23 e 24-11** (AS-04). Restano aperti: chi le esegue su Informix SDA e dove va il Product ID lato SDA, che non ha una tabella articoli (SEW-02) | Int. 07, 08 |
+| PA-05 | DDL: **colonne, tipi e nomi decisi il 23 e 24-11** (AS-04). **Tabelle SDA chiuse il 24-11 (Diego)**: solo `sew_spedizioni_work` (SEW-01). Restano aperti: chi le esegue su Informix SDA e dove va il Product ID lato SDA, che non ha una tabella articoli (SEW-02) | Int. 07, 08 |
 | PA-06 | Repo del batch producer dei preavvisi da portali e web service | Int. 09 |
 | PA-07 | Fase 2: quali sono i due campi verso BEP, con quale contratto e quale flusso (`ldv-pdb` o `ldv-pdb-sync`) | Int. 06 |
 | PA-08 | Fase 2: contratto del microservizio comune Zonos (sincrono o su topic, chiave di idempotenza, formato di dazi e fee, codici di errore) e punto del processo in cui si avvia la lavorazione | Orchestratore fase 2 |
