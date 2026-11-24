@@ -1,6 +1,7 @@
 # 146073 — Compliance USA Entry Type 13: nuovi campi e controlli sul preadvising — analisi
 
-Versione 0.2 del 2026-11-16.
+Versione 0.3 del 2026-11-24 (decisioni di Diego del 23 e 24-11 su nomi, regola, colonne SEW, branch e
+primo passo della fase 1).
 
 ## Fonti
 
@@ -13,8 +14,8 @@ Sistema impattato: **AP-00988 Corriere Espresso / PK-03089 ce-dichiarato**.
 
 ## Obiettivo
 
-Le spedizioni business verso gli USA che contengono merce devono rispettare la normativa
-USA **Entry Type 13**.
+Le spedizioni verso gli USA che contengono merce, per i prodotti interessati, devono rispettare la
+normativa USA **Entry Type 13**.
 
 - **Fase 1, dati di accettazione**: il preavviso porta due nuovi campi, che vanno validati
   e propagati lungo tutta la catena preadvising fino alle tabelle SEW:
@@ -35,9 +36,9 @@ Fuori dal nostro perimetro, secondo la descrizione:
 
 | Campo | Fase | Cardinalità | Regola | Posizione proposta nel tracciato unico |
 |---|---|---|---|---|
-| Account Key | 1 | una per spedizione | obbligatoria per le spedizioni soggette (vedi R-01); lunghezza **52** | testata `spedizione[]` (nome JSON da concordare col builder, es. `account_key`) |
-| Product ID | 1 | uno per **articolo** | obbligatorio per **ogni** articolo delle spedizioni soggette; lunghezza **1–255** | `spedizione[].collo[].articolo[]` (array che esiste già, con `posizione`, `codice_taric`, `valore`, `quantita`…), es. `product_id` |
-| Declaration ID | 2 | uno per spedizione | restituito da Zonos | testata `spedizione[]` |
+| Account Key | 1 | una per spedizione | obbligatoria per le spedizioni soggette (vedi R-01); lunghezza **52** | testata `spedizione[]`, `zonos_account_key` [DECISO, Diego 23-11] |
+| Product ID | 1 | uno per **articolo** | obbligatorio per **ogni** articolo delle spedizioni soggette; lunghezza **1–255** | `spedizione[].collo[].articolo[]` (array che esiste già, con `posizione`, `codice_taric`, `valore`, `quantita`…), `zonos_product_id` [DECISO, Diego 23-11] |
+| Declaration ID | 2 (predisposto in 1) | uno per spedizione | restituito da Zonos; lunghezza 13 | testata `spedizione[]`, `zonos_declaration_id` [DECISO, Diego 23-11] |
 | Dazi, fee | 2 | da contratto Zonos | restituiti da Zonos | da contratto (oggi in `spedizione.importi` ci sono `importo_diritti_doganali`, `importo_oneri`…) |
 
 **I 3 campi dell'HLD.** Gli interventi 07, 08 e 09 della fase 1 parlano di "3 nuovi campi"
@@ -48,15 +49,14 @@ Declaration ID si predispone nella fase 1 e si valorizza nella fase 2 (PA-01).
 
 ### Regole
 
-- **R-01**: l'obbligatorietà vale solo per le spedizioni **business**, **dirette negli
-  USA**, **con merce** (non documenti) e appartenenti ai **prodotti interessati**. Campi
-  candidati nel tracciato unico:
-  - `importi.cliente_business`;
-  - `destinatario.codice_nazione` / `codice_nazione_iso_2` (USA / US);
-  - `tipo_merce` o `collo.codice_contenuto` / `internazionale.codice_contenuto` per merce o documenti;
-  - `codice_prodotto` / `id_servizio` per i prodotti.
-
-  Valori e prodotti sono da confermare (PA-02).
+- **R-01** [DECISO, Diego 23-11]: l'obbligatorietà vale solo per le spedizioni **dirette negli
+  USA**, **con merce** (non documenti) e appartenenti ai **prodotti interessati**. La condizione
+  "cliente business" non c'è più. Campi del tracciato unico:
+  - `tipo_merce` per merce o documenti (documenti = `D`; `tipo_merce` assente = merce);
+  - `destinatario.codice_nazione_iso_2` (`US`) / `destinatario.codice_nazione` (`US`, `USA`);
+  - `codice_prodotto` **oppure** `id_servizio` per i prodotti: 456, 457 (EXPORT BOX), 458, 459
+    (EXPORT BOX PCIM), 515, 516 (CRONO INTERNAZIONALE, 516 = assicurato). I codici vengono da
+    `ce_prodotto` di ce-rules; l'elenco di CRONO INTERNAZIONALE è da confermare (PA-12).
 - **R-02**: il validatore controlla **solo presenza e lunghezza**. Niente lookup in
   anagrafica, niente chiamate a Zonos.
 - **R-03**: l'errore deve indicare il campo e, per il Product ID, **l'articolo** non valido
@@ -76,80 +76,99 @@ Declaration ID si predispone nella fase 1 e si valorizza nella fase 2 (PA-01).
 ## Contratto della fase 1 (base comune dei funzionali)
 
 Decisione di Diego del 2026-11-16: **per ora si lavora solo sulla fase 1**. Le assunzioni
-che seguono servono a non bloccare i funzionali. Sono vincolanti per tutti i documenti di
-`sviluppo/` finché Poste non risponde (PA-02, PA-03, PA-04).
+che seguono sono vincolanti per tutti i documenti di `sviluppo/`. Il 23-11 Diego ha deciso nomi,
+regola, errori e colonne SEW (AS-01…AS-04), il 24-11 i nomi delle colonne, i branch e il primo passo
+della fase 1.
 
-**AS-01, nomi e posizione nel tracciato unico.** Si usa lo stile snake_case dell'ICD.
+**AS-01, nomi e posizione nel tracciato unico** [DECISO, Diego 23-11]. Stile snake_case dell'ICD,
+con il prefisso `zonos_`. I nomi provvisori `account_key`, `product_id`, `declaration_id` non si usano più.
 
 ```json
 {
   "spedizione": [{
-    "account_key": "<52 caratteri>",
-    "declaration_id": null,
+    "zonos_account_key": "<52 caratteri>",
+    "zonos_declaration_id": null,
     "collo": [{
       "articolo": [
-        { "posizione": "1", "codice_taric": "...", "product_id": "<1-255 caratteri>" }
+        { "posizione": "1", "codice_taric": "...", "zonos_product_id": "<1-255 caratteri>" }
       ]
     }]
   }]
 }
 ```
 
-- `account_key` e `declaration_id` stanno sulla testata di ogni elemento di `spedizione[]`.
-- `product_id` sta su ogni elemento di `spedizione[].collo[].articolo[]`.
-- `declaration_id` è solo **predisposto**: in fase 1 è sempre assente o `null`, e si
+- `zonos_account_key` e `zonos_declaration_id` stanno sulla testata di ogni elemento di `spedizione[]`.
+- `zonos_product_id` sta su ogni elemento di `spedizione[].collo[].articolo[]`.
+- `zonos_declaration_id` è solo **predisposto**: in fase 1 è sempre assente o `null`, e si
   propaga e si salva come gli altri due (è il 3° campo dell'HLD, PA-01).
 - Tutti e tre sono **opzionali** nei DTO, `String`, senza default e senza trasformazioni
-  (R-04, R-05).
+  (niente trim, niente conversioni; R-04, R-05).
+- Esempi di formato (inventati): `zonos_account_key` `credential_live_<uuid>` (52 caratteri),
+  `zonos_declaration_id` `0rtvQg6j865xR` (13), `zonos_product_id` da 1 a 255 caratteri.
 
-**AS-02, riconoscimento delle spedizioni soggette (R-01).** Una spedizione è soggetta se
-valgono **tutte** queste condizioni:
+**AS-02, riconoscimento delle spedizioni soggette (R-01)** [DECISO, Diego 23-11]. Una spedizione
+è soggetta se valgono **tutte** queste condizioni:
 
-- `importi.cliente_business` = `S`;
+- `tipo_merce` diverso da "documenti" (`D`); `tipo_merce` assente = merce;
 - la nazione del destinatario è USA: `destinatario.codice_nazione_iso_2` = `US`, oppure
-  `destinatario.codice_nazione` in (`USA`, `US`);
-- non contiene solo documenti: `tipo_merce` diverso dal valore "documenti", da confermare;
-- `codice_prodotto` appartiene all'elenco dei prodotti interessati.
+  `destinatario.codice_nazione` in (`US`, `USA`), senza spazi e senza distinzione fra maiuscole e
+  minuscole;
+- `codice_prodotto` **oppure** `id_servizio` appartiene all'elenco dei prodotti interessati:
+  `456,457,458,459,515,516`.
 
-I valori (S, US/USA, codice "documenti", elenco dei prodotti) e un flag di attivazione
-generale stanno in **configurazione** del validatore. Con l'elenco dei prodotti vuoto
-valgono tutti i prodotti. Con il flag spento la regola non scatta: è il default fino alla
-conferma di Poste.
+La condizione "cliente business" della versione precedente non c'è più. Per le spedizioni
+soggette `zonos_account_key` è obbligatorio (esattamente 52 caratteri) e `zonos_product_id` è
+obbligatorio su ogni articolo di ogni collo (1-255); `zonos_declaration_id` non si controlla.
+
+I valori e un flag di attivazione generale stanno in **configurazione** del validatore
+(prefisso `compliance-usa`: `abilitata`, `tipi-merce-documenti` = `D`, `nazioni-usa` = `US,USA`,
+`prodotti` = `456,457,458,459,515,516`). Con il flag spento la regola non scatta: è il default
+(`abilitata: 'false'` anche in `.helm/values.yaml`) finché il builder non manda i campi.
 
 **AS-03, errori.** Seguono il modello delle regole esistenti: `errors.put(codice,
 descrizione)` sul `DichiaratoDTO`, con codici numerici di 4 cifre come `1181` e `1182`.
-I codici nuovi sono proposti nel funzionale del validatore, e Poste li conferma. L'esito è
-lo **scarto** della spedizione, come per gli altri campi obbligatori mancanti.
+I codici e le descrizioni sono decisi da Diego il 23-11. L'esito è lo **scarto** della
+spedizione, come per gli altri campi obbligatori mancanti.
 Il nome del campo sta sempre prima dei due punti, perché il monitoring legge così il
 "campo in errore". Le occorrenze di più articoli si elencano fra parentesi, separate da
 `"; "`: la mappa degli errori ha una sola voce per codice.
 
-| Errore | Descrizione (proposta) |
-|---|---|
-| Account Key assente | "Account Key: Campo obbligatorio mancante" |
-| Account Key di lunghezza diversa da 52 | "Account Key: lunghezza non valida (attesi 52 caratteri)" |
-| Product ID assente | "Product ID: obbligatorio mancante (collo <n> articolo <posizione>)" |
-| Product ID più lungo di 255 | "Product ID: lunghezza non valida, attesi 1-255 caratteri (collo <n> articolo <posizione>)" |
+| Codice | Errore | Descrizione |
+|---|---|---|
+| `1320` | Account Key assente | `zonos_account_key: Campo obbligatorio mancante` |
+| `1321` | Account Key di lunghezza diversa da 52 | `zonos_account_key: lunghezza non valida (attesi 52 caratteri)` |
+| `1322` | Product ID assente | `zonos_product_id: Campo obbligatorio mancante (collo <n> articolo <posizione>; ...)` |
+| `1323` | Product ID più lungo di 255 | `zonos_product_id: lunghezza non valida, attesi 1-255 caratteri (collo <n> articolo <posizione>; ...)` |
 
-**AS-04, SEW.** `account_key` e `declaration_id` vanno in colonne nuove della tabella della
-spedizione (`sew_spedizioni_work`, `_2` se scritta dallo stesso consumer, `sew_spedizioni_poste`).
-`product_id` va in una colonna nuova della **tabella articoli** che il consumer scrive già.
-Le DDL le esegue il DBA.
+**AS-04, SEW** [DECISO, Diego 23 e 24-11]. Colonne Informix con gli stessi nomi dei campi:
+
+| Colonna | Tipo | Tabella |
+|---|---|---|
+| `zonos_account_key` | `char(52) default ''` | tabella della spedizione (`sew_spedizioni_work`, `_2`, `sew_spedizioni_poste`) |
+| `zonos_declaration_id` | `char(13) default ''` | tabella della spedizione |
+| `zonos_product_id` | `char(255) default ''` | **tabella articoli** che il consumer scrive già |
+
+I consumer che scrivono le SEW mettono le colonne nuove nella INSERT (e nell'eventuale
+UPDATE/MERGE) **solo se il campo arriva valorizzato**. Senza i campi lo statement resta
+identico a quello di oggi: così il consumer funziona anche prima delle DDL. Le DDL le esegue il
+DBA ([sviluppo/ddl-sew-146073.md](sviluppo/ddl-sew-146073.md)).
 
 **AS-05, ingresso.** Il builder, fuori perimetro, e i canali PDB, PDW e ILP (attraverso
 l'adapter) pubblicano i campi con i nomi di AS-01. Finché il builder non è pronto, i test si
 fanno con messaggi costruiti a mano su `preadvising.pre-enrichment`.
 
-**Branch (decisione di Diego del 2026-11-16).** Tutto lo sviluppo va su un branch
-dedicato, `146073_compliance_usa_fase1`, uno per ogni repo toccato. Si parte da
-`origin/develop` oppure, se il repo non ha `develop`, dal suo branch di integrazione.
-Non si sviluppa mai su `develop`/`master` né su branch di altre iniziative. Il merge verso
-`develop` si fa con una merge request, dopo la revisione.
+**Branch (decisione di Diego del 2026-11-24, sostituisce quella del 16-11).** Nei repository
+dei servizi preadvising (validatore, orchestratore, smistatore, bff, adapter,
+`poste-ldv-preadv-consumer`) lo sviluppo va su **`develop`**. Solo `ESITI/sda-ldv-preadv-consumer`
+(moduli `consumer-sew_sped` e `producer-sew-sped`) resta sul branch dedicato
+`146073_compliance_usa_fase1`, creato da `origin/dev202508_preadvising` (il repo non ha `develop`).
+Non si sviluppa mai su `master` né su branch di altre iniziative.
 
 **AS-07, campi assenti.** Un campo assente e un campo `null` si trattano allo stesso modo
 in tutta la catena. Ogni servizio serializza i campi nuovi secondo la propria convenzione:
 il validatore scrive i `null`, orchestratore e smistatore li omettono (`NON_NULL`). Nessun
-consumer deve distinguere i due casi. In tabella si scrive `NULL`, non `" "`.
+consumer deve distinguere i due casi. Nelle SEW un campo assente non entra nello statement e la
+colonna resta al default `''` (AS-04).
 
 **AS-06, fuori dalla fase 1.**
 - Zonos, valorizzazione del Declaration ID, dazi e fee, verso BEP.
@@ -172,11 +191,19 @@ consumer deve distinguere i due casi. In tabella si scrive `NULL`, non `" "`.
 Per le SEW il Product ID, che è per articolo, va nella **tabella articoli**. Account Key e
 Declaration ID vanno nella tabella della spedizione (PA-05).
 
-## Esito dei funzionali della fase 1 (2026-11-16)
+## Esito dei funzionali della fase 1 (2026-11-16, aggiornato il 2026-11-24)
 
 I funzionali sono in `sviluppo/`, uno per microservizio, ciascuno con il suo prompt. Il codice è
 stato letto sui ref `origin/develop` presenti in locale: il `git fetch` del 16-11 è fallito
-per un problema di rete, quindi va ripetuto prima di creare i branch.
+per un problema di rete, quindi va ripetuto prima di creare i branch. Il 24-11 tutti i funzionali
+sono passati alla versione 0.2 (nomi `zonos_*`, regola, colonne SEW, branch).
+
+**Primo passo e punto 2 della fase 1 (decisione di Diego del 2026-11-24).** Nel primo passo si
+sviluppano validatore, orchestratore, smistatore e bff (su `develop`) e `sda-ldv-preadv-consumer`
+(`consumer-sew_sped` e `producer-sew-sped`, branch dedicato). Lo sviluppo è in corso, ancora senza
+commit pubblicati. L'adapter (int. 05) e `consumer-sew_sped_poste` (int. 08) sono **rimandati al
+punto 2 della fase 1**: mancano i nomi dei campi nei messaggi sorgente PDB, PDW e ILP e i dettagli
+lato Poste (PA-13). I loro funzionali sono comunque allineati ai nomi `zonos_*`.
 
 | Int. | Servizio | Modifica di codice | Sintesi |
 |---|---|---|---|
@@ -186,17 +213,17 @@ per un problema di rete, quindi va ripetuto prima di creare i branch.
 | 04 | `ce-event-handler-event-store` | no | `eventData` è un `Object` generico: i campi arrivano su Mongo così come sono. Solo test di non regressione |
 | 04 | `ce-event-handler-monitoring` | no (variante A) | Usa solo identificativi, stato ed errori. Gli errori nuovi arrivano già alla console. Variante B (campi nel `Record`) solo se Poste la chiede |
 | 04 | `ce-dichiarato-bff` | **sì**, piccola | Le API di dettaglio e di ricerca leggono `dichiarato_events` con DTO tipizzati: si aggiungono i tre campi. Nessuna modifica al front-end |
-| 05 | `ce-dichiarato-adapter` | **sì** | Mapping nei 3 consumer, con nomi sorgente provvisori (ADA-01). Su PDB si aggiunge `productId` a `hasValidProperties()` e la testata al merge degli esiti BEP. PDW ha un solo articolo per spedizione |
-| 07 | `consumer-sew_sped` | **sì** | `account_key` e `declaration_id` su `sew_spedizioni_work` e `_2`. Il consumer **non scrive una tabella articoli**: `product_id` non ha dove andare (SEW-02) |
-| 08 | `consumer-sew_sped_poste` | **sì** | Account Key e Declaration ID nella MERGE di `SEW_SPEDIZIONI_POSTE`. `PRODUCT_ID` su `SEW_SPEDIZIONI_POSTE_INTER` (e sullo scarto inter), solo nei rami internazionali PRTN |
-| 09 | `producer-sew-sped` | **sì** | Batch che rilegge le SEW dei portali (MYSDA, INVIO_WEB) e del web service (SDA_WS). Invia `account_key` solo se i portali la scrivono nelle tabelle sorgente; `product_id` non è disponibile per articolo |
+| 05 | `ce-dichiarato-adapter` | **sì**, **rimandato al punto 2** | Mapping nei 3 consumer, con nomi sorgente provvisori (ADA-01). Su PDB si aggiunge `productId` a `hasValidProperties()` e la testata al merge degli esiti BEP. PDW ha un solo articolo per spedizione |
+| 07 | `consumer-sew_sped` | **sì** | `zonos_account_key` e `zonos_declaration_id` su `sew_spedizioni_work` e `_2`, nell'insert solo se valorizzati. Il consumer **non scrive una tabella articoli**: `zonos_product_id` non ha dove andare (SEW-02) |
+| 08 | `consumer-sew_sped_poste` | **sì**, **rimandato al punto 2** | Account Key e Declaration ID nella MERGE di `SEW_SPEDIZIONI_POSTE`. `ZONOS_PRODUCT_ID` su `SEW_SPEDIZIONI_POSTE_INTER` (e sullo scarto inter), solo nei rami internazionali PRTN |
+| 09 | `producer-sew-sped` | **sì** | Batch che rilegge le SEW dei portali (MYSDA, INVIO_WEB) e del web service (SDA_WS). Invia `zonos_account_key` solo se i portali la scrivono nelle tabelle sorgente; `zonos_product_id` non è disponibile per articolo |
 | — | DDL (`ddl-sew-146073.md`) | Informix | `ALTER TABLE … ADD`, con query di verifica e rollback. Esegue il DBA, prima del rilascio del codice |
 
 **Rischi emersi oltre l'HLD**
 
 - **Il validatore non controlla tutti i canali.** Le regole girano solo nel flusso SDA (IF,
   IS, IE) e in quello PDB/EUD. I canali dei portali e del web service (MYSDA, SDA_WS,
-  INVIO_WEB), l'adapter e TUP passano senza regole: una spedizione business USA che arriva da
+  INVIO_WEB), l'adapter e TUP passano senza regole: una spedizione USA che arriva da
   lì non verrebbe controllata (VAL-DA-04).
 - **Le lavorazioni non conoscono i campi.** `ce-dichiarato-ldv`, `-ldv-pdb` e `-ldv-pdb-sync`
   restituiscono il tracciato senza i campi. In fase 1 l'orchestratore li conserva da Mongo,
@@ -214,9 +241,10 @@ per un problema di rete, quindi va ripetuto prima di creare i branch.
   Se l'Account Key è un dato riservato va mascherata (VAL-AS-11, EVS-03).
 - **Il carattere non ASCII.** Il consumer Poste toglie i caratteri non ASCII da tutta
   l'istruzione SQL, Product ID compreso (SWP-08).
-- **Base dei branch.** `sda-ldv-preadv-consumer` non ha `develop`: la base proposta è
-  `origin/dev202508_preadvising` (SEW-07). Sul `develop` locale dell'adapter ci sono due
-  commit di Diego non pubblicati (`c4a26d1`, `1a6202d`) sugli stessi file.
+- **Base dei branch.** `sda-ldv-preadv-consumer` non ha `develop`: il branch dedicato parte da
+  `origin/dev202508_preadvising` (SEW-07, deciso il 24-11). Sul `develop` locale dell'adapter ci
+  sono due commit di Diego non pubblicati (`c4a26d1`, `1a6202d`) sugli stessi file: da
+  riconsiderare quando parte il punto 2.
 
 ## Fase 2 — interventi (HLD)
 
@@ -254,17 +282,19 @@ Ci sono anche due punti da chiarire nel contenuto:
 
 | # | Punto | Serve per |
 |---|---|---|
-| PA-01 | Conferma che i "3 nuovi campi" dell'HLD sono Account Key, Product ID e Declaration ID, e che il Declaration ID si predispone in fase 1 | DTO, DDL, ICD |
-| PA-02 | Regola R-01 sui campi del tracciato: come si riconoscono "business" (`cliente_business` = S?), "USA" (`destinatario.codice_nazione_iso_2` = US?), "merce" (`tipo_merce`, `codice_contenuto`?) e quali sono i "prodotti interessati" (codici prodotto/servizio) | Validatore |
-| PA-03 | Nomi JSON dei campi nel tracciato unico, decisi con il team del builder, e aggiornamento dell'ICD | Tutti |
-| PA-04 | Codici e descrizioni dei nuovi errori di validazione (Account Key assente, Account Key di lunghezza errata, Product ID assente o errato per articolo) e loro effetto: scarto della spedizione | Validatore, scarti |
-| PA-05 | DDL: colonne in `sew_spedizioni_work` (e `_2`?), `sew_spedizioni_poste` e nelle tabelle articoli; chi le esegue | Int. 07, 08 |
+| PA-01 | **Deciso internamente il 23-11 (Diego)**: `zonos_declaration_id` (13) si predispone in fase 1. Resta la conferma di Poste che i "3 nuovi campi" dell'HLD sono Account Key, Product ID e Declaration ID, e che il Declaration ID si predispone in fase 1 | DTO, DDL, ICD |
+| PA-02 | **Chiuso il 23-11 (Diego).** Regola R-01: niente condizione "business"; USA da `codice_nazione_iso_2` / `codice_nazione`; documenti da `tipo_merce` = `D`; prodotti `456,457,458,459,515,516` su `codice_prodotto` o `id_servizio` (resta PA-12) | Validatore |
+| PA-03 | **Chiuso il 23-11 (Diego)** per i nomi: `zonos_account_key`, `zonos_product_id`, `zonos_declaration_id`. Resta l'aggiornamento dell'ICD con il team del builder | Tutti |
+| PA-04 | **Chiuso il 23-11 (Diego).** Codici `1320`…`1323` con le descrizioni di AS-03, esito scarto | Validatore, scarti |
+| PA-05 | DDL: **colonne, tipi e nomi decisi il 23 e 24-11** (AS-04). Restano aperti: chi le esegue su Informix SDA e dove va il Product ID lato SDA, che non ha una tabella articoli (SEW-02) | Int. 07, 08 |
 | PA-06 | Repo del batch producer dei preavvisi da portali e web service | Int. 09 |
 | PA-07 | Fase 2: quali sono i due campi verso BEP, con quale contratto e quale flusso (`ldv-pdb` o `ldv-pdb-sync`) | Int. 06 |
 | PA-08 | Fase 2: contratto del microservizio comune Zonos (sincrono o su topic, chiave di idempotenza, formato di dazi e fee, codici di errore) e punto del processo in cui si avvia la lavorazione | Orchestratore fase 2 |
 | PA-09 | Fase 2: elenco dei campi che la lavorazione Zonos può sovrascrivere nel preavviso; dazi e fee rientrano? | Orchestratore fase 2 |
 | PA-10 | `ce-dichiarato-ldv` e `ce-dichiarato-state-machine-handler` compaiono nella descrizione ma non nell'HLD: chi li fa? | Perimetro |
 | PA-11 | Palmari (`sew_sped_pre_adv_online_out_tot`), T&T-Repo e OneTracking: sono fuori perimetro? | Perimetro |
+| PA-12 | **Nuovo (23-11).** Diego ha elencato CRONO INTERNAZIONALE quattro volte, ma in `ce_prodotto` di ce-rules risultano solo `515` e `516` (516 = assicurato): l'elenco dei prodotti va confermato. Si cambia in configurazione | Validatore |
+| PA-13 | **Nuovo (24-11).** Punto 2 della fase 1: nomi e livello dei campi nei messaggi sorgente PDB, PDW e ILP (adapter, int. 05) e dettagli lato Poste (`consumer-sew_sped_poste`, int. 08) | Int. 05, 08 |
 
 ## Casi di test minimi (fase 1, dalla descrizione)
 

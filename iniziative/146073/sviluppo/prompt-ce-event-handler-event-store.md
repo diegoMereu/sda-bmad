@@ -3,14 +3,17 @@
 > Prompt per Mary (analyst): genera il documento funzionale dell'event store per l'iniziativa 146073.
 > Output: `iniziative/146073/sviluppo/ce-event-handler-event-store.md`.
 > Regola di progetto: un documento funzionale per microservizio.
+>
+> Aggiornato il 2026-11-24: nomi dei campi `zonos_account_key`, `zonos_product_id`,
+> `zonos_declaration_id` e colonne SEW `zonos_*` (decisioni di Diego del 23 e 24-11), branch del 24-11.
 
 ---
 
 # Contesto
 
 Sei l'Analyst del progetto sda-iniziative. Iniziativa 146073 "Compliance USA Entry Type 13", **solo
-fase 1**: il preavviso porta `account_key` (testata di `spedizione[]`), `product_id` (ogni
-`spedizione[].collo[].articolo[]`) e `declaration_id` solo predisposto (sempre assente o `null`).
+fase 1**: il preavviso porta `zonos_account_key` (testata di `spedizione[]`), `zonos_product_id` (ogni
+`spedizione[].collo[].articolo[]`) e `zonos_declaration_id` solo predisposto (sempre assente o `null`).
 L'HLD, intervento 04, chiede di adeguare monitoring, event store e bff per "ricevere e propagare i
 nuovi campi". La descrizione generale aggiunge per l'event store: cardinalità per articolo in
 serializzazione e deserializzazione, replay e ricostruzione dello stato, compatibilità con gli
@@ -52,10 +55,10 @@ regressione, e dillo in testa al documento: è un'informazione importante per la
 
 # Regole
 
-- Intestazione con **Branch** `146073_compliance_usa_fase1` da `origin/develop` (se il repo non ha
-  `develop`, dal branch di integrazione del repo, verificato con git). Dove basta un test di non
-  regressione il branch serve solo se emerge una modifica. Mai sviluppo su `develop`/`master` né su
-  branch di altre iniziative.
+- Intestazione con **Branch** `develop` (decisione di Diego del 2026-11-24, sostituisce il branch dedicato
+  `146073_compliance_usa_fase1` del 16-11; il branch dedicato resta solo per `sda-ldv-preadv-consumer`).
+  Mai sviluppo su `master` né su branch di altre iniziative.
+  Dove basta un test di non regressione non serve nessuna modifica.
 - Distingui **[FATTO]** (con la fonte), **[DECISO]** (data e riferimento), **[ASSUNTO]** (ID e default).
 - Assunzioni nuove con prefisso `EVS-`, numerate.
 - Esempi JSON inventati (chiavi con prefisso `99`), niente dati di produzione né valori di secret.

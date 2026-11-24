@@ -3,6 +3,9 @@
 > Prompt per Mary (analyst): genera il documento funzionale del validatore per l'iniziativa 146073.
 > Output: `iniziative/146073/sviluppo/ce-dichiarato-validatore.md`, da passare allo sviluppatore (Amelia).
 > Regola di progetto: un documento funzionale per microservizio.
+>
+> Aggiornato il 2026-11-24: nomi dei campi `zonos_account_key`, `zonos_product_id`,
+> `zonos_declaration_id` e colonne SEW `zonos_*` (decisioni di Diego del 23 e 24-11), branch del 24-11.
 
 ---
 
@@ -13,9 +16,9 @@ Sei l'Analyst del progetto. Scrivi il **documento funzionale per lo sviluppo** d
 Type 13" (AP-00988 Corriere Espresso / PK-03089 ce-dichiarato), **solo fase 1**.
 
 Nella fase 1 il preavviso porta due campi nuovi: **Account Key** sulla testata della spedizione
-(52 caratteri) e **Product ID** su ogni articolo (da 1 a 255). C'è anche `declaration_id`, solo
-predisposto. Il validatore deve estendere i DTO, riconoscere le spedizioni soggette (business, USA,
-con merce, prodotti interessati) e controllare presenza e lunghezza dei due campi, con un errore che
+(52 caratteri) e **Product ID** su ogni articolo (da 1 a 255). C'è anche `zonos_declaration_id`, solo
+predisposto. Il validatore deve estendere i DTO, riconoscere le spedizioni soggette (USA, con merce,
+prodotti interessati su `codice_prodotto` o `id_servizio`; la condizione "business" non c'è più) e controllare presenza e lunghezza dei due campi, con un errore che
 indica il campo e, per il Product ID, l'articolo.
 
 Il **contratto della fase 1** (`analisi.md`, AS-01…AS-06) è **vincolante**: il documento lo dettaglia,
@@ -37,10 +40,9 @@ non lo cambia. Incoerenze e buchi vanno fra le assunzioni e le domande aperte.
 
 # Cosa ti chiedo
 
-Intestazione come nel modello. Deve contenere anche il **branch di sviluppo**:
-`146073_compliance_usa_fase1` da `origin/develop`. Se il repo non ha `develop`, si parte dal branch
-di integrazione del repo, verificato con git e indicato. Non si sviluppa mai su `develop` o `master`,
-né su branch di altre iniziative (es. il branch EURODIS in checkout).
+Intestazione come nel modello. Deve contenere anche il **branch di sviluppo**: `develop`
+(decisione di Diego del 2026-11-24, sostituisce il branch dedicato `146073_compliance_usa_fase1`).
+Non si sviluppa mai su `master` né su branch di altre iniziative (es. il branch EURODIS in checkout).
 
 Sezioni: contesto e obiettivo, requisiti e interventi HLD coperti, dove si interviene nel codice,
 dati usati, regole, esempi di messaggi, casi d'uso, configurazione, RNF e osservabilità, criteri di
@@ -49,7 +51,7 @@ accettazione numerati, casi di test, assunzioni e domande aperte, riferimenti.
 Approfondisci:
 
 1. **DTO** (`SpedizioneDTO`, `ColloDTO`, `ArticoloDTO`, `DichiaratoDTO` in `kafka/dto`): dove si
-   aggiungono `account_key`, `declaration_id` e `product_id`; nomi JSON con Jackson; cosa succede
+   aggiungono `zonos_account_key`, `zonos_declaration_id` e `zonos_product_id`; nomi JSON con Jackson; cosa succede
    oggi ai campi sconosciuti (`FAIL_ON_UNKNOWN_PROPERTIES`); se il validatore ripubblica il DTO
    tipizzato su `preadvising.enrichment`, sull'event store e su Mongo, e quindi se i campi non
    dichiarati si perdono. Effetto delle annotazioni Bean Validation (regola semantica generica) e
@@ -69,7 +71,7 @@ Approfondisci:
    come si gestiscono più occorrenze dello stesso codice (la mappa degli errori ha come chiave il
    codice) e qual è l'effetto dello scarto (eventi, stati, Mongo, metriche, topic).
 5. **Esempi JSON inventati** (niente dati reali) e casi di test che coprono i casi minimi della
-   descrizione e ogni condizione di AS-02: non business, non USA, documenti, prodotto fuori elenco,
+   descrizione e ogni condizione di AS-02: non USA, documenti, prodotto fuori elenco (su `codice_prodotto` e su `id_servizio`),
    flag spento. Aggiungi i casi limite: lunghezze 51/52/53 e 255/256, più colli, più spedizioni,
    articolo senza posizione, multicollo, canali di passaggio.
 

@@ -4,6 +4,9 @@
 > l'iniziativa 146073, solo fase 1.
 > Output: `iniziative/146073/sviluppo/ce-dichiarato-adapter.md`, da passare allo sviluppatore.
 > Regola di progetto: un documento funzionale per microservizio.
+>
+> Aggiornato il 2026-11-24: nomi dei campi `zonos_account_key`, `zonos_product_id`,
+> `zonos_declaration_id` e colonne SEW `zonos_*` (decisioni di Diego del 23 e 24-11), branch del 24-11.
 
 ---
 
@@ -20,8 +23,8 @@ sempre `null`. L'adapter è un ingresso della catena: consuma PDB/BEP (`PACCHI.B
 `preadvising.pre-enrichment` (gli esiti BEP su `preadvising.enrichment`). L'HLD int. 05 chiede la
 "modifica dei 3 consumer per acquisizione e propagazione dei nuovi campi".
 
-Il **contratto della fase 1** di `analisi.md` (AS-01…AS-06: `account_key` e `declaration_id` sulla
-testata di `spedizione[]`, `product_id` su `collo[].articolo[]`, tutti `String` opzionali, nessuna
+Il **contratto della fase 1** di `analisi.md` (AS-01…AS-06: `zonos_account_key` e `zonos_declaration_id` sulla
+testata di `spedizione[]`, `zonos_product_id` su `collo[].articolo[]`, tutti `String` opzionali, nessuna
 trasformazione) è **vincolante**: il documento lo applica, non lo cambia. Incoerenze e buchi vanno fra
 le domande aperte.
 
@@ -69,10 +72,11 @@ Approfondisci:
 
 # Regole
 
-- **Branch**: lo sviluppo nei repo dei servizi va su un branch dedicato all'iniziativa,
-  `146073_compliance_usa_fase1`, da `origin/develop` (se il repo non ha `develop`, dal suo branch di
-  integrazione, verificato con git e indicato nell'intestazione). Mai sviluppo su `develop`/`master` né
-  su branch di altre iniziative.
+- **Branch** `develop` (decisione di Diego del 2026-11-24, sostituisce il branch dedicato
+  `146073_compliance_usa_fase1` del 16-11; il branch dedicato resta solo per `sda-ldv-preadv-consumer`).
+  Mai sviluppo su `master` né su branch di altre iniziative.
+- L'intervento è **rimandato al punto 2 della fase 1** (decisione di Diego del 2026-11-24): mancano i
+  nomi dei campi nei messaggi sorgente PDB, PDW e ILP. Il funzionale va tenuto allineato ai nomi `zonos_*`.
 - Distingui **[FATTO]** (con la fonte), **[DECISO]** (data e riferimento), **[ASSUNTO]** (ID e default).
 - Riprendi le AS di `analisi.md` che toccano l'adapter e aggiungi le tue con prefisso **ADA-**, numerate.
 - Niente dati di produzione né valori di secret: messaggi d'esempio inventati (Account Key d'esempio di

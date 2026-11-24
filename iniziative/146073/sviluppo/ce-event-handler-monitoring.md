@@ -1,14 +1,13 @@
 # `ce-event-handler-monitoring` — Documento funzionale per lo sviluppo (Compliance USA, fase 1)
 
-**Iniziativa**: 146073 — Compliance USA Entry Type 13 (AP-00988 Corriere Espresso / PK-03089 ce-dichiarato) · **Versione**: 0.1 · **Data**: 2026-11-16
+**Iniziativa**: 146073 — Compliance USA Entry Type 13 (AP-00988 Corriere Espresso / PK-03089 ce-dichiarato) · **Versione**: 0.2 · **Data**: 2026-11-24
 **Autrice**: Mary (analyst) · **Destinatario**: sviluppatore del monitoring (Amelia) e test manager
 **Intervento HLD**: 04 della fase 1 ("Adeguamento ce-dichiarato-monitoring, event store, bff"), stima TOW 1.2 di 0,40 per i tre servizi insieme; nel foglio Impatti "Adeguamento ce-dichiarato-monitoring", impatto M50
 **Repository**: `gitlab.alm.poste.it/CORRIERE-ESPRESSO/PREADVISING/ce-event-handler-monitoring` (in locale `gitposte/SDA/preadvising/ce-event-handler-monitoring`)
-**Branch**: `146073_compliance_usa_fase1` da `origin/develop`, **solo se emerge una modifica**: nella
-variante di default (A, sezione 3) non ne serve nessuna; il branch serve per la variante B. Il branch
-`develop` esiste nel repo (verificato con git il 16-11; `origin/develop` = `origin/master`, tag
-`26.09.26`). Non si sviluppa su `develop` né su `master`, e nemmeno sui branch di altre iniziative
-(es. `develop_pdb`).
+**Branch**: `develop` [DECISO, Diego 2026-11-24, sostituisce il branch dedicato del 16-11], **solo se
+emerge una modifica**: nella variante di default (A, sezione 3) non ne serve nessuna. `origin/develop`
+= `origin/master`, tag `26.09.26` (16-11). Non si sviluppa su `master` né sui branch di altre
+iniziative (es. `develop_pdb`).
 **Codice letto**: `origin/develop` @ `9dce7cf` (2026-10-19), con `git show`, senza checkout. Il
 `git fetch` del 16-11 è fallito (connessione rifiutata da GitLab): prima di iniziare va rifatto. La
 copia locale ha una modifica non committata di altri a `deploy-config/values_TEMPLATE.yaml` e le
@@ -41,8 +40,8 @@ e trasforma ogni evento di stato in un messaggio per la console di monitoraggio 
 `PRE-ADV.MONITORAGGIO-CAMBIO-STATO` [FATTO, values e `application.yaml`]. Registra anche metriche
 di stato per Datadog.
 
-La fase 1 aggiunge al preavviso `account_key`, `declaration_id` (testata di `spedizione[]`) e
-`product_id` (ogni `spedizione[].collo[].articolo[]`) (AS-01), e quattro errori di validazione nuovi
+La fase 1 aggiunge al preavviso `zonos_account_key`, `zonos_declaration_id` (testata di `spedizione[]`) e
+`zonos_product_id` (ogni `spedizione[].collo[].articolo[]`) (AS-01), e quattro errori di validazione nuovi
 (AS-03, codici `1320`…`1323` proposti dal validatore). L'HLD chiede di "ricevere e propagare i nuovi
 campi sul topic" [FATTO, HLD int. 04].
 
@@ -100,9 +99,9 @@ Nessun file cambia. Si verifica con i test della sezione 9 che:
 
 | Punto | Cosa si fa |
 |---|---|
-| `dto/SpedizioneDTO` | `account_key`, `declaration_id` (`String`, nessuna validazione), stesso stile snake_case dei campi esistenti |
-| `dto/ArticoloDTO` | `product_id` (`String`) |
-| `dto/producerDTO/Record` | `accountKey`, `declarationId` (`String`) e `articoli` (`List<ArticoloMonitoraggio>` con `posizione`, `productId`), stile camelCase dei campi del `Record`. Il `Record` è per collo: gli articoli sono quelli del collo |
+| `dto/SpedizioneDTO` | `zonos_account_key`, `zonos_declaration_id` (`String`, nessuna validazione), stesso stile snake_case dei campi esistenti |
+| `dto/ArticoloDTO` | `zonos_product_id` (`String`) |
+| `dto/producerDTO/Record` | `zonosAccountKey`, `zonosDeclarationId` (`String`) e `articoli` (`List<ArticoloMonitoraggio>` con `posizione`, `zonosProductId`), stile camelCase dei campi del `Record`. Il `Record` è per collo: gli articoli sono quelli del collo |
 | `MacchinaStatiService.mapToMonitoraggio` | valorizza i tre campi da `sped` e `collo`, senza trasformazioni (R-04); con i campi assenti restano `null` / lista vuota |
 | ICD della console | nuova versione, da Poste |
 
@@ -128,15 +127,15 @@ L'evento di scarto `ST_R0006` porta `eventData.errori`. Ogni voce diventa un `Er
 
 | `errori` (chiave: valore) | `codiceErrore` | `nomeCampoInErrore` | `descrizioneErrore` |
 |---|---|---|---|
-| `1320: Account Key: Campo obbligatorio mancante` | `1320` | `Account Key` | `Campo obbligatorio mancante` |
-| `1321: Account Key: lunghezza non valida (attesi 52 caratteri)` | `1321` | `Account Key` | `lunghezza non valida (attesi 52 caratteri)` |
-| `1322: Product ID: obbligatorio mancante (collo 1 articolo 2)` | `1322` | `Product ID` | `obbligatorio mancante (collo 1 articolo 2)` |
-| `1323: Product ID: lunghezza non valida, attesi 1-255 caratteri (collo 2 articolo 1)` | `1323` | `Product ID` | `lunghezza non valida, attesi 1-255 caratteri (collo 2 articolo 1)` |
-| `1322: Product ID: obbligatorio mancante (collo 1 articolo 1; collo 2 articolo 3)` | `1322` | `Product ID` | `obbligatorio mancante (collo 1 articolo 1; collo 2 articolo 3)` |
+| `1320: zonos_account_key: Campo obbligatorio mancante` | `1320` | `zonos_account_key` | `Campo obbligatorio mancante` |
+| `1321: zonos_account_key: lunghezza non valida (attesi 52 caratteri)` | `1321` | `zonos_account_key` | `lunghezza non valida (attesi 52 caratteri)` |
+| `1322: zonos_product_id: Campo obbligatorio mancante (collo 1 articolo 2)` | `1322` | `zonos_product_id` | `Campo obbligatorio mancante (collo 1 articolo 2)` |
+| `1323: zonos_product_id: lunghezza non valida, attesi 1-255 caratteri (collo 2 articolo 1)` | `1323` | `zonos_product_id` | `lunghezza non valida, attesi 1-255 caratteri (collo 2 articolo 1)` |
+| `1322: zonos_product_id: Campo obbligatorio mancante (collo 1 articolo 1; collo 2 articolo 3)` | `1322` | `zonos_product_id` | `Campo obbligatorio mancante (collo 1 articolo 1; collo 2 articolo 3)` |
 
 Il taglio al primo `:` è il comportamento di oggi e non cambia. Le descrizioni del validatore
 (AS-03) mettono il nome del campo prima dei due punti e le occorrenze (collo e articolo) fra
-parentesi: il "campo in errore" è quindi `Product ID` e la descrizione le contiene tutte (MON-02). Inoltre ogni collo riceve tutti gli errori della
+parentesi: il "campo in errore" è quindi `zonos_product_id` e la descrizione le contiene tutte (MON-02). Inoltre ogni collo riceve tutti gli errori della
 spedizione, anche quelli di un altro collo: è il comportamento attuale per tutti gli errori.
 
 ## 5. Esempi [dati inventati]
@@ -144,8 +143,8 @@ spedizione, anche quelli di un altro collo: è il comportamento attuale per tutt
 ### 5.1 `ST_R0004` di una spedizione USA, un collo, due articoli
 
 Ingresso (ridotto): l'evento 5.1 di [ce-event-handler-event-store.md](ce-event-handler-event-store.md),
-con in più `id_file` e `cliente`: `aggregateType` `ldv`, `canale` `PDB_INVIOFILE`, `account_key` di
-52 caratteri, due `product_id`.
+con in più `id_file` e `cliente`: `aggregateType` `ldv`, `canale` `PDB_INVIOFILE`, `zonos_account_key` di
+52 caratteri, due `zonos_product_id`.
 
 Uscita su `PRE-ADV.MONITORAGGIO-CAMBIO-STATO`, variante A (identica a oggi):
 
@@ -173,12 +172,12 @@ Uscita su `PRE-ADV.MONITORAGGIO-CAMBIO-STATO`, variante A (identica a oggi):
 (Ridotto: i campi omessi, come `codiceLoginCliente`, seguono le regole attuali. L'esempio mostra
 solo che non compare nessun campo nuovo.)
 
-Variante B: lo stesso `Record` con in più `"accountKey": "TESTACCOUNTKEY…0001"`,
-`"declarationId": null`, `"articoli": [{"posizione": "1", "productId": "PRD-TEST-0001"}, {"posizione": "2", "productId": "PRD-TEST-0002"}]`.
+Variante B: lo stesso `Record` con in più `"zonosAccountKey": "TESTACCOUNTKEY…0001"`,
+`"zonosDeclarationId": null`, `"articoli": [{"posizione": "1", "zonosProductId": "PRD-TEST-0001"}, {"posizione": "2", "zonosProductId": "PRD-TEST-0002"}]`.
 
 ### 5.2 Scarto `ST_R0006` con Account Key corta e Product ID mancante
 
-`errori` = `{"1321": "Account Key: lunghezza non valida (attesi 52 caratteri)", "1322": "Product ID: obbligatorio mancante (collo 1 articolo 2)"}`.
+`errori` = `{"1321": "zonos_account_key: lunghezza non valida (attesi 52 caratteri)", "1322": "zonos_product_id: Campo obbligatorio mancante (collo 1 articolo 2)"}`.
 
 Uscita: un `Record` con `esito` `KO` e due `errore` come nelle righe 2 e 3 della tabella 4.2.
 
@@ -191,7 +190,7 @@ Variante A: nessuna proprietà nuova, nessun cambio ai values. Variante B: nessu
 - Volumi e tempi invariati.
 - **Log** [FATTO]: `KafkaConsumer` scrive in INFO l'intero evento ricevuto e `gestisciLDV` l'intero
   payload in uscita; `gestisciErroreTecnico` scrive il payload in ERROR. Con la fase 1 nei log va
-  anche `account_key` (e in variante B anche nel payload in uscita). Oggi ci vanno già P.IVA e
+  anche `zonos_account_key` (e in variante B anche nel payload in uscita). Oggi ci vanno già P.IVA e
   ragione sociale: problema esistente, fuori iniziativa. Se l'Account Key è riservata serve
   mascherarla (MON-03, come EVS-03).
 - Metriche invariate: i codici nuovi compaiono nelle metriche di stato esistenti senza tag nuovi.
@@ -201,15 +200,15 @@ Variante A: nessuna proprietà nuova, nessun cambio ai values. Variante B: nessu
 | # | Given / When / Then |
 |---|---|
 | AC-01 | Dato l'evento 5.1, il messaggio su `PRE-ADV.MONITORAGGIO-CAMBIO-STATO` è uguale, campo per campo, a quello di un evento identico senza i tre campi |
-| AC-02 | Dato un evento con `account_key` di 52 caratteri, `declaration_id: null` e `product_id` di 255 caratteri, non ci sono eccezioni né incrementi di `business_monitoring_error_total` |
+| AC-02 | Dato un evento con `zonos_account_key` di 52 caratteri, `zonos_declaration_id: null` e `zonos_product_id` di 255 caratteri, non ci sono eccezioni né incrementi di `business_monitoring_error_total` |
 | AC-03 | Dato l'evento 5.2, il `Record` ha `esito` `KO` e gli `Errore` della tabella 4.2 (codice, campo, descrizione, `CLIENTE`, `BLOCCANTE`) |
-| AC-04 | Dato uno scarto con `1322` su più articoli (descrizioni concatenate con `"; "`), `nomeCampoInErrore` è `Product ID` e `descrizioneErrore` contiene tutte le occorrenze (collo e articolo), senza eccezioni |
+| AC-04 | Dato uno scarto con `1322` su più articoli (descrizioni concatenate con `"; "`), `nomeCampoInErrore` è `zonos_product_id` e `descrizioneErrore` contiene tutte le occorrenze (collo e articolo), senza eccezioni |
 | AC-05 | Dato uno scarto `1322` su una spedizione con due colli, entrambi i `Record` hanno l'errore |
 | AC-06 | Eventi non USA, `FILE` e storici producono gli stessi messaggi di prima (test esistenti verdi) |
 | AC-07 | Variante A: nessuna modifica a codice e values (diff vuoto). Variante B: AC-08…AC-10 |
-| AC-08 | (B) Dato l'evento 5.1, il `Record` ha `accountKey` uguale all'ingresso, `declarationId` `null`, `articoli` con i due `productId` nell'ordine di ingresso |
+| AC-08 | (B) Dato l'evento 5.1, il `Record` ha `zonosAccountKey` uguale all'ingresso, `zonosDeclarationId` `null`, `articoli` con i due `zonosProductId` nell'ordine di ingresso |
 | AC-09 | (B) Dato un evento con due colli, ogni `Record` ha solo gli articoli del proprio collo |
-| AC-10 | (B) Dato un evento senza i campi, `accountKey` e `declarationId` sono `null` e `articoli` è vuota; il resto del `Record` è invariato |
+| AC-10 | (B) Dato un evento senza i campi, `zonosAccountKey` e `zonosDeclarationId` sono `null` e `articoli` è vuota; il resto del `Record` è invariato |
 
 ## 9. Casi di test
 
@@ -221,7 +220,7 @@ di regressione. In variante A non si aggiungono test al repo; si verifica in svi
 | TC | Tipo | Input | Atteso | AC |
 |---|---|---|---|---|
 | TC-01 | integrato svil | evento 5.1 su `preadvising.evensource`, e lo stesso senza i campi | due messaggi in uscita uguali (a parte gli identificativi) | AC-01 |
-| TC-02 | integrato svil | campi alle lunghezze massime, `declaration_id: null` | nessun errore, metriche di errore ferme | AC-02 |
+| TC-02 | integrato svil | campi alle lunghezze massime, `zonos_declaration_id: null` | nessun errore, metriche di errore ferme | AC-02 |
 | TC-03 | integrato svil | evento 5.2 | `Record` KO con gli `Errore` di 4.2 | AC-03 |
 | TC-04 | integrato svil | scarto `1322` concatenato, due colli | AC-04 e AC-05 | AC-04, AC-05 |
 | TC-05 | regressione | `mvn -o test` su `origin/develop` | 19 test verdi | AC-06 |
@@ -235,7 +234,7 @@ Valgono AS-01…AS-06 di [analisi.md](../analisi.md). Nuove (Mary, 16-11):
 | ID | Assunzione o domanda | Default adottato | Da confermare con |
 |---|---|---|---|
 | MON-01 | L'HLD dice "propagazione dei nuovi campi sul topic" e il foglio Impatti cita il monitoring con impatto M50. Il topic del monitoring è `PRE-ADV.MONITORAGGIO-CAMBIO-STATO`, verso la console, e il suo contratto non ha dati di spedizione né di articolo. Il contratto della fase 1 (AS-01…AS-06) non lo cita. La console deve ricevere Account Key, Product ID e Declaration ID? Che cos'è M50? | variante A: nessun campo nuovo sul topic. Se sì, variante B (3.4) con nuova versione dell'ICD della console | Poste |
-| MON-02 | [DECISO 2026-11-16] Le descrizioni del validatore (AS-03) mettono il nome del campo prima dei due punti: `Product ID: obbligatorio mancante (collo 1 articolo 2; collo 2 articolo 3)`. La console mostra quindi `Product ID` come campo in errore e tutte le occorrenze nella descrizione | nessuna modifica al monitoring | — |
+| MON-02 | [DECISO 2026-11-16, testi decisi da Diego il 23-11] Le descrizioni del validatore (AS-03) mettono il nome del campo prima dei due punti: `zonos_product_id: Campo obbligatorio mancante (collo 1 articolo 2; collo 2 articolo 3)`. La console mostra quindi `zonos_product_id` come campo in errore e tutte le occorrenze nella descrizione | nessuna modifica al monitoring | — |
 | MON-03 | L'Account Key è un dato riservato? Il servizio logga l'evento intero | non riservata: nessuna modifica | Poste |
 | MON-04 | La stima di 0,40 dell'int. 04 copre tre servizi | quota monitoring = test di non regressione (A); la variante B non è stimata nell'HLD come modifica di DTO | Diego |
 

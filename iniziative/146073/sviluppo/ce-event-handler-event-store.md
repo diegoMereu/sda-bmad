@@ -1,13 +1,12 @@
 # `ce-event-handler-event-store` — Documento funzionale per lo sviluppo (Compliance USA, fase 1)
 
-**Iniziativa**: 146073 — Compliance USA Entry Type 13 (AP-00988 Corriere Espresso / PK-03089 ce-dichiarato) · **Versione**: 0.1 · **Data**: 2026-11-16
+**Iniziativa**: 146073 — Compliance USA Entry Type 13 (AP-00988 Corriere Espresso / PK-03089 ce-dichiarato) · **Versione**: 0.2 · **Data**: 2026-11-24
 **Autrice**: Mary (analyst) · **Destinatario**: sviluppatore dell'event store (Amelia) e test manager
 **Intervento HLD**: 04 della fase 1 ("Adeguamento ce-dichiarato-monitoring, event store, bff"), stima TOW 1.2 di 0,40 per i tre servizi insieme
 **Repository**: `gitlab.alm.poste.it/CORRIERE-ESPRESSO/PREADVISING/ce-event-handler-event-store` (in locale `gitposte/SDA/preadvising/ce-event-handler-event-store`)
-**Branch**: `146073_compliance_usa_fase1` da `origin/develop`, **solo se emerge una modifica**: con le
-verifiche di questo documento non ne serve nessuna (sezione 3). Il branch `develop` esiste nel repo
-(verificato con git il 16-11). Non si sviluppa su `develop` né su `master`, e nemmeno sui branch di
-altre iniziative.
+**Branch**: `develop` [DECISO, Diego 2026-11-24, sostituisce il branch dedicato del 16-11], **solo se
+emerge una modifica**: con le verifiche di questo documento non ne serve nessuna (sezione 3). Non si
+sviluppa su `master` né sui branch di altre iniziative.
 **Codice letto**: `origin/develop` @ `94bb901` (2026-09-03), con `git show`, senza checkout. Il
 `git fetch` del 16-11 è fallito (connessione rifiutata da GitLab): prima di iniziare va rifatto. La
 copia locale ha modifiche non committate di altri (`AsyncProcessingConfig` e 4 DTO): non sono
@@ -25,7 +24,7 @@ Etichette:
 - **[ASSUNTO]**: scelta adottata per non bloccare il lavoro, con ID e default (sezione 10).
 
 > **Verdetto: nessuna modifica di codice.** L'event store tratta `eventData` come JSON generico e
-> lo salva così com'è: `account_key`, `declaration_id` e `product_id` (per articolo) arrivano su
+> lo salva così com'è: `zonos_account_key`, `zonos_declaration_id` e `zonos_product_id` (per articolo) arrivano su
 > Mongo senza interventi. L'intervento si riduce a **verifica e test di non regressione**.
 
 ---
@@ -41,8 +40,8 @@ tipi [FATTO, ICD eventsource §3-§6]:
 | `file` | `ce-dichiarato-builder`, `ce-dichiarato-eurodis-in` | `FileDigest` (dati del file) |
 | `ldv`, `collo` | validatore, orchestratore, smistatore, `ce-dichiarato-ldv` | il `DichiaratoDTO` completo del preavviso, con `spedizione[].collo[].articolo[]` |
 
-Con la fase 1 il preavviso porta tre campi nuovi (AS-01): `account_key` e `declaration_id` sulla
-testata di `spedizione[]`, `product_id` su ogni `spedizione[].collo[].articolo[]`. La descrizione
+Con la fase 1 il preavviso porta tre campi nuovi (AS-01): `zonos_account_key` e `zonos_declaration_id` sulla
+testata di `spedizione[]`, `zonos_product_id` su ogni `spedizione[].collo[].articolo[]`. La descrizione
 chiede all'event store di [FATTO, descrizione]:
 
 1. estendere il modello degli eventi con Account Key e Product ID;
@@ -90,12 +89,12 @@ Codice di `origin/develop` @ `94bb901` [FATTO, letto il 16-11].
   `String` / numeri, **qualunque** sia il contenuto. Nessuna classe Java descrive il preavviso in
   questo percorso, quindi un campo nuovo non può essere scartato.
 - `MongoTemplate.insert` scrive la mappa come documento BSON annidato con le stesse chiavi e lo
-  stesso ordine. Gli array restano array: ogni `product_id` resta nell'elemento di `articolo[]` in
-  cui è arrivato, e ogni `account_key` nel suo elemento di `spedizione[]` (cardinalità per articolo
+  stesso ordine. Gli array restano array: ogni `zonos_product_id` resta nell'elemento di `articolo[]` in
+  cui è arrivato, e ogni `zonos_account_key` nel suo elemento di `spedizione[]` (cardinalità per articolo
   e per spedizione, R-04).
 - I valori stringa non vengono toccati: niente `trim`, maiuscole, troncamenti (R-04). Lunghezze di
   52 e 255 caratteri non hanno limiti né in Jackson né in Mongo.
-- `declaration_id: null` si salva come `null`; un campo assente resta assente. Per la fase 1 le due
+- `zonos_declaration_id: null` si salva come `null`; un campo assente resta assente. Per la fase 1 le due
   forme sono equivalenti (AS-01). Il test TC-03 registra quale delle due si ottiene.
 
 ### 3.3 DTO tipizzati presenti nel repo, ma fuori dal percorso [FATTO]
@@ -133,7 +132,7 @@ usa una mappa): nessuna incompatibilità.
 | ID | Regola |
 |---|---|
 | RE-01 | L'evento si salva com'è arrivato: i tre campi nuovi, se presenti in `eventData`, sono nel documento di `event_store` con lo stesso nome, la stessa posizione e lo stesso valore |
-| RE-02 | `product_id` resta sull'elemento di `articolo[]` in cui è arrivato, con più colli e più articoli |
+| RE-02 | `zonos_product_id` resta sull'elemento di `articolo[]` in cui è arrivato, con più colli e più articoli |
 | RE-03 | Un evento senza i campi (scenari non USA, eventi `file`, eventi storici) si salva come oggi |
 | RE-04 | Nessuna validazione dei campi: presenza e lunghezza le controlla solo il validatore (R-02) |
 | RE-05 | Nessun cambio a topic, collection, gruppo consumer, metriche |
@@ -155,13 +154,13 @@ In ingresso su `preadvising.evensource` (ridotto ai campi utili):
     "canale": "PDB_INVIOFILE",
     "spedizione": [{
       "rif_spedizione": "99RIF-USA-0001",
-      "account_key": "TESTACCOUNTKEY00000000000000000000000000000000000001",
-      "declaration_id": null,
+      "zonos_account_key": "TESTACCOUNTKEY00000000000000000000000000000000000001",
+      "zonos_declaration_id": null,
       "collo": [{
         "id_collo": "99COLLO0001",
         "articolo": [
-          { "posizione": "1", "codice_taric": "6109100010", "product_id": "PRD-TEST-0001" },
-          { "posizione": "2", "codice_taric": "6203420000", "product_id": "PRD-TEST-0002" }
+          { "posizione": "1", "codice_taric": "6109100010", "zonos_product_id": "PRD-TEST-0001" },
+          { "posizione": "2", "codice_taric": "6203420000", "zonos_product_id": "PRD-TEST-0002" }
         ]
       }]
     }]
@@ -173,13 +172,13 @@ In ingresso su `preadvising.evensource` (ridotto ai campi utili):
 ```
 
 Documento in `event_store`: stesso contenuto, con `_id` = `id` e `timestamp` come `Date`. In
-`eventData.spedizione[0]` ci sono `account_key` (52 caratteri) e `declaration_id` (`null`); in
-`eventData.spedizione[0].collo[0].articolo[0]` e `[1]` i due `product_id`, ognuno sul suo articolo.
+`eventData.spedizione[0]` ci sono `zonos_account_key` (52 caratteri) e `zonos_declaration_id` (`null`); in
+`eventData.spedizione[0].collo[0].articolo[0]` e `[1]` i due `zonos_product_id`, ognuno sul suo articolo.
 
 ### 5.2 Scarto `ST_R0006` per Product ID mancante
 
-`eventData.errori` = `{"1322": "Articolo 2 collo 1: Product ID obbligatorio mancante"}` (codice del
-validatore), il secondo articolo senza `product_id`. Si salva com'è: l'articolo senza `product_id`
+`eventData.errori` = `{"1322": "zonos_product_id: Campo obbligatorio mancante (collo 1 articolo 2)"}` (codice del
+validatore), il secondo articolo senza `zonos_product_id`. Si salva com'è: l'articolo senza `zonos_product_id`
 resta senza la chiave.
 
 ### 5.3 Spedizione non USA
@@ -196,7 +195,7 @@ Nessuna proprietà nuova, nessun cambio ai values (`.helm`, `deploy-svil`, `depl
 - Volumi e tempi invariati: due stringhe per spedizione e una per articolo, al massimo 255 caratteri.
 - **Log** [FATTO]: `processaMessaggio` scrive in INFO l'intero evento (`Evento ricevuto da topic…`) e
   `gestisciErroreTecnico` in ERROR l'intero payload. Con la fase 1 nei log finiscono anche
-  `account_key` e `product_id`. Oggi ci finiscono già nomi, indirizzi e P.IVA, contro le linee guida:
+  `zonos_account_key` e `zonos_product_id`. Oggi ci finiscono già nomi, indirizzi e P.IVA, contro le linee guida:
   è un problema esistente, non di questa iniziativa. Se Poste considera l'Account Key un dato
   riservato serve una modifica (EVS-03).
 - Metriche e span invariati (`kafka_eventstore_message_*`, span `ce-event-handler-event-store` e
@@ -206,11 +205,11 @@ Nessuna proprietà nuova, nessun cambio ai values (`.helm`, `deploy-svil`, `depl
 
 | # | Given / When / Then |
 |---|---|
-| AC-01 | Dato l'evento 5.1 su `preadvising.evensource`, il documento in `event_store` con `_id` = `e1000000-…0001` ha `eventData.spedizione[0].account_key` uguale al valore inviato (52 caratteri, identico) |
-| AC-02 | Nello stesso documento `articolo[0].product_id` = `PRD-TEST-0001` e `articolo[1].product_id` = `PRD-TEST-0002`: nessuno spostamento né accorpamento |
-| AC-03 | `declaration_id` è `null` o assente nel documento; nessun errore nei log |
-| AC-04 | Con due colli e tre articoli ciascuno, ogni `product_id` è sull'articolo di partenza; un `product_id` di 255 caratteri è salvato intero |
-| AC-05 | L'evento 5.2 (articolo senza `product_id`) si salva senza la chiave sull'articolo e con `errori` invariato |
+| AC-01 | Dato l'evento 5.1 su `preadvising.evensource`, il documento in `event_store` con `_id` = `e1000000-…0001` ha `eventData.spedizione[0].zonos_account_key` uguale al valore inviato (52 caratteri, identico) |
+| AC-02 | Nello stesso documento `articolo[0].zonos_product_id` = `PRD-TEST-0001` e `articolo[1].zonos_product_id` = `PRD-TEST-0002`: nessuno spostamento né accorpamento |
+| AC-03 | `zonos_declaration_id` è `null` o assente nel documento; nessun errore nei log |
+| AC-04 | Con due colli e tre articoli ciascuno, ogni `zonos_product_id` è sull'articolo di partenza; un `zonos_product_id` di 255 caratteri è salvato intero |
+| AC-05 | L'evento 5.2 (articolo senza `zonos_product_id`) si salva senza la chiave sull'articolo e con `errori` invariato |
 | AC-06 | L'evento 5.3 (non USA) e un evento `file` si salvano come prima: confronto con un evento equivalente salvato da `94bb901` senza i campi |
 | AC-07 | Il BFF legge con `EventStoreEntry` sia un documento della fase 1 sia uno storico, senza errori |
 | AC-08 | Nessuna modifica a codice, values, topic, collection, metriche (diff vuoto sul repo) |
@@ -225,8 +224,8 @@ test al repo se non emerge una modifica: le verifiche si fanno in svil. Regole d
 | TC | Tipo | Input | Atteso | AC |
 |---|---|---|---|---|
 | TC-01 | integrato svil | evento 5.1 iniettato su `preadvising.evensource` | documento in `event_store` con i tre campi al posto giusto | AC-01, AC-02 |
-| TC-02 | integrato svil | 2 colli × 3 articoli, `product_id` di 1 e di 255 caratteri | cardinalità e valori invariati | AC-04 |
-| TC-03 | integrato svil | evento con `declaration_id: null` e uno senza la chiave | `null` o assente (annotare quale), nessun errore | AC-03 |
+| TC-02 | integrato svil | 2 colli × 3 articoli, `zonos_product_id` di 1 e di 255 caratteri | cardinalità e valori invariati | AC-04 |
+| TC-03 | integrato svil | evento con `zonos_declaration_id: null` e uno senza la chiave | `null` o assente (annotare quale), nessun errore | AC-03 |
 | TC-04 | integrato svil | evento 5.2 | articolo senza chiave, `errori` invariato | AC-05 |
 | TC-05 | regressione svil | evento non USA, evento `file` | come prima | AC-06 |
 | TC-06 | integrato svil, catena | preavviso USA vero da `preadvising.pre-enrichment` (AS-05), dopo i rilasci di validatore, orchestratore e smistatore | gli eventi `ST_R0002` e `ST_R0004` di quell'`aggregateId` hanno i campi in `event_store` | AC-01, AC-02 |
@@ -244,7 +243,7 @@ Valgono AS-01…AS-06 di [analisi.md](../analisi.md). Nuove (Mary, 16-11):
 |---|---|---|---|
 | EVS-01 | I DTO tipizzati di `dto/`, `dto/dto/` e `entity/PreadvisingEvents` non sono nel percorso dell'evento | non si estendono; nessuna modifica di codice | Diego |
 | EVS-02 | La "ricostruzione dello stato dall'event store" della descrizione: nel perimetro non c'è un servizio che rilegge `event_store` per ricostruire lo stato, salvo la consultazione del BFF | la ricostruzione è la lettura degli eventi di un `aggregateId` ordinati per `timestamp` (ICD §7.3), verificata da TC-06 e TC-07 | Poste |
-| EVS-03 | L'Account Key è un dato riservato? Il servizio logga l'intero evento in INFO e in ERROR | non è riservata: nessuna modifica. Se lo è, serve mascherare `account_key` nei due log (modifica piccola, con branch) | Poste |
+| EVS-03 | L'Account Key è un dato riservato? Il servizio logga l'intero evento in INFO e in ERROR | non è riservata: nessuna modifica. Se lo è, serve mascherare `zonos_account_key` nei due log (modifica piccola, con branch) | Poste |
 | EVS-04 | La stima di 0,40 dell'int. 04 copre tre servizi. Per l'event store resta solo la verifica | quota event store = test di non regressione in svil (TC-01…TC-07) | Diego |
 | EVS-05 | I campi arrivano in `event_store` solo se ci sono nel `DichiaratoDTO` dei servizi che pubblicano l'evento, `ce-dichiarato-ldv` compreso (non è nell'HLD, PA-10) | dipendenza dichiarata, verificata da TC-06 | Diego |
 

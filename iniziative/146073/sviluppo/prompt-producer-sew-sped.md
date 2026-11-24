@@ -4,6 +4,9 @@
 > funzionale per la fase 1 dell'iniziativa 146073.
 > Output: `iniziative/146073/sviluppo/producer-sew-sped.md` (nome del componente individuato).
 > Regola di progetto: un documento funzionale per microservizio.
+>
+> Aggiornato il 2026-11-24: nomi dei campi `zonos_account_key`, `zonos_product_id`,
+> `zonos_declaration_id` e colonne SEW `zonos_*` (decisioni di Diego del 23 e 24-11), branch del 24-11.
 
 ---
 
@@ -11,9 +14,9 @@
 
 Sei l'Analyst del progetto. Iniziativa 146073 "Compliance USA Entry Type 13", **solo la fase 1**. I campi
 nuovi sono:
-- `account_key`: testata della spedizione, 52 caratteri;
-- `product_id`: per articolo, da 1 a 255 caratteri;
-- `declaration_id`: solo predisposto.
+- `zonos_account_key`: testata della spedizione, 52 caratteri;
+- `zonos_product_id`: per articolo, da 1 a 255 caratteri;
+- `zonos_declaration_id`: solo predisposto.
 
 Sono i "3 nuovi campi" dell'HLD. Il contratto della fase 1 di `iniziative/146073/analisi.md`
 (AS-01…AS-06) è **vincolante**.
@@ -22,10 +25,15 @@ HLD, int. 09 "Adeguamento producer dati da portali e webservice": "deve essere m
 prende i dati di preavviso dei portali e dei webservice per inviare anche i 3 nuovi campi: modifica
 producer kafka". Il repo non è indicato (PA-06).
 
-**Branch (regola di Diego)**: lo sviluppo si fa sul branch dedicato `146073_compliance_usa_fase1`, da
-`origin/develop`. Se il repo non ha `develop`, si parte dal branch di integrazione, dopo averlo
-verificato con git, e lo si scrive nell'intestazione. Mai sviluppo su `develop` o `master`, né su
-branch di altre iniziative.
+**Branch (regola di Diego)**: questo repo (`sda-ldv-preadv-consumer`) è l'unico della 146073 che resta
+sul branch dedicato `146073_compliance_usa_fase1`, da `origin/dev202508_preadvising` (il repo non ha
+`develop`). Decisione del 2026-11-24: gli altri repo si sviluppano su `develop`. Mai sviluppo su
+`dev202508_preadvising` o `master`, né su branch di altre iniziative.
+
+**Colonne SEW (decisione di Diego del 2026-11-23)**: `zonos_account_key char(52) default ''`,
+`zonos_declaration_id char(13) default ''` sulla tabella della spedizione, `zonos_product_id char(255) default ''`
+sulla tabella articoli. Il default è la stringa vuota: un valore vuoto o di soli spazi (`char`) vale
+come campo assente e non si invia.
 
 # Prima: individua il producer
 

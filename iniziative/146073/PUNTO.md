@@ -1,33 +1,37 @@
 # 146073 — Compliance USA Entry Type 13 — nuovi campi e controlli sul preadvising
 
-**Data**: 2026-11-16 · **Stato**: in_analisi · **Semaforo**: 🟡
+**Data**: 2026-11-24 · **Stato**: in_analisi · **Semaforo**: 🟡
 **Owner cliente**: da definire · **PRJ**: da assegnare
 
 ## In una riga
-La fase 1 (Account Key per spedizione, Product ID per articolo, Declaration ID predisposto)
-ha i funzionali per tutti gli 8 interventi dell'HLD, in `sviluppo/`, con le DDL Informix.
-Lo sviluppo può partire sul branch `146073_compliance_usa_fase1` con le assunzioni dichiarate.
-Per chiudere servono da Poste:
-- la regola esatta che riconosce le spedizioni soggette;
-- i nomi dei campi nelle sorgenti;
-- la conferma dei codici di errore.
+La fase 1 (Account Key per spedizione, Product ID per articolo, Declaration ID predisposto) ha
+nomi, regola, errori e colonne SEW decisi da Diego. Lo sviluppo del primo passo è in corso, ancora
+senza commit pubblicati:
+- validatore, orchestratore, smistatore e bff su `develop`;
+- `sda-ldv-preadv-consumer` (`consumer-sew_sped`, `producer-sew-sped`) sul branch dedicato.
+
+Adapter e consumer Poste sono rimandati al punto 2 della fase 1. Da Poste servono ancora l'elenco
+dei prodotti CRONO INTERNAZIONALE e i nomi dei campi nelle sorgenti.
 
 ## Fatto dall'ultimo punto
-- 2026-11-16 — HLD fase 1 e 2 e descrizione generale "Compliance USA Entry Type 13" in `cliente/`.
-- 2026-11-16 — Analisi 0.2 con il contratto della fase 1 (AS-01…AS-07), l'esito dei funzionali e i rischi emersi.
-- 2026-11-16 — Funzionali 0.1 della fase 1 con i prompt, Mary:
-  - `ce-dichiarato-validatore`, `ce-dichiarato-orchestratore`, `ce-dichiarato-smistatore`, `ce-dichiarato-adapter`;
-  - `ce-event-handler-event-store`, `ce-event-handler-monitoring`, `ce-dichiarato-bff`;
-  - `consumer-sew-sped`, `consumer-sew-sped-poste`, `producer-sew-sped`.
-- 2026-11-16 — DDL Informix delle tabelle SEW (`ddl-sew-146073.md`), Winston.
-- 2026-11-16 — Verdetto per l'int. 04: event store e monitoring senza modifiche di codice (solo test); bff con una modifica piccola.
+- 2026-11-23 — Diego decide nomi, regola, errori e colonne SEW:
+  - nomi `zonos_account_key`, `zonos_product_id`, `zonos_declaration_id`;
+  - regola senza "cliente business", prodotti 456-459, 515, 516 su `codice_prodotto` o `id_servizio`;
+  - errori `1320`…`1323`;
+  - colonne `char` con default `''`.
+- 2026-11-24 — Partito lo sviluppo del primo passo. Validatore, orchestratore, smistatore e bff vanno su `develop`, `sda-ldv-preadv-consumer` sul branch `146073_compliance_usa_fase1`.
+- 2026-11-24 — Analisi 0.3 (contratto AS-01…AS-07 aggiornato, primo passo e punto 2, punti aperti), Mary.
+- 2026-11-24 — Funzionali e prompt alla versione 0.2 con le decisioni del 23 e 24-11, Mary. Adapter e `consumer-sew-sped-poste` hanno in testa la nota "rimandato al punto 2 della fase 1".
+- 2026-11-24 — DDL 0.2 (`ddl-sew-146073.md`) con le colonne `zonos_*` `char` con default `''`, Mary.
 
 ## Prossimi passi
-- Rifare il `git fetch` dei repo (fallito il 16-11 per un problema di rete) e ricontrollare i ref letti — Amelia — prima dei branch
-- Sviluppo della fase 1 sul branch `146073_compliance_usa_fase1` in ogni repo, a partire da validatore, orchestratore e adapter — Amelia — dopo il fetch
-- Inviare a Poste le domande della fase 1 (vedi sotto) — Diego — prossimo passo
-- Richiedere al DBA Informix le DDL in svil — Diego / Winston — dopo la conferma delle tabelle
-- Test integrati in svil con messaggi costruiti a mano su `preadvising.pre-enrichment` — test manager — dopo lo sviluppo
+- Completare lo sviluppo del primo passo: validatore, orchestratore, smistatore e bff su `develop` — Amelia — in corso
+- Completare lo sviluppo di `consumer-sew_sped` e `producer-sew-sped` sul branch `146073_compliance_usa_fase1` — Amelia — in corso
+- Pubblicare i commit; GitLab non rispondeva il 23-11 — coordinatore — appena GitLab risponde
+- Chiedere a Poste la conferma dell'elenco CRONO INTERNAZIONALE (PA-12) — Diego — prossimo passo
+- Richiedere al DBA Informix gli script 1 e 2 delle DDL in svil — Diego / Winston — prima che il builder mandi i campi
+- Test integrati in svil con messaggi costruiti a mano su `preadvising.pre-enrichment`, con il flag `compliance-usa.abilitata` acceso solo per il test — test manager — dopo lo sviluppo
+- Punto 2 della fase 1: adapter (int. 05) e `consumer-sew_sped_poste` (int. 08) — Amelia — quando arrivano i nomi dei campi sorgente e i dettagli lato Poste (PA-13)
 
 ## Blocchi e rischi
 - 🟡 Il validatore controlla solo i flussi SDA e PDB/EUD: portali e web service (MYSDA, SDA_WS, INVIO_WEB), adapter e TUP passano senza regole.
@@ -35,26 +39,31 @@ Per chiudere servono da Poste:
 - 🟡 Lato SDA il Product ID non ha una tabella articoli (né consumer né producer): va deciso con Poste.
 - 🟡 L'Account Key dei portali arriva solo se i portali, fuori perimetro, la scrivono nelle SEW.
 - 🟡 Due retry (`retry-eurodis`, `retry-pread-completo`) perderebbero i campi.
-- 🟡 `git fetch` fallito il 16-11: i funzionali sono scritti sui ref locali di `origin/develop`.
+- 🟡 Le DDL vanno eseguite prima che il builder mandi i campi. Prima di allora i consumer funzionano, perché le colonne entrano nello statement solo se i campi arrivano valorizzati.
 
 ## Serve dal cliente
-- Regola di riconoscimento: "business" (`importi.cliente_business` o `cliente.tipo_cliente`?), "documenti" (`tipo_merce` o `collo.codice_contenuto`?) ed elenco dei prodotti.
-- Nomi e livello di Account Key e Product ID nei messaggi PDB, PDW e ILP; PDW avrà più articoli?
-- Conferma dei codici di errore `1320`…`1323` e del formato delle descrizioni.
+- Elenco dei prodotti CRONO INTERNAZIONALE: in `ce_prodotto` ci sono solo `515` e `516` (PA-12).
+- Nomi e livello di Account Key e Product ID nei messaggi PDB, PDW e ILP; PDW avrà più articoli? Serve per il punto 2 (PA-13).
 - Il validatore deve controllare anche portali, web service, adapter e TUP?
 - Dove va il Product ID lato SDA (nuova tabella `sew_spedizioni_work_art`?) e chi adegua i portali per l'Account Key.
 - L'Account Key è un dato riservato? Se sì va mascherata nei log.
 - La console di monitoraggio deve ricevere i campi (variante B)?
 - Chi adegua `ce-dichiarato-ldv`, `-ldv-pdb`, `-ldv-pdb-sync` e i retry?
+- Aggiornamento dell'ICD con i nomi `zonos_*` (team del builder).
 - PRJ e owner cliente.
 
 ## Serve da Diego
-- I due commit locali sull'adapter (`c4a26d1`, `1a6202d`, 30-10), non pubblicati e sugli stessi file: vanno pubblicati prima o inclusi nel branch?
-- Base del branch per `sda-ldv-preadv-consumer` (senza `develop`): va bene `origin/dev202508_preadvising`?
 - Istanze Informix di svil e collaudo, referente DBA e modalità di richiesta delle DDL; valori delle properties esterne del producer (topic, query, schedule).
+- Per il punto 2: i due commit locali sull'adapter (`c4a26d1`, `1a6202d`, 30-10), non pubblicati e sugli stessi file.
 
 ## Decisioni prese
 - 2026-11-16 — Il perimetro di Accenture è quello degli interventi negli HLD; la descrizione generale serve da contesto (Diego).
 - 2026-11-16 — Si lavora solo sulla fase 1 (Diego).
-- 2026-11-16 — Sviluppo su branch dedicato `146073_compliance_usa_fase1` in ogni repo, mai su develop/master o branch di altre iniziative (Diego).
 - 2026-11-16 — Nelle descrizioni degli errori il nome del campo va prima dei due punti, con le occorrenze fra parentesi, perché la console le legge così.
+- 2026-11-23 — Nomi nel tracciato `zonos_account_key` (spedizione, 52), `zonos_product_id` (articolo, 1-255), `zonos_declaration_id` (spedizione, 13, solo predisposto) (Diego).
+- 2026-11-23 — Soggette le spedizioni con merce (`tipo_merce` diverso da `D`), destinatario USA e prodotto `456,457,458,459,515,516` su `codice_prodotto` o `id_servizio`. Niente condizione "cliente business". Flag spento di default (Diego).
+- 2026-11-23 — Errori `1320`…`1323` con le descrizioni dell'analisi (AS-03), esito scarto (Diego).
+- 2026-11-23 — Colonne SEW `char(52)`, `char(13)` e `char(255)` con default `''`. I consumer le mettono nello statement solo se il campo arriva valorizzato (Diego).
+- 2026-11-24 — Nomi `zonos_*` sia nel tracciato sia nelle colonne SEW: niente prefisso `z_` (Diego).
+- 2026-11-24 — Branch: `develop` nei repo dei servizi preadvising (validatore, orchestratore, smistatore, bff, adapter, `poste-ldv-preadv-consumer`). Solo `sda-ldv-preadv-consumer` resta sul branch dedicato `146073_compliance_usa_fase1`, da `origin/dev202508_preadvising`. Sostituisce la decisione del 16-11 (Diego).
+- 2026-11-24 — Adapter (int. 05) e `consumer-sew_sped_poste` (int. 08) rimandati al punto 2 della fase 1, perché mancano i dettagli (Diego).

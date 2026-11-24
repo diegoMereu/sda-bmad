@@ -1,10 +1,15 @@
 # `consumer-sew_sped_poste` — Documento funzionale per lo sviluppo (int. 08, fase 1)
 
-**Iniziativa**: 146073 — Compliance USA Entry Type 13 · **Fase**: 1 · **Versione**: 0.1 · **Data**: 2026-11-16
+> **Rimandato al punto 2 della fase 1** (decisione di Diego del 2026-11-24): l'intervento non si
+> sviluppa nel primo passo perché mancano ancora i dettagli (lato Poste). Il documento resta allineato ai nomi
+> `zonos_*` e va completato quando i dettagli arrivano.
+
+**Iniziativa**: 146073 — Compliance USA Entry Type 13 · **Fase**: 1 · **Versione**: 0.2 · **Data**: 2026-11-24
 **Autrice**: Mary (analyst), DDL con Winston · **Destinatario**: sviluppatore del consumer
 **Repository**: `gitlab.alm.poste.it/esiti/poste-ldv-preadv-consumer` (locale `gitposte/SDA/ESITI/poste-ldv-preadv-consumer`), modulo `consumer-sew_sped_poste`
-**Branch**: `146073_compliance_usa_fase1` da **`origin/develop`** (`03f66b9` del 10-11, verificato con git
-il 16-11). Lo sviluppo non si fa mai su `develop` o `master`, né su branch di altre iniziative
+**Branch**: `develop` [DECISO, Diego 2026-11-24: sostituisce il branch dedicato `146073_compliance_usa_fase1`]
+(`origin/develop` @ `03f66b9` del 10-11, verificato con git il 16-11). Lo sviluppo non si fa mai su `master`,
+né su branch di altre iniziative
 (`dev202511_preadvising_extend`, `dev20261013_handling_storico_oneri`, `dev202610_prodotto_a_valore`…).
 **Stack**: Java 8, client Kafka, Jackson, JDBC Informix (`ifxjdbc` 3.70.JC7X1), SQL dinamico (`MERGE …
 FROM SYSMASTER:'informix'.SYSDUAL`). Progetto Eclipse senza `pom.xml`. Nessun test automatico nel repo.
@@ -17,6 +22,10 @@ FROM SYSMASTER:'informix'.SYSDUAL`). Progetto Eclipse senza `pom.xml`. Nessun te
 Etichette: **[FATTO]** (HLD o codice, con la fonte), **[DECISO]** (data e riferimento), **[ASSUNTO]**
 (ID e default, da confermare nella sezione 10).
 
+> **Aggiornamento 0.2 (2026-11-24).** Nomi dei campi `zonos_account_key`, `zonos_product_id`,
+> `zonos_declaration_id` (Diego, 23-11); colonne SEW con gli stessi nomi (Diego, 24-11); branch
+> `develop` (Diego, 24-11).
+>
 > Il contratto della fase 1 non si cambia. Le differenze fra il codice e il contratto sono fra le
 > assunzioni SWP-xx.
 
@@ -44,9 +53,9 @@ Con l'int. 08 il consumer deve **storicizzare in `sew_spedizioni_poste` i 3 nuov
 
 | Campo (AS-01) | Livello | Fase 1 |
 |---|---|---|
-| `account_key` | `spedizione[]` | valorizzato per le spedizioni soggette, 52 caratteri |
-| `declaration_id` | `spedizione[]` | solo predisposto: sempre assente o `null` |
-| `product_id` | `spedizione[].collo[].articolo[]` | ogni articolo delle spedizioni soggette, da 1 a 255 caratteri |
+| `zonos_account_key` | `spedizione[]` | valorizzato per le spedizioni soggette, 52 caratteri |
+| `zonos_declaration_id` | `spedizione[]` | solo predisposto: sempre assente o `null` |
+| `zonos_product_id` | `spedizione[].collo[].articolo[]` | ogni articolo delle spedizioni soggette, da 1 a 255 caratteri |
 
 **Non fa**: validazione, Zonos, PRTN verso i vettori (SWP-02), palmari, stampe (AS-06).
 
@@ -96,13 +105,13 @@ Con l'int. 08 il consumer deve **storicizzare in `sew_spedizioni_poste` i 3 nuov
 
 | Punto | Cosa si fa |
 |---|---|
-| `dto/SpedizioneDTO.java` | `String account_key`, `String declaration_id`, con getter e setter nello stile del file |
-| `dto/ArticoloColloDTO.java` | `String product_id`, con getter e setter |
-| `dao/QueriesManagerDao.prepareInsertIntoSewSpedizioniPoste` | due blocchi come `NUM_ORDINE`, per `ACCOUNT_KEY` e `DECLARATION_ID`, da `spedizione[0]`, aggiunti in coda ai campi opzionali. Valore con l'escape della sezione 5 |
+| `dto/SpedizioneDTO.java` | `String zonos_account_key`, `String zonos_declaration_id`, con getter e setter nello stile del file |
+| `dto/ArticoloColloDTO.java` | `String zonos_product_id`, con getter e setter |
+| `dao/QueriesManagerDao.prepareInsertIntoSewSpedizioniPoste` | due blocchi come `NUM_ORDINE`, per `ZONOS_ACCOUNT_KEY` e `ZONOS_DECLARATION_ID`, da `spedizione[0]`, aggiunti in coda ai campi opzionali. Valore con l'escape della sezione 5 |
 | `dao/QueriesManagerDao2.prepareInsertIntoSewSpedizioniPoste` (PDW) | gli stessi due blocchi |
-| `dao/QueriesManagerDao.prepareInsertIntoSewInter` | blocco `if (!isNullOrBlank(cd.getProduct_id()))` → `fields.append("PRODUCT_ID, ")`, `values.append("\"" + escape(product_id) + "\", ")`. Il metodo serve sia `INTER` che `INTERSCARTO`: le due tabelle hanno bisogno della colonna (DDL, script 4) |
+| `dao/QueriesManagerDao.prepareInsertIntoSewInter` | blocco `if (!isNullOrBlank(cd.getZonos_product_id()))` → `fields.append("ZONOS_PRODUCT_ID, ")`, `values.append("\"" + escape(zonos_product_id) + "\", ")`. Il metodo serve sia `INTER` che `INTERSCARTO`: le due tabelle hanno bisogno della colonna (DDL, script 4) |
 | `prepareInsertIntoPrtnArticolo`, extender, `prepareInsertIntoSewScarto`, `…PosteOLD` | **nessuna modifica** (SWP-02, SWP-04) |
-| log | se serve, solo `account_key=presente/assente` e il numero di articoli con `product_id`, mai i valori |
+| log | se serve, solo `zonos_account_key=presente/assente` e il numero di articoli con `zonos_product_id`, mai i valori |
 
 Prima di committare: niente letterali ripetuti (Sonar S1192) e niente riferimenti a PA o documenti nei commenti.
 
@@ -110,16 +119,16 @@ Prima di committare: niente letterali ripetuti (Sonar S1192) e niente riferiment
 
 | Campo JSON (AS-01) | DTO | Tabella.colonna | Tipo (DDL) | Regola |
 |---|---|---|---|---|
-| `spedizione[0].account_key` | `SpedizioneDTO.account_key` | `SEW_SPEDIZIONI_POSTE.ACCOUNT_KEY` | `VARCHAR(52)` | inserita solo se non blank, come le altre colonne; nessun trim né troncamento |
-| `spedizione[0].declaration_id` | `SpedizioneDTO.declaration_id` | `SEW_SPEDIZIONI_POSTE.DECLARATION_ID` | `VARCHAR(64)` (SEW-03) | idem; in fase 1 assente, quindi la colonna resta `NULL` |
-| `spedizione[0].collo[0].articolo[i].product_id` | `ArticoloColloDTO.product_id` | `SEW_SPEDIZIONI_POSTE_INTER.PRODUCT_ID` (e `…INTER` scarto) | `VARCHAR(255)` | una riga per articolo, accanto a `ITEMNUMBER` = `posizione` |
+| `spedizione[0].zonos_account_key` | `SpedizioneDTO.zonos_account_key` | `SEW_SPEDIZIONI_POSTE.ZONOS_ACCOUNT_KEY` | `char(52) default ''` | entra nella MERGE solo se valorizzata [DECISO, Diego 23-11], come le altre colonne opzionali; nessun trim né troncamento |
+| `spedizione[0].zonos_declaration_id` | `SpedizioneDTO.zonos_declaration_id` | `SEW_SPEDIZIONI_POSTE.ZONOS_DECLARATION_ID` | `char(13) default ''` | idem; in fase 1 di norma assente, quindi la colonna resta `''` |
+| `spedizione[0].collo[0].articolo[i].zonos_product_id` | `ArticoloColloDTO.zonos_product_id` | `SEW_SPEDIZIONI_POSTE_INTER.ZONOS_PRODUCT_ID` (e `…INTER` scarto) | `char(255) default ''` | entra nella insert solo se valorizzato; una riga per articolo, accanto a `ITEMNUMBER` = `posizione` |
 
 **Escape** (SWP-07): per i tre campi nuovi il doppio apice si raddoppia (`"` → `""`, letterale Informix
 fra doppi apici), così il valore arriva intatto. Non si usa `cleanDoubleQuotesForInsert`, che
 trasformerebbe `"` in `'`. Resta l'effetto di `cleanString` su tutto lo statement: i caratteri non
 ASCII stampabili vengono tolti (SWP-08).
 
-**MERGE e ripetizioni**: se un messaggio successivo della stessa LDV arriva senza `account_key`, la
+**MERGE e ripetizioni**: se un messaggio successivo della stessa LDV arriva senza `zonos_account_key`, la
 colonna non entra nello statement e il valore salvato resta. È il comportamento di tutte le colonne (SWP-06).
 
 ## 6. Esempi [dati inventati]
@@ -131,13 +140,13 @@ Messaggio (estratto), canale `PDB`, LDV internazionale nel ramo MADRE:
   "canale": "PDB",
   "spedizione": [{
     "rif_spedizione": "ORD-TEST-146073-02",
-    "account_key": "AK00000000000000000000000000000000000000000000000002",
+    "zonos_account_key": "AK00000000000000000000000000000000000000000000000002",
     "internazionale": { "vettore": "UPS" },
     "collo": [{
       "id_ldv": "6UTST1460730002",
       "articolo": [
-        { "posizione": "1", "codice_taric": "6109100010", "quantita": 2, "product_id": "PRD-TEST-0001" },
-        { "posizione": "2", "codice_taric": "6203423100", "quantita": 1, "product_id": "PRD \"TEST\" 0002" }
+        { "posizione": "1", "codice_taric": "6109100010", "quantita": 2, "zonos_product_id": "PRD-TEST-0001" },
+        { "posizione": "2", "codice_taric": "6203423100", "quantita": 1, "zonos_product_id": "PRD \"TEST\" 0002" }
       ]
     }]
   }]
@@ -145,14 +154,15 @@ Messaggio (estratto), canale `PDB`, LDV internazionale nel ramo MADRE:
 ```
 
 Frammento atteso nel MERGE su main:
-`… "AK0…02" AS ACCOUNT_KEY …`, poi `WHEN NOT MATCHED THEN INSERT (…, SSP.ACCOUNT_KEY) …`. Non c'è
-`DECLARATION_ID` perché è assente.
+`… "AK0…02" AS ZONOS_ACCOUNT_KEY …`, poi `WHEN NOT MATCHED THEN INSERT (…, SSP.ZONOS_ACCOUNT_KEY) …`. Non c'è
+`ZONOS_DECLARATION_ID` perché è assente. Senza nessuno dei campi lo statement è identico a quello di oggi:
+il consumer funziona anche prima della DDL.
 
 Righe attese:
-- `SEW_SPEDIZIONI_POSTE`: `ACCOUNT_KEY = 'AK0…02'`, `DECLARATION_ID = NULL`.
+- `SEW_SPEDIZIONI_POSTE`: `ZONOS_ACCOUNT_KEY = 'AK0…02'`, `ZONOS_DECLARATION_ID = ''` (default).
 - `SEW_SPEDIZIONI_POSTE_INTER`:
-  - `ITEMNUMBER = '1'`, `PRODUCT_ID = 'PRD-TEST-0001'`;
-  - `ITEMNUMBER = '2'`, `PRODUCT_ID = 'PRD "TEST" 0002'` (doppio apice conservato).
+  - `ITEMNUMBER = '1'`, `ZONOS_PRODUCT_ID = 'PRD-TEST-0001'`;
+  - `ITEMNUMBER = '2'`, `ZONOS_PRODUCT_ID = 'PRD "TEST" 0002'` (doppio apice conservato).
 - `PRTN_ARTICOLO`: invariato.
 
 ## 7. Configurazione e prerequisiti
@@ -168,16 +178,16 @@ Righe attese:
 
 | # | Given / When / Then |
 |---|---|
-| AC-01 | Dato l'esempio della sezione 6, `SEW_SPEDIZIONI_POSTE.ACCOUNT_KEY` è uguale al valore ricevuto (52 caratteri) e `DECLARATION_ID` è `NULL` |
-| AC-02 | Dato l'esempio, `SEW_SPEDIZIONI_POSTE_INTER` ha 2 righe con `ITEMNUMBER` 1 e 2 e il `PRODUCT_ID` del rispettivo articolo; il doppio apice dell'articolo 2 è conservato |
-| AC-03 | Lo stesso messaggio con canale `PDW` scrive `ACCOUNT_KEY` sulla main (`QueriesManagerDao2`) |
-| AC-04 | Dato un messaggio con `declaration_id: "DECL-TEST-0002"`, `DECLARATION_ID` vale `DECL-TEST-0002` |
+| AC-01 | Dato l'esempio della sezione 6, `SEW_SPEDIZIONI_POSTE.ZONOS_ACCOUNT_KEY` è uguale al valore ricevuto (52 caratteri) e `ZONOS_DECLARATION_ID` è `''` (default) |
+| AC-02 | Dato l'esempio, `SEW_SPEDIZIONI_POSTE_INTER` ha 2 righe con `ITEMNUMBER` 1 e 2 e il `ZONOS_PRODUCT_ID` del rispettivo articolo; il doppio apice dell'articolo 2 è conservato |
+| AC-03 | Lo stesso messaggio con canale `PDW` scrive `ZONOS_ACCOUNT_KEY` sulla main (`QueriesManagerDao2`) |
+| AC-04 | Dato un messaggio con `zonos_declaration_id: "DECL-TEST-0002"`, `ZONOS_DECLARATION_ID` vale `DECL-TEST-0002` |
 | AC-05 | Dato un messaggio senza i campi nuovi (non USA o storico), gli statement sono identici a prima: nessuna colonna nuova nel MERGE né nell'insert inter (R-05) |
-| AC-06 | Dato un articolo senza `product_id` in una spedizione con altri articoli valorizzati, solo quella riga ha `PRODUCT_ID` `NULL` |
-| AC-07 | Dato un messaggio che finisce nello scarto, gli articoli scritti nella tabella inter scarto hanno `PRODUCT_ID` |
+| AC-06 | Dato un articolo senza `zonos_product_id` in una spedizione con altri articoli valorizzati, solo quella riga ha `ZONOS_PRODUCT_ID` al default `''` |
+| AC-07 | Dato un messaggio che finisce nello scarto, gli articoli scritti nella tabella inter scarto hanno `ZONOS_PRODUCT_ID` |
 | AC-08 | `PRTN_ARTICOLO`, `PRTN_COLLO`, `PRTN_SPEDIZIONE` ed extender sono scritti come prima |
-| AC-09 | Nei log non compaiono i valori di `account_key` e `product_id` |
-| AC-10 | Ricevendo due volte lo stesso messaggio, la main resta con una riga (MERGE) e `ACCOUNT_KEY` invariato |
+| AC-09 | Nei log non compaiono i valori di `zonos_account_key` e `zonos_product_id` |
+| AC-10 | Ricevendo due volte lo stesso messaggio, la main resta con una riga (MERGE) e `ZONOS_ACCOUNT_KEY` invariato |
 
 ## 9. Casi di test
 
@@ -190,10 +200,10 @@ database, se il team li vuole introdurre.
 |---|---|---|---|
 | TC-01 | sezione 6, canale PDB | main e inter valorizzate | AC-01, AC-02 |
 | TC-02 | sezione 6, canale PDW | main valorizzata | AC-03 |
-| TC-03 | `declaration_id` valorizzato | salvato | AC-04 |
+| TC-03 | `zonos_declaration_id` valorizzato | salvato | AC-04 |
 | TC-04 | messaggio storico senza campi nuovi; spedizione nazionale | statement uguali a prima (confronto dello statement loggato) | AC-05 |
-| TC-05 | 3 articoli, il secondo senza `product_id` | `NULL` solo sul secondo | AC-06 |
-| TC-06 | messaggio che va in errore dopo il MERGE (es. lookup PRTN mancante) | inter scarto con `PRODUCT_ID` | AC-07 |
+| TC-05 | 3 articoli, il secondo senza `zonos_product_id` | `''` (default) solo sul secondo | AC-06 |
+| TC-06 | messaggio che va in errore dopo il MERGE (es. lookup PRTN mancante) | inter scarto con `ZONOS_PRODUCT_ID` | AC-07 |
 | TC-07 | regressione su un messaggio internazionale con articoli già usato nei test | PRTN ed extender invariati | AC-08 |
 | TC-08 | log di TC-01 | nessun valore | AC-09 |
 | TC-09 | TC-01 due volte | una riga main | AC-10 |
@@ -202,20 +212,20 @@ database, se il team li vuole introdurre.
 ## 10. Assunzioni e domande aperte
 
 Dal contratto: AS-01, AS-04, AS-05, AS-06. Comuni con [consumer-sew-sped.md](consumer-sew-sped.md):
-SEW-03 (`declaration_id` `VARCHAR(64)`).
+SEW-03 (`zonos_declaration_id` `char(13) default ''`, decisa il 23-11).
 
 Nuove (Mary, 16-11):
 
 | ID | Assunzione o domanda | Default adottato | Da confermare con |
 |---|---|---|---|
-| SWP-01 | `account_key` e `declaration_id` stanno sulla tabella main, come dice l'HLD, e non sull'extender, che pure ha i dati internazionali | main (`kafka.tabella.main`), in entrambi i DAO | Poste |
-| SWP-02 | **Tabella articoli.** Ce ne sono due. `SEW_SPEDIZIONI_POSTE_INTER` è la SEW per articolo, con `ITEMNUMBER` = `posizione`. `PRTN_ARTICOLO` (`kafka.tabella.articolo`) è la tabella partner verso il vettore: `ARTICOLO` è sempre `1` e non c'è la posizione, quindi il legame con l'articolo si perderebbe (R-04) | `PRODUCT_ID` su `SEW_SPEDIZIONI_POSTE_INTER` (e inter scarto). `PRTN_ARTICOLO` non si tocca in fase 1 | Poste |
-| SWP-03 | **Copertura del Product ID.** Gli articoli si scrivono solo nei rami PRTN di `QueriesManagerDao` (LDV `5U`-`8U`, esclusi DHL, EURODIS e `id_ldv_itz(2)`), mai per PDW. Una spedizione USA fuori da quei rami non salva il `product_id` | nessun ramo nuovo: si salva dove gli articoli si scrivono già | Poste / Diego |
+| SWP-01 | `zonos_account_key` e `zonos_declaration_id` stanno sulla tabella main, come dice l'HLD, e non sull'extender, che pure ha i dati internazionali | main (`kafka.tabella.main`), in entrambi i DAO | Poste |
+| SWP-02 | **Tabella articoli.** Ce ne sono due. `SEW_SPEDIZIONI_POSTE_INTER` è la SEW per articolo, con `ITEMNUMBER` = `posizione`. `PRTN_ARTICOLO` (`kafka.tabella.articolo`) è la tabella partner verso il vettore: `ARTICOLO` è sempre `1` e non c'è la posizione, quindi il legame con l'articolo si perderebbe (R-04) | `ZONOS_PRODUCT_ID` su `SEW_SPEDIZIONI_POSTE_INTER` (e inter scarto). `PRTN_ARTICOLO` non si tocca in fase 1 | Poste |
+| SWP-03 | **Copertura del Product ID.** Gli articoli si scrivono solo nei rami PRTN di `QueriesManagerDao` (LDV `5U`-`8U`, esclusi DHL, EURODIS e `id_ldv_itz(2)`), mai per PDW. Una spedizione USA fuori da quei rami non salva il `zonos_product_id` | nessun ramo nuovo: si salva dove gli articoli si scrivono già | Poste / Diego |
 | SWP-04 | Tabella scarto main (`kafka.tabella.scarto`, costruita da `…PosteOLD` + extender): nessuna colonna nuova. La inter scarto invece sì, perché il metodo è condiviso | come detto | Poste |
 | SWP-05 | Extender non toccato | — | Poste |
 | SWP-06 | Il MERGE non cancella un valore già salvato se il messaggio successivo non ha il campo | comportamento standard del consumer | Diego |
 | SWP-07 | **Escape**: per i campi nuovi `"` → `""`, invece di `cleanDoubleQuotesForInsert`, per non alterare il valore (R-04) | `""` | — |
-| SWP-08 | **Caratteri non ASCII**: `cleanString` li toglie da tutto lo statement, quindi anche da `product_id`. Contraddice R-04 per i Product ID con caratteri accentati o speciali | accettato per la fase 1; il validatore non vieta i non ASCII | Poste |
+| SWP-08 | **Caratteri non ASCII**: `cleanString` li toglie da tutto lo statement, quindi anche da `zonos_product_id`. Contraddice R-04 per i Product ID con caratteri accentati o speciali | accettato per la fase 1; il validatore non vieta i non ASCII | Poste |
 | SWP-09 | **Nomi reali delle tabelle** nelle properties di svil, collaudo e produzione (es. varianti `_2`) | DDL sui nomi logici, da allineare | Diego / DBA |
 | SWP-10 | **Topic** `preadvising.completed.poste` | da verificare sulle properties | Diego |
 

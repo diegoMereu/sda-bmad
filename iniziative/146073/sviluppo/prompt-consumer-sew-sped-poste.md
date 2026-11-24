@@ -4,6 +4,9 @@
 > `consumer-sew_sped_poste` per la fase 1 dell'iniziativa 146073.
 > Output: `iniziative/146073/sviluppo/consumer-sew-sped-poste.md`, da passare allo sviluppatore.
 > Regola di progetto: un documento funzionale per microservizio.
+>
+> Aggiornato il 2026-11-24: nomi dei campi `zonos_account_key`, `zonos_product_id`,
+> `zonos_declaration_id` e colonne SEW `zonos_*` (decisioni di Diego del 23 e 24-11), branch del 24-11.
 
 ---
 
@@ -11,9 +14,9 @@
 
 Sei l'Analyst del progetto. Iniziativa 146073 "Compliance USA Entry Type 13" (Poste Italiane / SDA,
 filone PCL-127), **solo la fase 1**. I campi nuovi sono:
-- `account_key`: testata della spedizione, 52 caratteri;
-- `product_id`: ogni articolo di `collo[].articolo[]`, da 1 a 255 caratteri;
-- `declaration_id`: testata, solo predisposto (sempre `null` in fase 1).
+- `zonos_account_key`: testata della spedizione, 52 caratteri;
+- `zonos_product_id`: ogni articolo di `collo[].articolo[]`, da 1 a 255 caratteri;
+- `zonos_declaration_id`: testata, solo predisposto (sempre `null` in fase 1).
 
 Sono i "3 nuovi campi" dell'HLD.
 
@@ -24,10 +27,12 @@ fase 1 con impatto Database (M50).
 Il "Contratto della fase 1" di `iniziative/146073/analisi.md` (AS-01…AS-06) è **vincolante**: le
 incoerenze vanno fra le domande aperte, senza cambiarlo.
 
-**Branch (regola di Diego)**: lo sviluppo si fa sul branch dedicato `146073_compliance_usa_fase1`, da
-`origin/develop`. Se il repo non ha `develop`, si parte dal branch di integrazione, dopo averlo
-verificato con git, e lo si scrive nell'intestazione. Mai sviluppo su `develop` o `master`, né su
-branch di altre iniziative.
+**Branch (regola di Diego)**: `develop` (decisione del 2026-11-24, sostituisce il branch dedicato
+`146073_compliance_usa_fase1`). Mai sviluppo su `master` né su branch di altre iniziative.
+
+**Rimandato al punto 2 della fase 1** (decisione di Diego del 2026-11-24): mancano i dettagli lato
+Poste. Il funzionale va tenuto allineato ai nomi `zonos_*` e alle colonne `zonos_*`, e le colonne entrano
+nella MERGE e nella insert solo se il campo arriva valorizzato.
 
 # Fonti
 

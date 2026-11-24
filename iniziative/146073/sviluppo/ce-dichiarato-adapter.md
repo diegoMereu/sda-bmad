@@ -1,9 +1,13 @@
 # `ce-dichiarato-adapter` — Documento funzionale per lo sviluppo (fase 1)
 
-**Iniziativa**: 146073 — Compliance USA Entry Type 13, **solo fase 1** · **Versione**: 0.1 · **Data**: 2026-11-16
+> **Rimandato al punto 2 della fase 1** (decisione di Diego del 2026-11-24): l'intervento non si
+> sviluppa nel primo passo perché mancano ancora i dettagli (nomi dei campi nei messaggi
+> sorgente PDB, PDW e ILP). Il documento resta allineato ai nomi `zonos_*` e va completato quando i dettagli arrivano.
+
+**Iniziativa**: 146073 — Compliance USA Entry Type 13, **solo fase 1** · **Versione**: 0.2 · **Data**: 2026-11-24
 **Autrice**: Mary (analyst) · **Destinatario**: sviluppatore del `ce-dichiarato-adapter`
 **Repository**: `gitlab.alm.poste.it/CORRIERE-ESPRESSO/PREADVISING/ce-dichiarato-adapter` (locale `gitposte/SDA/preadvising/ce-dichiarato-adapter`)
-**Branch**: `146073_compliance_usa_fase1` da `origin/develop` (il repo ha `develop`, verificato con git il 16-11). Mai sviluppo su `develop`/`master` né su branch di altre iniziative
+**Branch**: `develop` [DECISO, Diego 2026-11-24: sostituisce il branch dedicato `146073_compliance_usa_fase1` deciso il 16-11]. Mai sviluppo su `master` né su branch di altre iniziative
 **Stack**: Spring Boot, Java 17, Spring Kafka, Jackson, Lombok
 **Generato da**: [prompt-ce-dichiarato-adapter.md](prompt-ce-dichiarato-adapter.md)
 **Fonti**: [analisi.md](../analisi.md), sezione "Contratto della fase 1" (AS-01…AS-06, **vincolante**);
@@ -16,6 +20,10 @@ Etichette:
 - **[DECISO]**: decisione presa, con data e riferimento.
 - **[ASSUNTO]**: scelta adottata per non bloccare lo sviluppo, con ID e default; da confermare (sezione 11).
 
+> **Aggiornamento 0.2 (2026-11-24).** Nomi dei campi `zonos_account_key`, `zonos_product_id`,
+> `zonos_declaration_id` (Diego, 23-11); colonne SEW con gli stessi nomi (Diego, 24-11); branch
+> `develop` (Diego, 24-11).
+>
 > Il contratto della fase 1 (nomi e posizione dei campi nel tracciato unico, AS-01) viene da
 > `analisi.md` e non si cambia. Questo documento lo applica all'adapter. Buchi e incoerenze sono fra
 > le assunzioni ADA-xx.
@@ -24,7 +32,7 @@ Etichette:
 
 ## 1. Contesto e obiettivo
 
-Le spedizioni business verso gli USA con merce devono rispettare la normativa USA **Entry Type 13**.
+Le spedizioni verso gli USA con merce devono rispettare la normativa USA **Entry Type 13**.
 In fase 1 il preavviso porta due campi nuovi, validati dal validatore e propagati fino alle SEW:
 
 - **Account Key**: uno per spedizione, 52 caratteri;
@@ -47,7 +55,7 @@ messaggio nel tracciato unico (`DichiaratoOutputDTO`) e lo pubblica.
 
 All'adapter si chiede di **leggere i nuovi campi dai messaggi delle tre sorgenti e metterli nel
 tracciato unico**: Account Key sulla testata della spedizione, ogni Product ID sul suo articolo,
-`declaration_id` predisposto e sempre `null`.
+`zonos_declaration_id` predisposto e sempre `null`.
 
 **Non fa**:
 
@@ -65,7 +73,7 @@ tracciato unico**: Account Key sulla testata della spedizione, ogni Product ID s
 | Int. | Fase | Testo HLD [FATTO] | Copertura |
 |---|---|---|---|
 | 05 | 1 | "Deve essere adeguato il ms ce-dichiarato-adapter per la ricezione dei nuovi campi nei consumer in lettura pdb e pdw, ilp — modifica dei 3 consumer per acquisizione e propagazione dei nuovi campi" (stima 0,40) | tutto il documento |
-| 05 | 2 | "ricezione del nuovo campo, non anticipabile in quanto essendo una ricezione integrata non conosciamo il nome del campo" (0,50) | **non in fase 1**: si predispone solo `declaration_id` nel DTO di uscita, senza leggerlo dalle sorgenti (5.4) |
+| 05 | 2 | "ricezione del nuovo campo, non anticipabile in quanto essendo una ricezione integrata non conosciamo il nome del campo" (0,50) | **non in fase 1**: si predispone solo `zonos_declaration_id` nel DTO di uscita, senza leggerlo dalle sorgenti (5.4) |
 
 Indicazioni della descrizione per l'adapter in fase 1 [FATTO]: Account Key a livello spedizione,
 ogni Product ID sull'articolo corrispondente, campi assenti senza effetti sugli scenari non
@@ -78,8 +86,8 @@ Codice di `origin/develop` `e615495` [FATTO]. Le classi sono quelle esistenti; n
 
 | Punto | Cosa c'è oggi | Cosa si fa |
 |---|---|---|
-| `kafka/dto/SpedizioneDTO.java` | DTO della spedizione del tracciato unico, `@JsonProperty` snake_case, nessun `@JsonInclude` (i `null` si serializzano) | due campi `String`: `accountKey` → `account_key`, `declarationId` → `declaration_id` |
-| `kafka/dto/ArticoloDTO.java` | `@Builder @Data`: `valore`, `posizione`, `codice_taric`, `quantita`, `peso_totale`, `paese_origine`, `english_descr`, `ita_descr`, `valuta` | campo `String productId` → `product_id` |
+| `kafka/dto/SpedizioneDTO.java` | DTO della spedizione del tracciato unico, `@JsonProperty` snake_case, nessun `@JsonInclude` (i `null` si serializzano) | due campi `String`: `accountKey` → `zonos_account_key`, `declarationId` → `zonos_declaration_id` |
+| `kafka/dto/ArticoloDTO.java` | `@Builder @Data`: `valore`, `posizione`, `codice_taric`, `quantita`, `peso_totale`, `paese_origine`, `english_descr`, `ita_descr`, `valuta` | campo `String productId` → `zonos_product_id` |
 | `kafka/dto/pdb/PdbMessageDTO.java` | messaggio BEP piatto (`code_externalId`, `booking_channel`, `contract_*`…), articoli in `customsDeclaration_items` | campo Account Key (nome sorgente provvisorio, 5.1) |
 | `kafka/dto/pdb/DeclarationItem.java` | articolo BEP: `itemNumber`, `taric`, `totalValue`… (camelCase); `hasValidProperties()` scarta gli articoli tutti `null` | campo Product ID; **aggiungerlo a `hasValidProperties()`**, altrimenti un articolo con il solo Product ID viene scartato |
 | `mapper/PdbMapper.java` | `toOutputPDB` (un messaggio = una spedizione con un collo); `convertToOutputItem` (articolo); `toOutputPDBFase2` unisce i messaggi dello stesso `code_externalId` (un messaggio per collo) e fa il merge della testata con `mergeSpedizioneScalarFields` (`mergeIfNull`) | Account Key in `toOutputPDB`; Product ID in `convertToOutputItem`; `accountKey` in `mergeSpedizioneScalarFields` (5.1) |
@@ -105,18 +113,18 @@ mandano con un nome diverso, il messaggio si elabora come oggi e i campi escono 
 ```json
 {
   "spedizione": [{
-    "account_key": "<52 caratteri>",
-    "declaration_id": null,
+    "zonos_account_key": "<52 caratteri>",
+    "zonos_declaration_id": null,
     "collo": [{
       "articolo": [
-        { "posizione": "1", "codice_taric": "...", "product_id": "<1-255 caratteri>" }
+        { "posizione": "1", "codice_taric": "...", "zonos_product_id": "<1-255 caratteri>" }
       ]
     }]
   }]
 }
 ```
 
-- `account_key` e `declaration_id` su ogni elemento di `spedizione[]`; `product_id` su ogni elemento di
+- `zonos_account_key` e `zonos_declaration_id` su ogni elemento di `spedizione[]`; `zonos_product_id` su ogni elemento di
   `spedizione[].collo[].articolo[]`.
 - Tutti `String`, opzionali, senza default. Nel JSON in uscita compaiono anche quando sono `null`,
   come gli altri campi del DTO (nessun `@JsonInclude`): va bene per R-05, i consumer a valle tollerano
@@ -132,7 +140,7 @@ mandano con un nome diverso, il messaggio si elabora come oggi e i campi escono 
 | RF-02 | Campo assente o `null` nella sorgente → `null` nel tracciato, nessun errore, nessun log WARN (R-05) |
 | RF-03 | Il Product ID resta sull'**articolo da cui viene**: stesso elemento, stessa `posizione`, stesso collo. L'ordine degli articoli non cambia |
 | RF-04 | L'adapter non valida e non scarta: nessun controllo su lunghezza o obbligatorietà, nessun riconoscimento delle spedizioni USA |
-| RF-05 | `declaration_id` sempre `null` in fase 1, per tutte le sorgenti (5.4) |
+| RF-05 | `zonos_declaration_id` sempre `null` in fase 1, per tutte le sorgenti (5.4) |
 | RF-06 | Nessuna modifica ai campi esistenti: in particolare `ID_PRODOTTO` (PDW) e `services.product` (ILP) restano `codice_prodotto` (ADA-03) |
 
 ### 5.1 PDB/BEP (`PdbMessageDTO`)
@@ -144,15 +152,15 @@ l'unico "account" è `contract_accountOwner` = intestatario del conto, che non c
 
 | Campo sorgente (provvisorio) | Livello sorgente | Campo tracciato unico | Punto del codice |
 |---|---|---|---|
-| `code_accountKey` | radice del messaggio (un messaggio = un collo) | `spedizione[0].account_key` | `toOutputPDB` |
-| `customsDeclaration_items[].productId` | articolo | `collo[0].articolo[i].product_id` (stesso `i`, `posizione` = `itemNumber`) | `convertToOutputItem` |
+| `code_accountKey` | radice del messaggio (un messaggio = un collo) | `spedizione[0].zonos_account_key` | `toOutputPDB` |
+| `customsDeclaration_items[].productId` | articolo | `collo[0].articolo[i].zonos_product_id` (stesso `i`, `posizione` = `itemNumber`) | `convertToOutputItem` |
 
 Regole specifiche:
 - `DeclarationItem.hasValidProperties()` considera anche `productId` (un articolo con il solo Product ID
   passa).
 - **Esiti BEP (`toOutputPDBFase2`)**: i messaggi dello stesso `code_externalId` (uno per collo) diventano
   una spedizione. I colli si concatenano: ogni collo porta i suoi articoli con i loro Product ID (RF-03).
-  `account_key` della spedizione = il primo non `null` fra i messaggi, nell'ordine di arrivo
+  `zonos_account_key` della spedizione = il primo non `null` fra i messaggi, nell'ordine di arrivo
   (`mergeIfNull` in `mergeSpedizioneScalarFields`). Se i messaggi hanno Account Key diverse, vince la
   prima e si scrive un log WARN con `code_externalId` e numero di valori distinti, **senza i valori** (ADA-05).
 - Il flusso dei callback POU per `walletRequestId` passa dallo stesso `toOutputPDBFase2`: nessuna regola in più.
@@ -168,8 +176,8 @@ Type 13 (ADA-03). PDW non ha una lista di articoli: il mapper crea un solo artic
 
 | Campo sorgente (provvisorio) | Livello sorgente | Campo tracciato unico |
 |---|---|---|
-| `ACCOUNT_KEY` | `PRE_WEB` (una traccia = una spedizione) | `spedizione[0].account_key` |
-| `PRODUCT_ID` | `PRE_WEB` | `collo[0].articolo[0].product_id` (l'unico articolo) |
+| `ACCOUNT_KEY` | `PRE_WEB` (una traccia = una spedizione) | `spedizione[0].zonos_account_key` |
+| `PRODUCT_ID` | `PRE_WEB` | `collo[0].articolo[0].zonos_product_id` (l'unico articolo) |
 
 - L'articolo PDW oggi non ha `posizione`. Non la si inventa: resta `null` come oggi (ADA-04).
 - Se PDW in futuro mandasse più articoli per spedizione, servirà una lista nel messaggio: fuori fase 1 (ADA-04).
@@ -182,8 +190,8 @@ prodotto (`codice_prodotto`), non il Product ID (ADA-03).
 
 | Campo sorgente (provvisorio) | Livello sorgente | Campo tracciato unico |
 |---|---|---|
-| `content.accountKey` | `content` (una `content` = una spedizione) | `spedizione[0].account_key` |
-| `content.customsDeclarationItems[].productId` | articolo | `collo[0].articolo[i].product_id` (stesso `i`; `posizione` = `itemNumber`, se presente) |
+| `content.accountKey` | `content` (una `content` = una spedizione) | `spedizione[0].zonos_account_key` |
+| `content.customsDeclarationItems[].productId` | articolo | `collo[0].articolo[i].zonos_product_id` (stesso `i`; `posizione` = `itemNumber`, se presente) |
 
 - Lo stile camelCase segue quello di `content`. Non si usa la mappa `services` (`{nome: {code}}`):
   è per i codici servizio e non è per articolo (ADA-02).
@@ -195,13 +203,13 @@ prodotto (`codice_prodotto`), non il Product ID (ADA-03).
 
 Non si legge da nessuna sorgente: l'HLD fase 2 dice che il nome del campo non si conosce [FATTO].
 In fase 1 c'è solo il campo `declarationId` in `SpedizioneDTO`, mai valorizzato dai mapper (RF-05),
-che esce `"declaration_id": null`. In `mergeSpedizioneScalarFields` si aggiunge comunque il `mergeIfNull`,
+che esce `"zonos_declaration_id": null`. In `mergeSpedizioneScalarFields` si aggiunge comunque il `mergeIfNull`,
 così in fase 2 basta valorizzarlo nel mapper.
 
 ### 5.5 Nomi sorgente provvisori: come si scrivono nel codice
 
 Si dichiarano con `@JsonProperty` sul nome provvisorio e `@JsonAlias` sulle varianti snake_case
-(`account_key`, `product_id`), così un messaggio con i nomi del tracciato unico funziona già. Quando le
+(`zonos_account_key`, `zonos_product_id`), così un messaggio con i nomi del tracciato unico funziona già. Quando le
 sorgenti confermano i nomi (ADA-01) si cambia solo l'annotazione e il test del mapper. Nessuna
 proprietà di configurazione: un mapping a nomi configurabili costerebbe più dello 0,40 stimato e
 complicherebbe i DTO (ADA-02).
@@ -230,13 +238,13 @@ Uscita su `preadvising.pre-enrichment` (estratto):
   "canale": "PDB",
   "spedizione": [{
     "rif_spedizione": "ORD-TEST-0001",
-    "account_key": "AKTEST0000000000000000000000000000000000000000000001",
-    "declaration_id": null,
+    "zonos_account_key": "AKTEST0000000000000000000000000000000000000000000001",
+    "zonos_declaration_id": null,
     "collo": [{
       "id_ldv": "TST000000001",
       "articolo": [
-        { "posizione": "1", "codice_taric": "6109100010", "quantita": 2, "product_id": "SKU-TEST-001" },
-        { "posizione": "2", "codice_taric": "4202920000", "quantita": 1, "product_id": "SKU-TEST-002" }
+        { "posizione": "1", "codice_taric": "6109100010", "quantita": 2, "zonos_product_id": "SKU-TEST-001" },
+        { "posizione": "2", "codice_taric": "4202920000", "quantita": 1, "zonos_product_id": "SKU-TEST-002" }
       ]
     }]
   }]
@@ -252,7 +260,7 @@ preavviso si trova su Mongo. Collo A: `code_accountKey` = AK1, articolo 1 `produ
 `code_accountKey` assente, articoli 1 e 2 con `SKU-B1`, `SKU-B2`.
 
 Uscita su `preadvising.enrichment` (`tipo_lavorazione` `enrichment_bep`): una spedizione,
-`numero_colli` 2, `account_key` AK1, collo A con `[SKU-A1]`, collo B con `[SKU-B1, SKU-B2]`, nello stesso ordine.
+`numero_colli` 2, `zonos_account_key` AK1, collo A con `[SKU-A1]`, collo B con `[SKU-B1, SKU-B2]`, nello stesso ordine.
 
 ### UC-03 — PDW
 
@@ -264,19 +272,19 @@ Uscita su `preadvising.enrichment` (`tipo_lavorazione` `enrichment_bep`): una sp
     "PRODUCT_ID": "SKU-TEST-003" } } } ] }
 ```
 
-Uscita: `codice_prodotto` come oggi (dal lookup ce-rules o `PRODTEST`), `account_key` = il valore di
-`ACCOUNT_KEY`, `collo[0].articolo[0]` = `{ "valore": 50, "posizione": null, "product_id": "SKU-TEST-003", ... }`.
+Uscita: `codice_prodotto` come oggi (dal lookup ce-rules o `PRODTEST`), `zonos_account_key` = il valore di
+`ACCOUNT_KEY`, `collo[0].articolo[0]` = `{ "valore": 50, "posizione": null, "zonos_product_id": "SKU-TEST-003", ... }`.
 
 ### UC-04 — ILP
 
 `content.accountKey` = AK4, `customsDeclarationItems` con 1 articolo senza `itemNumber` e
-`productId` `SKU-TEST-004`. Uscita: `account_key` AK4, `articolo[0].posizione` `null`,
-`articolo[0].product_id` `SKU-TEST-004`.
+`productId` `SKU-TEST-004`. Uscita: `zonos_account_key` AK4, `articolo[0].posizione` `null`,
+`articolo[0].zonos_product_id` `SKU-TEST-004`.
 
 ### UC-05 — Messaggio di oggi, senza i campi (tutte le sorgenti)
 
-Uscita identica a quella di oggi più `"account_key": null`, `"declaration_id": null` sulla spedizione e
-`"product_id": null` su ogni articolo. Nessun WARN, nessun errore.
+Uscita identica a quella di oggi più `"zonos_account_key": null`, `"zonos_declaration_id": null` sulla spedizione e
+`"zonos_product_id": null` su ogni articolo. Nessun WARN, nessun errore.
 
 ### UC-06 — Valori "sporchi"
 
@@ -293,10 +301,10 @@ Nessuna proprietà nuova, nessuna modifica ai values Helm (`.helm/values.yaml`, 
 - **Compatibilità**: nessun cambiamento per i messaggi senza i campi (UC-05). I test esistenti restano verdi.
 - **Prestazioni**: impatto trascurabile, nessuna chiamata esterna in più.
 - **Metriche**: un contatore `business_adapter_campi_usa_total` con tag `source` (`pdb`, `pdw`, `ilp`) e
-  `campo` (`account_key`, `product_id`), incrementato quando il campo è valorizzato nel tracciato in uscita
+  `campo` (`zonos_account_key`, `zonos_product_id`), incrementato quando il campo è valorizzato nel tracciato in uscita
   (per spedizione e per articolo). Serve a vedere quando le sorgenti cominciano a mandare i campi.
   Con `TraceUtil.incrementCounter`, che non deve mai far fallire la lavorazione.
-- **Span**: nessuno span nuovo. Facoltativo l'attributo `usa.account_key.presente` (`true`/`false`) sullo
+- **Span**: nessuno span nuovo. Facoltativo l'attributo `usa.zonos_account_key.presente` (`true`/`false`) sullo
   span del mapper; **mai il valore** come attributo.
 - **Log**: nessuna riga nuova con i valori. Oggi i consumer e i service loggano a INFO il payload intero
   in ingresso e il JSON in uscita, quindi Account Key e Product ID finiranno nei log come gli altri campi.
@@ -309,17 +317,17 @@ Nessuna proprietà nuova, nessuna modifica ai values Helm (`.helm/values.yaml`, 
 
 | # | Given / When / Then |
 |---|---|
-| AC-01 | Dato UC-01, il tracciato pubblicato su `preadvising.pre-enrichment` ha `account_key` uguale al valore in ingresso e `product_id` `SKU-TEST-001` sull'articolo `posizione` 1 e `SKU-TEST-002` su `posizione` 2 |
-| AC-02 | Dato UC-02, il tracciato su `preadvising.enrichment` ha una spedizione con 2 colli, `account_key` AK1, e ogni Product ID sul suo collo e articolo, nell'ordine di ingresso |
-| AC-03 | Dato UC-02 con AK1 sul collo A e AK2 sul collo B, `account_key` è AK1 e c'è un log WARN con `code_externalId`, senza i valori |
-| AC-04 | Dato un articolo PDB con il solo `productId` valorizzato, l'articolo è nel tracciato con `product_id` (non viene scartato da `hasValidProperties`) |
-| AC-05 | Dato UC-03, `account_key` e `collo[0].articolo[0].product_id` sono valorizzati; `codice_prodotto` è quello di oggi |
-| AC-06 | Dato UC-04, `account_key` e `product_id` sono valorizzati e `posizione` è `null` |
-| AC-07 | Dato UC-05 per ognuna delle tre sorgenti, il tracciato è uguale a quello di oggi più `account_key`, `declaration_id` e `product_id` a `null`; nessun WARN |
+| AC-01 | Dato UC-01, il tracciato pubblicato su `preadvising.pre-enrichment` ha `zonos_account_key` uguale al valore in ingresso e `zonos_product_id` `SKU-TEST-001` sull'articolo `posizione` 1 e `SKU-TEST-002` su `posizione` 2 |
+| AC-02 | Dato UC-02, il tracciato su `preadvising.enrichment` ha una spedizione con 2 colli, `zonos_account_key` AK1, e ogni Product ID sul suo collo e articolo, nell'ordine di ingresso |
+| AC-03 | Dato UC-02 con AK1 sul collo A e AK2 sul collo B, `zonos_account_key` è AK1 e c'è un log WARN con `code_externalId`, senza i valori |
+| AC-04 | Dato un articolo PDB con il solo `productId` valorizzato, l'articolo è nel tracciato con `zonos_product_id` (non viene scartato da `hasValidProperties`) |
+| AC-05 | Dato UC-03, `zonos_account_key` e `collo[0].articolo[0].zonos_product_id` sono valorizzati; `codice_prodotto` è quello di oggi |
+| AC-06 | Dato UC-04, `zonos_account_key` e `zonos_product_id` sono valorizzati e `posizione` è `null` |
+| AC-07 | Dato UC-05 per ognuna delle tre sorgenti, il tracciato è uguale a quello di oggi più `zonos_account_key`, `zonos_declaration_id` e `zonos_product_id` a `null`; nessun WARN |
 | AC-08 | Dato UC-06, i valori escono identici a quelli in ingresso (spazi e stringa vuota inclusi) |
-| AC-09 | `declaration_id` è `null` in ogni tracciato pubblicato, anche se il messaggio sorgente contiene un campo `declarationId` o `DECLARATION_ID` |
-| AC-10 | Un messaggio con i nomi del tracciato unico (`account_key`, `product_id`) nelle sorgenti viene letto come quello con i nomi provvisori (`@JsonAlias`) |
-| AC-11 | Il contatore `business_adapter_campi_usa_total` cresce di 1 per UC-03 su `account_key` e di 2 per UC-01 su `product_id`; un errore della metrica non blocca la pubblicazione |
+| AC-09 | `zonos_declaration_id` è `null` in ogni tracciato pubblicato, anche se il messaggio sorgente contiene un campo `declarationId` o `DECLARATION_ID` |
+| AC-10 | Un messaggio con i nomi del tracciato unico (`zonos_account_key`, `zonos_product_id`) nelle sorgenti viene letto come quello con i nomi provvisori (`@JsonAlias`) |
+| AC-11 | Il contatore `business_adapter_campi_usa_total` cresce di 1 per UC-03 su `zonos_account_key` e di 2 per UC-01 su `zonos_product_id`; un errore della metrica non blocca la pubblicazione |
 | AC-12 | Nessun valore di Account Key o Product ID compare in log nuovi, attributi di span o tag di metrica |
 | AC-13 | I test esistenti del repo sono verdi senza modifiche alle asserzioni esistenti |
 
