@@ -6,7 +6,7 @@
 ## In una riga
 La fase 1 (Account Key per spedizione, Product ID per articolo, Declaration ID predisposto) ha
 nomi, regola, errori e colonne SEW decisi da Diego. Lo sviluppo del primo passo è in corso:
-- validatore su `develop` (`090d037`, `43f5cbe`); orchestratore, smistatore e bff su `develop`, ripartono oggi;
+- validatore su `develop` (`090d037`, `43f5cbe`); orchestratore (`9a96564`), smistatore (`9289aeb`) e bff (`d2f5027`) su `develop`;
 - `sda-ldv-preadv-consumer` (`consumer-sew_sped`, `producer-sew-sped`) sul branch dedicato (`990503a` + `ef0a5ce`,
   pubblicati), scrive solo su `sew_spedizioni_work`; da compilare in Eclipse.
 
@@ -26,10 +26,11 @@ dei prodotti CRONO INTERNAZIONALE e i nomi dei campi nelle sorgenti.
 - 2026-11-24 — Validatore su `develop`, commit `090d037`: campi `zonos_*`, regola ed errori `1320`…`1323`, verifica spenta di default. I 153 test `regoledrools/Invio*Test` falliscono già su `develop`: sono preesistenti, da sistemare a parte.
 - 2026-11-24 — `sda-ldv-preadv-consumer` sul branch `146073_compliance_usa_fase1`, commit `990503a` e `ef0a5ce` (colonne solo su `sew_spedizioni_work`), pubblicati. Mai compilato con le librerie reali: serve un build in Eclipse con i jar di `L:` prima del rilascio.
 - 2026-11-24 — Validatore: chiavi `zonos_*` anche su Mongo (`@Field`), commit `43f5cbe` su `develop`.
+- 2026-11-24 — Su `develop`: orchestratore `9a96564` (campi protetti nel merge con le lavorazioni, chiavi `zonos_*` su Mongo), smistatore `9289aeb` (campi su `.completed.poste`/`.sda`, non verso i palmari), bff `d2f5027` (campi in lettura e risottomissione). Lo smistatore ha 4 test `PalmariMapper*` rossi già su `develop` (commit `3d91ac5` del 18-11), non legati alla 146073.
 - 2026-11-24 — Documenti aggiornati con le decisioni del giorno (Mary): analisi 0.4, DDL 0.3 (script 2 su `sew_spedizioni_work_2` eliminato), funzionali 0.3 di `consumer-sew_sped`, `producer-sew-sped`, validatore e orchestratore; note su bff ed event store; prompt.
 
 ## Prossimi passi
-- Completare orchestratore, smistatore e bff su `develop`, con le chiavi `zonos_*` su Mongo — Amelia — da oggi
+- Segnalare i 4 test `PalmariMapper*` rossi su `develop` dello smistatore all'autore di `3d91ac5` — Diego — fuori dalla 146073
 - Build in Eclipse di `consumer-sew_sped` e `producer-sew-sped` con i jar di `L:` — Diego — prima del rilascio
 - Sistemare a parte i 153 test `regoledrools/Invio*Test` già rotti su `develop` del validatore — da assegnare — fuori dalla 146073
 - Chiedere a Poste la conferma dell'elenco CRONO INTERNAZIONALE (PA-12) — Diego — prossimo passo
