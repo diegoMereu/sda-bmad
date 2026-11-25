@@ -54,8 +54,13 @@ seme        = madre.substring(2,7) = family_printStation
   `2308` + progressivo `[M-Z][0-9A-Z]{3}` + `W` + madre. Esempio: madre `3UW2308123456` → figlio
   `2308M000W3UW2308123456`. Va concordato con EURODIS e con Poste/BEP chi garantisce l'unicità del
   progressivo, visto che il serbatoio è per seme.
-- **Mock da correggere:** WireMock e `uat/genera_mock_test.py` generano 9 caratteri casuali al posto
-  di `seme[1:5]` + progressivo + `seme[0]`.
+- **`W` fisso o `seme[0]`:** tutti i 7 semi del campione cominciano con `W`, quindi i dati non lo
+  distinguono. Per `W2308` il risultato è lo stesso.
+- **Mock (corretto il 25-11):** dal 24-11 WireMock e `uat/genera_mock_test.py` usavano già
+  `2308` + 4 + `W` + madre, ma con 4 lettere casuali. Circa il 46% dei contatori cominciava fra `A` e
+  `L`, fuori da `[M-Z]`, e i figli della stessa spedizione non erano consecutivi. Ora il contatore ha
+  una radice `[M-Z][0-9A-Z]{2}` per spedizione e un ultimo carattere `1`, `2`, … per collo (vedi
+  `regole-ldv-multicollo-pdb.md`, la regola del 24-11 dall'esempio di Azzurra).
 - **OP-02 / RF-17:** i figli di 22 caratteri sono LDV valide in PDB. Il mapper oggi li scarta
   (`ldv_non_pdb`): la regola RF-17 va estesa a "figlio di 9 conforme + madre PDB di 13".
 - **`ce-dichiarato-ldv-pdb`:** per un autoproduttore la LDV non viene sovrascritta e i figli restano

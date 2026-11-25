@@ -28,12 +28,14 @@ Esempio: madre `1UW0X5B201716`, postazione (seme, `LdvPdb`: caratteri 2-6) `W0X5
 | Codice | Struttura | Esempio | |
 |---|---|---|---|
 | Madre (13) | `[1-8]U` + postazione (5) + 6 cifre | `1U` `W0X5B` `201716` | verificato (regola `LdvPdb`/`ce-ldv`) |
-| Figlio (9) | postazione senza il primo carattere (4) + contatore di 4 lettere + primo carattere della postazione | `0X5B` `MBBL` `W` | dedotto da 3 famiglie |
+| Figlio (9) | postazione senza il primo carattere (4) + contatore di 4 caratteri `[M-Z][0-9A-Z]{3}` (base 36, per postazione) + primo carattere della postazione | `0X5B` `MBBL` `W` | verificato su 667 figli in collaudo ([ldv-figlia-multicollo-pdb.md](ldv-figlia-multicollo-pdb.md)) |
 | Figlio completo (22) | figlio (9) + madre (13) | `0X5BMBBLW1UW0X5B201716` | verificato |
 
-Il contatore cresce di uno per figlio (`MBBL`, `MBBM`, `MBBN`, `MBBO`). In tutti gli esempi il
-primo carattere della postazione è `W`: non si distingue se l'ultimo carattere del figlio sia `W`
-fisso o preso dalla postazione. Non è noto se BEP controlli il contatore rispetto a un range.
+Il contatore cresce di uno per figlio, in base 36 (`MBBL`, `MBBM`, `MBBN`, `MBBO`; in collaudo
+anche `MUV1`, `MUV2`, `MUV3`: non solo lettere). Comincia sempre con `M` nei 667 figli letti in
+collaudo il 25-11. Anche lì tutte le postazioni (7) cominciano con `W`: non si distingue ancora se
+l'ultimo carattere del figlio sia `W` fisso o preso dalla postazione. Non è noto se BEP controlli il
+contatore rispetto a un range.
 
 ## Cosa arriva a BEP
 

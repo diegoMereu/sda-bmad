@@ -30,10 +30,14 @@ corrispondente di `wiremock-receive-pan.yaml`. Dopo una modifica alla ConfigMap 
   1. con contrassegno, 1 collo, LDV `4UW2308` + 6 cifre;
   2. senza contrassegno (`cashOnDeliveryService: null`), **3 colli** (`numberOfHandlingUnits: 3`, peso 45):
      il primo collo ha la LDV madre `3UW2308` + 6 cifre (13 caratteri), gli altri due il barcode figlio di
-     22 caratteri = 9 caratteri alfanumerici casuali + la stessa madre (regola dell'ICD BEP Mediation v2.5
-     per INVIOSYSTEM: "in caso di multicollo il primo conterra' il barcode a 13 digit della madre, mentre i
-     successivi conterranno i barcode a 22 digit dei figli"). La madre e' una sola per spedizione grazie a
-     `{{#assign 'madre'}}`. Il formato dei 9 caratteri del figlio non e' documentato: e' inventato.
+     22 caratteri = figlio di 9 + la stessa madre (regola dell'ICD BEP Mediation v2.5 per INVIOSYSTEM: "in
+     caso di multicollo il primo conterra' il barcode a 13 digit della madre, mentre i successivi
+     conterranno i barcode a 22 digit dei figli"). Il figlio di 9 segue la regola verificata su 667 figli
+     reali in collaudo ([../../ldv-figlia-multicollo-pdb.md](../../ldv-figlia-multicollo-pdb.md)):
+     `2308` + contatore `[M-Z][0-9A-Z]{3}` + `W`. Il contatore ha una radice casuale di 3 caratteri
+     (`{{#assign 'radice'}}`, prima lettera fra M e Z) e un ultimo carattere `1`, `2` per i colli 2 e 3:
+     figli consecutivi e mai uguali, es. `2308MK71W` + madre, `2308MK72W` + madre. Madre e radice sono
+     una sola per spedizione grazie a `{{#assign}}`.
 
   Identificativi casuali a ogni chiamata (`response-template`):
   - `edReference` = `88` + 11 cifre: è `spedizione.rif_spedizione`, la chiave Kafka e la chiave della

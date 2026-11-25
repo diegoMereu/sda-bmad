@@ -107,8 +107,18 @@ BASE = json.loads(r"""
 
 RND = "{{randomValue length=%d type='NUMERIC'}}"
 POSTAZIONE = "W2308"
-# id_ldv del figlio: postazione senza il primo carattere + contatore di 4 lettere + primo carattere
-FIGLIO = POSTAZIONE[1:] + "{{randomValue length=4 type='ALPHABETIC' uppercase=true}}" + POSTAZIONE[0]
+# id_ldv del figlio (ldv-figlia-multicollo-pdb.md, 667 figli reali in collaudo):
+# postazione senza il primo carattere + contatore di 4 [M-Z][0-9A-Z]{3} (base 36) + primo carattere.
+# Il contatore della famiglia: radice [M-Z][0-9A-Z]{2} fissata sul collo 1, ultimo carattere 1, 2, 3...
+# per i colli 2, 3, 4... cosi' i figli sono consecutivi e mai uguali.
+B36 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+RADICE = ("{{#assign 'radice'}}{{pickRandom %s}}{{randomValue length=2 type='ALPHANUMERIC' uppercase=true}}"
+          "{{/assign}}" % " ".join("'%s'" % c for c in "MNOPQRSTUVWXYZ"))
+
+
+def figlio(i):
+    """id_ldv completo del collo i (2..36): figlio di 9 + madre."""
+    return POSTAZIONE[1:] + "{{radice}}" + B36[i - 1] + POSTAZIONE[0] + "{{madre}}"
 PUDO = "PUDO-IT-00144-ROMA-0001"
 
 
@@ -151,10 +161,10 @@ def spedizione(pesi=(15,), servizio=None, contrassegno=None, **kw):
             # multicollo (come PDB_INVIOSYSTEM, regole-ldv-multicollo-pdb.md): il primo collo ha la madre
             # a 13 caratteri, gli altri il figlio a 22 = id_ldv del figlio (9) + la stessa madre
             madre = prefisso + POSTAZIONE + RND % 6
-            c["deliveryPartnerBarcode"] = ("{{#assign 'madre'}}%s{{/assign}}{{madre}}" % madre
+            c["deliveryPartnerBarcode"] = (RADICE + "{{#assign 'madre'}}%s{{/assign}}{{madre}}" % madre
                                            if len(pesi) > 1 else madre)
         else:
-            c["deliveryPartnerBarcode"] = FIGLIO + "{{madre}}"
+            c["deliveryPartnerBarcode"] = figlio(i)
         colli.append(c)
     s["collis"] = colli
     if servizio and servizio["deliveryService"] in ("M", "F"):
