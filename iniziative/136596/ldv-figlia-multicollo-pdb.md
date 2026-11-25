@@ -61,9 +61,13 @@ Il messaggio di collaudo è stato inviato all'offset 45108 e la risposta è arri
 `PACCHI.BEP.MEDIATION.INVIOSYSTEMRESPONSE`. Per il resto è identico all'invio di svil
 `3f5b6e0a-…`: contratto `SFA-00633620`, madre `3UW2308718451`, `APT000945`.
 
-**Da correggere in `ce-dichiarato-ldv-pdb`:** per INVIOSYSTEM `BepRequestMapper` manda
-`code = collo.id_ldv`, che sul figlio ha 9 caratteri. Deve mandare il figlio completo:
-`id_ldv_figlio` (22 caratteri) quando è valorizzato, altrimenti `id_ldv`.
+**Corretto in `ce-dichiarato-ldv-pdb`** (commit `25ccdf5` su `develop`, 416 test verdi), **solo per il
+canale `EUD_INVIOSYSTEM`**. Gli altri canali non cambiano:
+- request: `declared[].code` = `id_ldv_figlio` (22 caratteri) quando è valorizzato, altrimenti `id_ldv`;
+- risposta: `id_ldv_figlio` resta il figlio di 22 scritto dal mapper e non viene sostituito con
+  `id_ldv` (9). `id_ldv` (9 e 13) e `id_ldv_madre` restano come li scrive il mapper.
+
+Da rilasciare in svil e da riprovare con S02.
 
 ## Conseguenze per EURODIS (autoproduttore INVIOSYSTEM)
 
