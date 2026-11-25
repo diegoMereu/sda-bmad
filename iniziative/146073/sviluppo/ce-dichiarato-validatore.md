@@ -1,6 +1,6 @@
 # `ce-dichiarato-validatore` — Documento funzionale per lo sviluppo (Compliance USA, fase 1)
 
-**Iniziativa**: 146073 — Compliance USA Entry Type 13 (AP-00988 Corriere Espresso / PK-03089 ce-dichiarato) · **Versione**: 0.3 · **Data**: 2026-11-24
+**Iniziativa**: 146073 — Compliance USA Entry Type 13 (AP-00988 Corriere Espresso / PK-03089 ce-dichiarato) · **Versione**: 0.4 · **Data**: 2026-11-25
 **Autrice**: Mary (analyst) · **Destinatario**: sviluppatore del validatore (Amelia)
 **Intervento HLD**: 01 della fase 1, stima TOW 1.2 di 0,80
 **Repository**: `gitlab.alm.poste.it/CORRIERE-ESPRESSO/PREADVISING/ce-dichiarato-validatore` (in locale `gitposte/SDA/preadvising/ce-dichiarato-validatore`)
@@ -24,6 +24,13 @@ Etichette usate nel documento:
 > nomi del tracciato `zonos_account_key`, `zonos_declaration_id`, `zonos_product_id`, non camelCase
 > (RV-05, VAL-AS-20). Il commit `090d037` su `develop` dichiara campi Java camelCase con il solo
 > `@JsonProperty`: su Mongo andrebbero come `zonosAccountKey`…, quindi va aggiunto `@Field` (3.1).
+>
+> **Versione 0.4 (Diego, 2026-11-25).** La verifica Compliance USA si applica **solo ai flussi SDA**
+> (`SdaFlussoHandler`). Sul `PdbPreadvisingHandler` (PDB, PDW, ILP, EUD) non si fa, perché per i flussi
+> PDB non ci sono ancora le informazioni: lì i campi `zonos_*` passano senza controlli e si propagano
+> (VAL-AS-21). Fatto con il commit `c7f82eb` su `develop`: tolta la chiamata nel
+> `PdbPreadvisingHandler`, test PDB riscritti. Nei flussi SDA il prodotto arriva in `codice_prodotto`
+> (5.2).
 
 ---
 
@@ -151,21 +158,24 @@ Fatti da tenere presenti [FATTO]:
 
 | Handler | Canali | Validazione oggi | R-01 si applica? |
 |---|---|---|---|
-| `PdbPreadvisingHandler` | `PdbChannel.SUPPORTED`: `PDB_INVIOSYSTEM`, `PDB_INVIOFILE`, `PDB_INVIOEASY`, `PDB_STAMPAMASSIVA`, `EUD_INVIOFILE`, `EUD_INVIOSYSTEM` | regole PDB | **sì** |
+| `PdbPreadvisingHandler` | `PdbChannel.SUPPORTED`: `PDB_INVIOSYSTEM`, `PDB_INVIOFILE`, `PDB_INVIOEASY`, `PDB_STAMPAMASSIVA`, `EUD_INVIOFILE`, `EUD_INVIOSYSTEM` | regole PDB | **no** fino alle specifiche dei flussi PDB [DECISO, Diego 2026-11-25] (VAL-AS-21) |
 | `PdbPdwFlussoHandler` | `config.canali-pdb` (`CANALI_PDB`, default `PDB,PDW,ILP`), cioè gli ingressi dell'adapter | nessuna: LDV, duplicato e passaggio | no (VAL-AS-12) |
 | `TfiFlussoHandler` | `id_canale` in `config.id-canali` (`TFI,TWS,BNC`), canale `MYSDA`, `SDA_WS`, `INVIO_WEB` | nessuna (commento nel codice: "NIENTE VALIDAZIONE") | no (VAL-AS-12) |
 | `TupFlussoHandler` | `TUP`, `OMP` | nessuna | no (VAL-AS-12) |
 | `SdaFlussoHandler` | tutti gli altri: `IF`, `IS`, `IE` (canali a file del builder); un canale sconosciuto finisce qui, e la regola logic "Canale non valido" lo scarta con 400 | semantic, controllo 143, logic | **sì** |
 
-**R-01 si applica nei due handler che validano**, `SdaFlussoHandler` e `PdbPreadvisingHandler`.
-Gli handler di solo passaggio non cambiano: i loro canali arrivano già validati dai sistemi di
+**R-01 si applica solo in `SdaFlussoHandler`** [DECISO, Diego 2026-11-25]. Fino alla versione 0.3
+valeva anche nel `PdbPreadvisingHandler`; per i flussi PDB (PDB, PDW, ILP, EUD) però non ci sono ancora
+le informazioni, quindi lì la verifica non si fa e i campi `zonos_*` passano senza controlli, come
+negli handler di passaggio (VAL-AS-21). Si riprende quando arriveranno le specifiche, insieme al
+punto 2 della fase 1 (PA-14 di `analisi.md`). Gli handler di solo passaggio non cambiano: i loro canali arrivano già validati dai sistemi di
 origine (adapter, portali, web service), e aggiungere uno scarto lì cambierebbe il loro
 comportamento (VAL-AS-12, VAL-DA-04).
 
 ### 3.4 Dove si mette la regola: componente Java comune (proposta)
 
 La regola si scrive **in Java**, in un componente nuovo (es. `compliance/ComplianceUsaValidator`)
-chiamato dai due handler. Non si scrive in un DRL (VAL-AS-13), per tre motivi:
+chiamato da `SdaFlussoHandler` (fino alla 0.3 anche dal `PdbPreadvisingHandler`). Non si scrive in un DRL (VAL-AS-13), per tre motivi:
 
 1. serve una **configurazione** (flag, valori, elenco prodotti: 8). Le sessioni Drools di oggi non
    leggono proprietà Spring;
@@ -179,8 +189,8 @@ chiamato dai due handler. Non si scrive in un DRL (VAL-AS-13), per tre motivi:
 | nuovo `ComplianceUsaProperties` (`@ConfigurationProperties(prefix = "config.compliance-usa")`) | proprietà della sezione 8 |
 | nuovo `ComplianceUsaValidator` (`@Component`) | `Map<String,String> valida(DichiaratoDTO dto)`: riconoscimento (5.2) e controlli (5.3); restituisce gli errori senza modificare il DTO |
 | `SdaFlussoHandler.gestisci` | subito dopo `validaEventoConRegoleSemantiche`, si uniscono gli errori di compliance a quelli semantici (`errori.putAll(...)`, con le regole di unione di 5.4) **prima** del controllo `if (!errori.isEmpty())`. L'operatore vede così tutti gli errori formali in un solo scarto (VAL-AS-14) |
-| `PdbPreadvisingHandler.validaConRegolePdb` | dopo `fireAllRules`, e dopo il ripristino del canale, si uniscono gli errori di compliance a `dto.getErrors()` |
-| `FlussoHandler` | eventuale metodo protetto comune `aggiungiErroriComplianceUsa(dto, errori)`, per non duplicare il codice nei due handler (Sonar) |
+| `PdbPreadvisingHandler.validaConRegolePdb` | **nessuna chiamata** [DECISO, Diego 2026-11-25; commit `c7f82eb`]: con il flag acceso non produce errori `1320`…`1323` né metriche di compliance, e i campi si propagano. Quando arriveranno le specifiche dei flussi PDB la chiamata andrà dopo `fireAllRules` e dopo il ripristino del canale |
+| `FlussoHandler` | eventuale metodo protetto comune `aggiungiErroriComplianceUsa(dto, errori)`, utile quando la verifica tornerà anche sul PDB (Sonar) |
 
 Il multicollo a riga singola (configurazione `002` in `SdaFlussoHandler`) clona il DTO dopo la
 validazione: i cloni ereditano `zonos_account_key` e, collo per collo, gli articoli con il loro
@@ -196,8 +206,8 @@ validazione: i cloni ereditano `zonos_account_key` e, collo per collo, gli artic
 | Nazione ISO2 del destinatario | `spedizione[].destinatario.codice_nazione_iso_2` | `getDestinatario().getCodiceNazioneIso2()` | riconoscimento |
 | Nazione del destinatario | `spedizione[].destinatario.codice_nazione` | `getDestinatario().getCodice_nazione()` | riconoscimento |
 | Tipo merce | `spedizione[].tipo_merce` (1 carattere, nessun dominio nello schema del builder) | `getTipo_merce()` | riconoscimento |
-| Codice prodotto | `spedizione[].codice_prodotto` | `getCodice_prodotto()` | riconoscimento |
-| Servizio | `spedizione[].id_servizio` | `getId_servizio()` | riconoscimento |
+| Codice prodotto | `spedizione[].codice_prodotto` | `getCodice_prodotto()` | riconoscimento: nei flussi SDA è il campo valorizzato (5.2) |
+| Servizio | `spedizione[].id_servizio` | `getId_servizio()` | riconoscimento: nei flussi SDA in genere vuoto, usato dai flussi PDB (5.2) |
 | Posizione articolo | `…articolo[].posizione` (`@Size(max = 1)`) | `ArticoloDTO.getPosizione()` | descrizione dell'errore |
 
 ## 5. Regole funzionali
@@ -235,6 +245,13 @@ I prodotti interessati, con i codici di `ce_prodotto` di ce-rules:
 
 Diego ha elencato CRONO INTERNAZIONALE quattro volte, ma in `ce_prodotto` risultano solo `515` e
 `516`: l'elenco è da confermare (PA-12). Si cambia in configurazione, senza toccare il codice.
+
+**Dove arriva il prodotto** [FATTO, verificato sul codice il 2026-11-25]. Nei messaggi SDA il
+prodotto è in `codice_prodotto`, con il codice numerico di `ce_prodotto` (es. `517`, `311`, `449`):
+il `producer-sew-sped` lo legge da `id_prodotto` delle SEW. `id_servizio` nei flussi SDA in genere
+non è valorizzato: lo usano i flussi PDB (es. `580`, `582`). Il confronto resta su `codice_prodotto`
+**oppure** `id_servizio`, con valori normalizzati (trim, maiuscolo) e l'elenco configurabile
+`COMPLIANCE_USA_PRODOTTI` (8); con la verifica solo sui flussi SDA, in pratica decide `codice_prodotto`.
 
 - I confronti delle condizioni ignorano maiuscole e spazi iniziali e finali. Si tratta dei campi di
   riconoscimento: i campi nuovi non si toccano (VAL-AS-16).
@@ -300,7 +317,7 @@ mancanti (AS-03). Si usa il percorso che già esiste, senza nulla di nuovo:
 | Handler | Cosa succede |
 |---|---|
 | `SdaFlussoHandler` | `gestisciEsito`: span marcato con l'errore di validazione, evento `PREADVISING_PARZIALE_E_BLOCCATO` (`ST_R0006`) su `preadvising.evensource` con `eventData.errori` = la mappa degli errori, Mongo `dichiarato_events` a `stato` 2 con `errori`, `dichiarato_ldv_history` a `stato` 2, contatore `kafka_message_consumed_total_ko{canale=SDA}` |
-| `PdbPreadvisingHandler` | stesso evento `ST_R0006` con errori, `salvaErroreRegole`, contatore `kafka_message_consumed_total_ko{canale=<canale>}` e `business_stato_pread_stato_total{stato=PREADVISING_PARZIALE_E_BLOCCATO}` |
+| `PdbPreadvisingHandler` | nessuno scarto di compliance (3.3, VAL-AS-21). Quando la verifica tornerà sul PDB: stesso evento `ST_R0006` con errori, `salvaErroreRegole`, contatore `kafka_message_consumed_total_ko{canale=<canale>}` e `business_stato_pread_stato_total{stato=PREADVISING_PARZIALE_E_BLOCCATO}` |
 
 Il messaggio **non** va su `preadvising.enrichment`. Gli scarti si leggono dall'event store come
 quelli di oggi (`ce-event-handler-dichiarato-scarti` e il file esiti, senza modifiche). Prima dello
@@ -315,7 +332,7 @@ scarto c'è sempre l'evento `PREAD_EMESSO` (`ST_R0002`): con i DTO estesi porta 
 | RV-10…RV-13 | Controlli di presenza e lunghezza (5.3) |
 | RV-20 | Errori 1320…1323, descrizioni con collo e articolo, concatenazione per codice (5.4) |
 | RV-21 | Esito = scarto con il percorso esistente dell'handler (5.5) |
-| RV-22 | La regola vale in `SdaFlussoHandler` e `PdbPreadvisingHandler`, non negli handler di passaggio (3.3) |
+| RV-22 | La regola vale solo in `SdaFlussoHandler`: non nel `PdbPreadvisingHandler` (flussi PDB, fino alle specifiche) né negli handler di passaggio (3.3) [DECISO, Diego 2026-11-25] |
 | RV-23 | Nessun valore di `zonos_account_key` o `zonos_product_id` nei log, nelle metriche e negli attributi degli span (9) |
 
 ## 6. Esempi di messaggi [dati inventati]
@@ -367,9 +384,9 @@ Esito: nessun errore di compliance. Su `preadvising.enrichment` esce il tracciat
 }
 ```
 
-### 6.2 Spedizione soggetta con Account Key corta e un articolo senza Product ID (canale PDB_INVIOFILE)
+### 6.2 Spedizione soggetta con Account Key corta e un articolo senza Product ID (canale IS)
 
-Ingresso: come 6.1 ma `"canale": "PDB_INVIOFILE"`, `"zonos_account_key": "TESTAK-CORTA"` e il secondo articolo
+Ingresso: come 6.1 ma `"canale": "IS"`, `"zonos_account_key": "TESTAK-CORTA"` e il secondo articolo
 senza `zonos_product_id`. Evento su `preadvising.evensource` (ridotto):
 
 ```json
@@ -378,7 +395,7 @@ senza `zonos_product_id`. Evento su `preadvising.evensource` (ridotto):
   "aggregateType": "ldv",
   "eventType": "ST_R0006",
   "eventData": {
-    "canale": "PDB_INVIOFILE",
+    "canale": "IS",
     "errori": {
       "1321": "zonos_account_key: lunghezza non valida (attesi 52 caratteri)",
       "1322": "zonos_product_id: Campo obbligatorio mancante (collo 1 articolo 2)"
@@ -390,7 +407,9 @@ senza `zonos_product_id`. Evento su `preadvising.evensource` (ridotto):
 }
 ```
 
-Il messaggio non va su `preadvising.enrichment`.
+Il messaggio non va su `preadvising.enrichment`. Lo stesso ingresso su `PDB_INVIOFILE` o
+`EUD_INVIOSYSTEM` non ha errori di compliance (3.3): restano solo gli eventuali errori PDB e i campi
+si propagano.
 
 ### 6.3 Due colli, articoli senza Product ID in entrambi
 
@@ -436,6 +455,7 @@ l'`ObjectMapper` serializza i `null` (VAL-AS-18).
 | UC-13 | soggetta, con anche un errore semantico esistente (flusso SDA) | un solo scarto con entrambi gli errori |
 | UC-14 | messaggio storico senza campi nuovi | come oggi |
 | UC-15 | soggetta su canale di passaggio (`PDW`, `MYSDA`, `TUP`) | nessun controllo (VAL-AS-12), campi propagati |
+| UC-17 | soggetta su canale del `PdbPreadvisingHandler` (`PDB_INVIOFILE`, `EUD_INVIOSYSTEM`), flag acceso | nessun controllo (VAL-AS-21), campi propagati |
 | UC-16 | multicollo a riga singola (`002`) | i cloni portano `zonos_account_key` e gli articoli del proprio collo con `zonos_product_id` |
 
 ## 8. Configurazione
@@ -511,11 +531,11 @@ Nessun secret nuovo. Le regole DRL e la configmap **non cambiano** (3.4).
 | AC-13 | Con `prodotti` di default è soggetta una spedizione con `codice_prodotto` `456`, e una con `codice_prodotto` `ALTRO` e `id_servizio` `516`; non lo è una con `codice_prodotto` `ALTRO` e `id_servizio` `ALTRO2`; con `prodotti` vuoto ogni prodotto è interessato |
 | AC-14 | Dato UC-13 nel flusso SDA, lo scarto contiene sia l'errore semantico sia quello di compliance |
 | AC-15 | Dato UC-15 (canali `PDW`, `MYSDA`, `TUP`) con campi mancanti, il preavviso prosegue senza errori di compliance |
-| AC-16 | Dato 6.2 su `PDB_INVIOFILE` ed `EUD_INVIOSYSTEM`, lo scarto ha gli errori di compliance oltre a quelli PDB, e il canale in uscita è quello originale |
+| AC-16 | Dato UC-17 (6.2 su `PDB_INVIOFILE` ed `EUD_INVIOSYSTEM`) con flag acceso, non c'è nessun errore `1320`…`1323`, la metrica `business_compliance_usa_verifiche_total` non si incrementa e i campi `zonos_*` si propagano; gli eventuali errori PDB restano quelli di oggi [DECISO, Diego 2026-11-25] |
 | AC-17 | Dato UC-16, ogni clone ha `zonos_account_key` della spedizione e, sul suo collo, gli articoli con il loro `zonos_product_id` |
 | AC-18 | Una spedizione non soggetta con `zonos_product_id` di 300 caratteri passa senza errori: nessuna annotazione Bean Validation sui campi nuovi |
 | AC-19 | Nei log (anche a DEBUG e nel WARN di `salvaErroreRegole`) non compare il valore di `zonos_account_key`; nei log a INFO e WARN non compare `zonos_product_id` |
-| AC-20 | La metrica `business_compliance_usa_verifiche_total` si incrementa con `esito` `ok`, `ko` e `non_soggetta` nei casi attesi e non si incrementa con il flag spento |
+| AC-20 | La metrica `business_compliance_usa_verifiche_total` si incrementa con `esito` `ok`, `ko` e `non_soggetta` nei casi attesi del flusso SDA e non si incrementa con il flag spento né sui canali del `PdbPreadvisingHandler` |
 | AC-21 | Tutti i test esistenti (`regoledrools/*`, `handler/*`) restano verdi. Eccezione nota: i 153 test `regoledrools/Invio*Test` falliscono già su `develop` prima della 146073 (verificato il 24-11): sono preesistenti e si sistemano a parte; la 146073 non deve aggiungerne altri |
 
 ## 11. Casi di test
@@ -537,14 +557,14 @@ mano su `preadvising.pre-enrichment` (AS-05). Tutti i dati sono inventati.
 | TC-09 | unit | flag spento con 6.2 | nessun errore | AC-02, AC-11 |
 | TC-10 | unit | soggetta senza colli o senza articoli | nessun errore `1322`, WARN | 5.3 |
 | TC-11 | handler SDA | 6.2 su canale `IF` con anche un campo semantico errato | scarto unico, evento `ST_R0006`, Mongo `stato` 2, niente invio su enrichment | AC-05, AC-14 |
-| TC-12 | handler PDB | 6.2 su `PDB_INVIOFILE` ed `EUD_INVIOSYSTEM` | errori PDB e di compliance insieme; canale ripristinato | AC-16 |
+| TC-12 | handler PDB | 6.2 su `PDB_INVIOFILE` ed `EUD_INVIOSYSTEM`, flag acceso | nessun errore `1320`…`1323`, nessuna metrica di compliance, campi propagati (test riscritti nel commit `c7f82eb`) | AC-16 |
 | TC-13 | handler di passaggio | 6.2 su `PDW`, `MYSDA`, `TUP` | nessun errore di compliance, invio su enrichment con i campi | AC-15 |
 | TC-14 | handler SDA multicollo `002` | 2 colli, articoli con Product ID diversi | i cloni hanno i campi giusti | AC-17 |
 | TC-15 | unit | spedizione non soggetta con Product ID di 300 caratteri nel flusso SDA (regola "Validazione annotazioni DTO") | nessun errore | AC-18 |
 | TC-16 | log capture | TC-11 con log a DEBUG | nessun valore di `zonos_account_key` | AC-19 |
 | TC-17 | unit (MeterRegistry semplice) | ok, ko, non soggetta, flag spento | contatori attesi | AC-20 |
 | TC-18 | regressione | suite esistente | verde | AC-21 |
-| TC-19 | integrato svil | 4 messaggi a mano su `preadvising.pre-enrichment`: 6.1 su `IF`, 6.2 su `PDB_INVIOFILE`, 6.4, 6.5 | uscite su `preadvising.enrichment` ed eventi su `preadvising.evensource` come in AC-01, AC-05, AC-11, AC-03 | AC-01…AC-05 |
+| TC-19 | integrato svil | 4 messaggi a mano su `preadvising.pre-enrichment`: 6.1 su `IF`, 6.2 su `IS`, 6.4, 6.5 | uscite su `preadvising.enrichment` ed eventi su `preadvising.evensource` come in AC-01, AC-05, AC-11, AC-03 | AC-01…AC-05 |
 | TC-20 | unit | `MongoConverter` (`mongoTemplate.getConverter().write`) su un `PreadvisingEvents` con i tre campi valorizzati | il `Document` ha le chiavi `zonos_account_key`, `zonos_declaration_id`, `zonos_product_id`; nessuna chiave `zonosAccountKey`, `zonosDeclarationId`, `zonosProductId` | AC-04 |
 
 Per il canale `IF` il messaggio deve avere un cliente e una postazione di test configurati in
@@ -575,7 +595,7 @@ Nuove (Mary, 16-11):
 |---|---|---|---|
 | VAL-AS-10 | Nessuna annotazione Bean Validation sui campi nuovi. La regola semantica generica le applicherebbe a tutte le spedizioni del flusso SDA, con codici `_OBBL_…` e anche fuori da R-01 | lunghezze controllate solo nel componente, solo sulle spedizioni soggette | Diego |
 | VAL-AS-11 | L'Account Key è una chiave del cliente: non va nei log | `@ToString.Exclude` su `zonos_account_key`; `zonos_product_id` resta nel `toString` (non è un dato personale), ma non va nei log del componente | Diego / Poste (sicurezza) |
-| VAL-AS-12 | R-01 vale solo negli handler che validano (`SdaFlussoHandler`, `PdbPreadvisingHandler`). `PdbPdwFlussoHandler` (PDB, PDW, ILP dall'adapter), `TfiFlussoHandler` (MYSDA, SDA_WS, INVIO_WEB, TFI/TWS/BNC) e `TupFlussoHandler` (TUP, OMP) oggi non validano nulla, e restano così | nessun controllo su quei canali, solo propagazione | Poste (vedi VAL-DA-04) |
+| VAL-AS-12 | R-01 vale solo in `SdaFlussoHandler` (il `PdbPreadvisingHandler` è escluso da VAL-AS-21). `PdbPdwFlussoHandler` (PDB, PDW, ILP dall'adapter), `TfiFlussoHandler` (MYSDA, SDA_WS, INVIO_WEB, TFI/TWS/BNC) e `TupFlussoHandler` (TUP, OMP) oggi non validano nulla, e restano così | nessun controllo su quei canali, solo propagazione | Poste (vedi VAL-DA-04) |
 | VAL-AS-13 | La regola si scrive in Java e non in DRL, per la configurazione, per le copie disallineate classpath/configmap e per il DRL PDB generato fuori dal repo | componente `ComplianceUsaValidator` | Diego |
 | VAL-AS-14 | Nel flusso SDA gli errori di compliance si uniscono a quelli semantici (prima del controllo postazione 143) | un solo scarto con tutti gli errori formali | Diego |
 | VAL-AS-15 | Il valore "documenti" di `tipo_merce` non è nello schema del tracciato (1 carattere, nessun dominio). Lo schema del builder ha invece `collo.codice_contenuto` con dominio `P`/`D` | **[DECISO, Diego 23-11]** `tipi-merce-documenti` = `D`, su `tipo_merce`; `tipo_merce` assente = merce | chiusa |
@@ -584,13 +604,14 @@ Nuove (Mary, 16-11):
 | VAL-AS-18 | In uscita i campi assenti diventano `null` espliciti, perché l'`ObjectMapper` serializza i null come per tutti gli altri campi | nessun `@JsonInclude(NON_NULL)` | Diego (impatto a valle nullo: gli altri DTO li accettano come opzionali) |
 | VAL-AS-19 | Flag spento di default in tutti gli ambienti finché il builder non manda i campi; in svil si accende solo per i test integrati | come 8 | Diego |
 | VAL-AS-20 | Nomi delle chiavi su MongoDB per i campi nuovi | **[DECISO, Diego 24-11]** `zonos_account_key`, `zonos_declaration_id`, `zonos_product_id` (RV-05): con campi Java camelCase serve `@Field` oltre a `@JsonProperty` | chiusa |
+| VAL-AS-21 | Verifica nel `PdbPreadvisingHandler` (PDB, PDW, ILP, EUD) | **[DECISO, Diego 25-11]** non si fa finché non arrivano le informazioni sui flussi PDB: i campi `zonos_*` passano senza controlli. Commit `c7f82eb` | regola per i flussi PDB: Poste (PA-14) |
 
 Domande aperte:
 
 | ID | Domanda | Perché serve | Per chi |
 |---|---|---|---|
 | VAL-DA-01 | **Chiusa il 23-11 (Diego).** Niente condizione "business"; "documenti" da `tipo_merce` = `D`; prodotti `456,457,458,459,515,516` su `codice_prodotto` o `id_servizio`. Resta da confermare solo l'elenco di CRONO INTERNAZIONALE (PA-12) | configurazione | — |
-| VAL-DA-02 | Le regole PDB (`ce-pdb-rules.drl`) si generano da ce-rules con un generatore che non è nel repo. Va aggiunta lì anche la regola di compliance, o basta il componente Java? | rischio di doppioni o di regole perse alla rigenerazione | Poste / team ce-rules |
+| VAL-DA-02 | Le regole PDB (`ce-pdb-rules.drl`) si generano da ce-rules con un generatore che non è nel repo. Quando la verifica tornerà sui flussi PDB (VAL-AS-21), va aggiunta lì anche la regola di compliance, o basta il componente Java? | rischio di doppioni o di regole perse alla rigenerazione | Poste / team ce-rules |
 | VAL-DA-03 | In produzione le regole semantic e logic si leggono dalla configmap (`DROOLS_RULES_DIR=/config` in `.helm/values.yaml`), in svil e collaudo dal classpath, e le due copie sono già disallineate. Va bene che questa iniziativa non tocchi i DRL? Chi riallinea le copie? | coerenza fra ambienti (fuori perimetro, ma va segnalato) | Diego |
 | VAL-DA-04 | Le spedizioni USA soggette che arrivano dai canali di passaggio (PDB/PDW/ILP dall'adapter, portali e web service su TFI, TUP) vanno controllate anche dal validatore, o le controlla il sistema di origine? | perimetro di R-01 | Poste |
 | VAL-DA-05 | Una spedizione soggetta senza articoli è valida, o va scartata perché il Product ID è "obbligatorio per ogni articolo"? | caso limite di RV-12 | Poste |

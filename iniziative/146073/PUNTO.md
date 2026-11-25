@@ -1,17 +1,18 @@
 # 146073 — Compliance USA Entry Type 13 — nuovi campi e controlli sul preadvising
 
-**Data**: 2026-11-24 · **Stato**: in_analisi · **Semaforo**: 🟡
+**Data**: 2026-11-25 · **Stato**: in_analisi · **Semaforo**: 🟡
 **Owner cliente**: da definire · **PRJ**: da assegnare
 
 ## In una riga
 La fase 1 (Account Key per spedizione, Product ID per articolo, Declaration ID predisposto) ha
 nomi, regola, errori e colonne SEW decisi da Diego. Lo sviluppo del primo passo è in corso:
-- validatore su `develop` (`090d037`, `43f5cbe`); orchestratore (`9a96564`), smistatore (`9289aeb`) e bff (`d2f5027`) su `develop`;
+- validatore su `develop` (`090d037`, `43f5cbe`, `c7f82eb`), verifica di compliance solo sui flussi SDA; orchestratore (`9a96564`), smistatore (`9289aeb`) e bff (`d2f5027`) su `develop`;
 - `sda-ldv-preadv-consumer` (`consumer-sew_sped`, `producer-sew-sped`) sul branch dedicato (`990503a` + `ef0a5ce`,
   pubblicati), scrive solo su `sew_spedizioni_work`; da compilare in Eclipse.
 
-Adapter e consumer Poste sono rimandati al punto 2 della fase 1. Da Poste servono ancora l'elenco
-dei prodotti CRONO INTERNAZIONALE e i nomi dei campi nelle sorgenti.
+Adapter, consumer Poste e verifica sui flussi PDB sono rimandati al punto 2 della fase 1. Da Poste
+servono ancora l'elenco dei prodotti CRONO INTERNAZIONALE, i nomi dei campi nelle sorgenti e la
+regola per i flussi PDB.
 
 ## Fatto dall'ultimo punto
 - 2026-11-23 — Diego decide nomi, regola, errori e colonne SEW:
@@ -28,6 +29,8 @@ dei prodotti CRONO INTERNAZIONALE e i nomi dei campi nelle sorgenti.
 - 2026-11-24 — Validatore: chiavi `zonos_*` anche su Mongo (`@Field`), commit `43f5cbe` su `develop`.
 - 2026-11-24 — Su `develop`: orchestratore `9a96564` (campi protetti nel merge con le lavorazioni, chiavi `zonos_*` su Mongo), smistatore `9289aeb` (campi su `.completed.poste`/`.sda`, non verso i palmari), bff `d2f5027` (campi in lettura e risottomissione). Lo smistatore ha 4 test `PalmariMapper*` rossi già su `develop` (commit `3d91ac5` del 18-11), non legati alla 146073.
 - 2026-11-24 — Documenti aggiornati con le decisioni del giorno (Mary): analisi 0.4, DDL 0.3 (script 2 su `sew_spedizioni_work_2` eliminato), funzionali 0.3 di `consumer-sew_sped`, `producer-sew-sped`, validatore e orchestratore; note su bff ed event store; prompt.
+- 2026-11-25 — Validatore su `develop`, commit `c7f82eb`: tolta la verifica di compliance dal `PdbPreadvisingHandler`; test PDB riscritti (con flag acceso nessun errore `1320`…`1323`, nessuna metrica, campi propagati).
+- 2026-11-25 — Analisi 0.5 (perimetro di R-01, PA-14), funzionale del validatore 0.4 e prompt aggiornati, Mary.
 
 ## Prossimi passi
 - Segnalare i 4 test `PalmariMapper*` rossi su `develop` dello smistatore all'autore di `3d91ac5` — Diego — fuori dalla 146073
@@ -36,10 +39,10 @@ dei prodotti CRONO INTERNAZIONALE e i nomi dei campi nelle sorgenti.
 - Chiedere a Poste la conferma dell'elenco CRONO INTERNAZIONALE (PA-12) — Diego — prossimo passo
 - Richiedere al DBA Informix lo script 1 delle DDL in svil, solo `sew_spedizioni_work` — Diego / Winston — prima che il builder mandi i campi
 - Test integrati in svil con messaggi costruiti a mano su `preadvising.pre-enrichment`, con il flag `compliance-usa.abilitata` acceso solo per il test — test manager — dopo lo sviluppo
-- Punto 2 della fase 1: adapter (int. 05) e `consumer-sew_sped_poste` (int. 08) — Amelia — quando arrivano i nomi dei campi sorgente e i dettagli lato Poste (PA-13)
+- Punto 2 della fase 1: adapter (int. 05), `consumer-sew_sped_poste` (int. 08) e verifica di compliance sui flussi PDB nel validatore — Amelia — quando arrivano i nomi dei campi sorgente, i dettagli lato Poste e la regola per i flussi PDB (PA-13, PA-14)
 
 ## Blocchi e rischi
-- 🟡 Il validatore controlla solo i flussi SDA e PDB/EUD: portali e web service (MYSDA, SDA_WS, INVIO_WEB), adapter e TUP passano senza regole.
+- 🟡 Il validatore controlla solo i flussi SDA (IF, IS, IE). PDB, PDW, ILP ed EUD passano senza controlli finché Poste non dà la regola per i flussi PDB; portali e web service (MYSDA, SDA_WS, INVIO_WEB), adapter e TUP passano senza regole.
 - 🟡 `ce-dichiarato-ldv`, `-ldv-pdb` e `-ldv-pdb-sync` non conoscono i campi e non sono nell'HLD. In fase 1 basta l'orchestratore, in fase 2 servono.
 - 🟡 Lato SDA il Product ID non ha una tabella articoli (né consumer né producer): va deciso con Poste.
 - 🟡 L'Account Key dei portali arriva solo se i portali, fuori perimetro, la scrivono nelle SEW.
@@ -50,6 +53,7 @@ dei prodotti CRONO INTERNAZIONALE e i nomi dei campi nelle sorgenti.
 ## Serve dal cliente
 - Elenco dei prodotti CRONO INTERNAZIONALE: in `ce_prodotto` ci sono solo `515` e `516` (PA-12).
 - Nomi e livello di Account Key e Product ID nei messaggi PDB, PDW e ILP; PDW avrà più articoli? Serve per il punto 2 (PA-13).
+- Regola di compliance per i flussi PDB (PDB, PDW, ILP, EUD): quali spedizioni sono soggette e su quale campo prodotto (es. `id_servizio`). Fino ad allora lì nessun controllo (PA-14).
 - Il validatore deve controllare anche portali, web service, adapter e TUP?
 - Dove va il Product ID lato SDA (nuova tabella `sew_spedizioni_work_art`?) e chi adegua i portali per l'Account Key.
 - L'Account Key è un dato riservato? Se sì va mascherata nei log.
@@ -77,3 +81,4 @@ dei prodotti CRONO INTERNAZIONALE e i nomi dei campi nelle sorgenti.
 - 2026-11-24 — Il producer toglie gli spazi di riempimento a destra dei campi `char`: un valore vuoto o di soli spazi vale come campo assente (PRD-02) (Diego).
 - 2026-11-24 — Su MongoDB validatore e orchestratore salvano i campi con i nomi del tracciato `zonos_account_key`, `zonos_declaration_id`, `zonos_product_id`, non camelCase (Diego).
 - 2026-11-24 — Orchestratore, smistatore e bff restano nel primo passo su `develop`; lo sviluppo riparte oggi (Diego).
+- 2026-11-25 — La verifica Compliance USA del validatore si applica solo ai flussi SDA (`SdaFlussoHandler`). Sul `PdbPreadvisingHandler` (PDB, PDW, ILP, EUD) non si fa finché mancano le informazioni sui flussi PDB: i campi `zonos_*` passano senza controlli (Diego).

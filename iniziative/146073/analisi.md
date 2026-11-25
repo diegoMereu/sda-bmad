@@ -1,8 +1,9 @@
 # 146073 — Compliance USA Entry Type 13: nuovi campi e controlli sul preadvising — analisi
 
-Versione 0.4 del 2026-11-24 (decisioni di Diego del 23 e 24-11 su nomi, regola, colonne SEW, branch e
+Versione 0.5 del 2026-11-25 (decisioni di Diego del 23 e 24-11 su nomi, regola, colonne SEW, branch e
 primo passo della fase 1; dal 24-11 anche colonne SDA solo su `sew_spedizioni_work`, spazi di
-riempimento nel producer, nomi su MongoDB e stato dello sviluppo).
+riempimento nel producer, nomi su MongoDB e stato dello sviluppo; dal 25-11 verifica di R-01 solo
+sui flussi SDA, flussi PDB rimandati al punto 2).
 
 ## Fonti
 
@@ -58,6 +59,15 @@ Declaration ID si predispone nella fase 1 e si valorizza nella fase 2 (PA-01).
   - `codice_prodotto` **oppure** `id_servizio` per i prodotti: 456, 457 (EXPORT BOX), 458, 459
     (EXPORT BOX PCIM), 515, 516 (CRONO INTERNAZIONALE, 516 = assicurato). I codici vengono da
     `ce_prodotto` di ce-rules; l'elenco di CRONO INTERNAZIONALE è da confermare (PA-12).
+  - **Perimetro** [DECISO, Diego 25-11]: la verifica si applica **solo ai flussi SDA**
+    (`SdaFlussoHandler` del validatore: canali a file `IF`, `IS`, `IE`). Sul `PdbPreadvisingHandler`
+    (PDB, PDW, ILP, EUD) non si fa, perché per i flussi PDB non ci sono ancora le informazioni: lì i
+    campi `zonos_*` passano senza controlli. La regola per i flussi PDB va nel punto 2 della fase 1,
+    con adapter e consumer Poste (PA-14).
+  - Nei flussi SDA il prodotto arriva in `codice_prodotto`, con il codice numerico di `ce_prodotto`
+    (es. 517, 311, 449; il `producer-sew-sped` lo legge da `id_prodotto` delle SEW). `id_servizio`
+    nei flussi SDA in genere non è valorizzato: lo usano i flussi PDB (es. 580, 582) [FATTO,
+    verificato sul codice il 25-11].
 - **R-02**: il validatore controlla **solo presenza e lunghezza**. Niente lookup in
   anagrafica, niente chiamate a Zonos.
 - **R-03**: l'errore deve indicare il campo e, per il Product ID, **l'articolo** non valido
@@ -119,7 +129,12 @@ con il prefisso `zonos_`. I nomi provvisori `account_key`, `product_id`, `declar
   `destinatario.codice_nazione` in (`US`, `USA`), senza spazi e senza distinzione fra maiuscole e
   minuscole;
 - `codice_prodotto` **oppure** `id_servizio` appartiene all'elenco dei prodotti interessati:
-  `456,457,458,459,515,516`.
+  `456,457,458,459,515,516` (valori normalizzati con trim e maiuscolo; elenco configurabile,
+  `COMPLIANCE_USA_PRODOTTI`).
+
+La verifica si fa **solo nei flussi SDA** (`SdaFlussoHandler`) [DECISO, Diego 25-11]. Nel
+`PdbPreadvisingHandler` (PDB, PDW, ILP, EUD) i campi passano senza controlli finché non arriva la
+regola per i flussi PDB (PA-14). Commit `c7f82eb` su `develop` del validatore.
 
 La condizione "cliente business" della versione precedente non c'è più. Per le spedizioni
 soggette `zonos_account_key` è obbligatorio (esattamente 52 caratteri) e `zonos_product_id` è
@@ -213,11 +228,14 @@ sviluppano validatore, orchestratore, smistatore e bff (su `develop`) e `sda-ldv
 `sew_spedizioni_work` e da compilare in Eclipse con i jar di `L:` prima del rilascio); orchestratore,
 smistatore e bff restano nel primo passo su `develop` e ripartono il 24-11. L'adapter (int. 05) e `consumer-sew_sped_poste` (int. 08) sono **rimandati al
 punto 2 della fase 1**: mancano i nomi dei campi nei messaggi sorgente PDB, PDW e ILP e i dettagli
-lato Poste (PA-13). I loro funzionali sono comunque allineati ai nomi `zonos_*`.
+lato Poste (PA-13). I loro funzionali sono comunque allineati ai nomi `zonos_*`. Nel punto 2 va
+anche la **verifica di compliance sui flussi PDB** (PDB, PDW, ILP, EUD) nel validatore: il 25-11
+Diego ha deciso di applicarla per ora solo ai flussi SDA, perché per i flussi PDB mancano le
+informazioni (PA-14).
 
 | Int. | Servizio | Modifica di codice | Sintesi |
 |---|---|---|---|
-| 01 | `ce-dichiarato-validatore` | **sì** | I DTO tipizzati oggi perdono i campi: si aggiungono a `SpedizioneDTO` e `ArticoloDTO`, senza annotazioni Bean Validation. La regola R-01 va in un componente Java configurabile (`ComplianceUsaValidator`), chiamato da `SdaFlussoHandler` e `PdbPreadvisingHandler`. I DRL restano come sono. Codici di errore `1320`…`1323` |
+| 01 | `ce-dichiarato-validatore` | **sì** | I DTO tipizzati oggi perdono i campi: si aggiungono a `SpedizioneDTO` e `ArticoloDTO`, senza annotazioni Bean Validation. La regola R-01 va in un componente Java configurabile (`ComplianceUsaValidator`), chiamato **solo** da `SdaFlussoHandler` (Diego 25-11, commit `c7f82eb`: nel `PdbPreadvisingHandler` nessun controllo fino alla regola per i flussi PDB, PA-14). I DRL restano come sono. Codici di errore `1320`…`1323` |
 | 02 | `ce-dichiarato-orchestratore` | **sì**, piccola | I campi si perdono in 8 punti (ingresso, Mongo, lavorazioni, merge, uscita): si aggiungono ai DTO. I tre campi vanno esclusi dal merge delle lavorazioni tramite `campi-esclusi` |
 | 03 | `ce-dichiarato-smistatore` | **sì**, piccola | Stesso `SmistatoreDTO` per Poste e SDA: si aggiungono i campi ai DTO. I palmari restano esclusi senza logica nuova |
 | 04 | `ce-event-handler-event-store` | no | `eventData` è un `Object` generico: i campi arrivano su Mongo così come sono. Solo test di non regressione |
@@ -231,10 +249,11 @@ lato Poste (PA-13). I loro funzionali sono comunque allineati ai nomi `zonos_*`.
 
 **Rischi emersi oltre l'HLD**
 
-- **Il validatore non controlla tutti i canali.** Le regole girano solo nel flusso SDA (IF,
-  IS, IE) e in quello PDB/EUD. I canali dei portali e del web service (MYSDA, SDA_WS,
-  INVIO_WEB), l'adapter e TUP passano senza regole: una spedizione USA che arriva da
-  lì non verrebbe controllata (VAL-DA-04).
+- **Il validatore non controlla tutti i canali.** La verifica di compliance gira solo nel flusso
+  SDA (IF, IS, IE). Il flusso PDB/EUD (`PdbPreadvisingHandler`) è escluso dal 25-11 fino alla regola
+  per i flussi PDB (PA-14). I canali dei portali e del web service (MYSDA, SDA_WS, INVIO_WEB),
+  l'adapter e TUP passano senza regole: una spedizione USA che arriva da lì non verrebbe
+  controllata (VAL-DA-04).
 - **Le lavorazioni non conoscono i campi.** `ce-dichiarato-ldv`, `-ldv-pdb` e `-ldv-pdb-sync`
   restituiscono il tracciato senza i campi. In fase 1 l'orchestratore li conserva da Mongo,
   ma in fase 2 servono verso BEP. Questi servizi non sono nell'HLD (PA-10).
@@ -305,6 +324,7 @@ Ci sono anche due punti da chiarire nel contenuto:
 | PA-11 | Palmari (`sew_sped_pre_adv_online_out_tot`), T&T-Repo e OneTracking: sono fuori perimetro? | Perimetro |
 | PA-12 | **Nuovo (23-11).** Diego ha elencato CRONO INTERNAZIONALE quattro volte, ma in `ce_prodotto` di ce-rules risultano solo `515` e `516` (516 = assicurato): l'elenco dei prodotti va confermato. Si cambia in configurazione | Validatore |
 | PA-13 | **Nuovo (24-11).** Punto 2 della fase 1: nomi e livello dei campi nei messaggi sorgente PDB, PDW e ILP (adapter, int. 05) e dettagli lato Poste (`consumer-sew_sped_poste`, int. 08) | Int. 05, 08 |
+| PA-14 | **Nuovo (25-11).** Regola di compliance per i flussi PDB (PDB, PDW, ILP, EUD): dal 25-11 la verifica del validatore vale solo per i flussi SDA e nel `PdbPreadvisingHandler` i campi passano senza controlli. Servono da Poste le informazioni sui flussi PDB (quali spedizioni sono soggette, su quale campo prodotto, es. `id_servizio`). Va nel punto 2 della fase 1 | Validatore, punto 2 |
 
 ## Casi di test minimi (fase 1, dalla descrizione)
 

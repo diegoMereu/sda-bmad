@@ -30,6 +30,15 @@ nomi del tracciato `zonos_account_key`, `zonos_declaration_id`, `zonos_product_i
 Spring Data usa il nome del campo Java e ignora `@JsonProperty`: con nomi Java camelCase serve anche
 `@Field("zonos_…")`. Il documento lo dice nei DTO, nelle regole, nei criteri di accettazione e nei test.
 
+**Perimetro della verifica (decisione di Diego del 2026-11-25)**: la verifica Compliance USA si applica
+**solo ai flussi SDA** (`SdaFlussoHandler`). Sul `PdbPreadvisingHandler` (PDB, PDW, ILP, EUD) non si
+fa, perché per i flussi PDB non ci sono ancora le informazioni: lì i campi `zonos_*` passano senza
+controlli e si propagano (commit `c7f82eb` su `develop`). Nei flussi SDA il prodotto arriva in
+`codice_prodotto` (codice numerico di `ce_prodotto`, letto dal `producer-sew-sped` da `id_prodotto`
+delle SEW); `id_servizio` in genere non è valorizzato ed è usato dai flussi PDB. Il confronto resta su
+`codice_prodotto` oppure `id_servizio`, normalizzati (trim, maiuscolo), con l'elenco
+`COMPLIANCE_USA_PRODOTTI`.
+
 # Fonti
 
 - `iniziative/146073/analisi.md`: soprattutto "Contratto della fase 1", regole R-01…R-05, punti aperti.
@@ -67,8 +76,9 @@ Approfondisci:
    generano, se c'è un generatore nel repo), copie in `.helm/config/files/rules` (configmap e
    `DROOLS_RULES_DIR` nei values di ogni ambiente), handler per famiglia di canale
    (`CanaleFlussoResolver`, `PdbPreadvisingHandler`, `SdaFlussoHandler`, `PdbPdwFlussoHandler`,
-   `TfiFlussoHandler`, `TupFlussoHandler`). Indica a quali handler va applicata R-01 e dove metterla
-   perché valga per tutti i canali che validano.
+   `TfiFlussoHandler`, `TupFlussoHandler`). R-01 si applica solo in `SdaFlussoHandler` (decisione
+   del 2026-11-25): indica dove metterla e come il `PdbPreadvisingHandler` resta senza controlli di
+   compliance fino alle specifiche dei flussi PDB.
 3. **Configurazione di AS-02** (flag, valori, elenco prodotti) nel modo in cui il servizio legge le
    proprietà (`application.yaml` con `${ENV:default}`, `envFrom` dei values `.helm`, svil, coll,
    template di prod con `_#VAR`).
