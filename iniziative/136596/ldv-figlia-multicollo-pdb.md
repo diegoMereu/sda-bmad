@@ -48,6 +48,23 @@ seme        = madre.substring(2,7) = family_printStation
 - **Altri scancode non di 13 caratteri** (18, 21, 24, 27; `code_barcode` sempre di 13): sono barcode
   di partner (`JJD…`, `JVGL…`, `JJITA…` in `code_international`), non figli di multicollo.
 
+## Prova su BEP (25-11)
+
+**Con il figlio di 22 caratteri in `declared[].code` BEP accetta il multicollo INVIOSYSTEM.**
+
+| ambiente | `code` del figlio | `parcelLabel` del figlio | esito BEP |
+|---|---|---|---|
+| svil, da ldv-pdb (3 invii: figli casuali, `2308XXXXW`, `2308NCT1W`) | 9 caratteri | 22 caratteri | `101` "Dati non conformi: barcode" su tutta la waybill, madre compresa |
+| collaudo, invio manuale su `PACCHI.MEDIATION.BEP.INVIOSYSTEMREQUEST` | **22** (`2308NCT1W3UW2308718451`) | 22 | **`0` OK** sulla spedizione e sui 3 colli |
+
+Il messaggio di collaudo è stato inviato all'offset 45108 e la risposta è arrivata all'offset 45130 di
+`PACCHI.BEP.MEDIATION.INVIOSYSTEMRESPONSE`. Per il resto è identico all'invio di svil
+`3f5b6e0a-…`: contratto `SFA-00633620`, madre `3UW2308718451`, `APT000945`.
+
+**Da correggere in `ce-dichiarato-ldv-pdb`:** per INVIOSYSTEM `BepRequestMapper` manda
+`code = collo.id_ldv`, che sul figlio ha 9 caratteri. Deve mandare il figlio completo:
+`id_ldv_figlio` (22 caratteri) quando è valorizzato, altrimenti `id_ldv`.
+
 ## Conseguenze per EURODIS (autoproduttore INVIOSYSTEM)
 
 - EURODIS deve generare i figli con questa regola sul seme `W2308`:
