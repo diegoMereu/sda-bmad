@@ -33,7 +33,7 @@ Etichette:
 ## 1. Contesto e obiettivo
 
 Le spedizioni verso gli USA con merce devono rispettare la normativa USA **Entry Type 13**.
-In fase 1 il preavviso porta due campi nuovi, validati dal validatore e propagati fino alle SEW:
+In fase 1 il preavviso porta due campi nuovi, verificati da `ce-dichiarato-ldv` (processo normale, flussi SDA) e propagati fino alle SEW:
 
 - **Account Key**: uno per spedizione, 52 caratteri;
 - **Product ID**: uno per articolo, 1–255 caratteri.
@@ -61,7 +61,7 @@ tracciato unico**: Account Key sulla testata della spedizione, ogni Product ID s
 
 | Fuori perimetro | Chi lo fa |
 |---|---|
-| Controllo di presenza e lunghezza, riconoscimento delle spedizioni soggette (R-01, R-02, R-03) | `ce-dichiarato-validatore` (int. 01) |
+| Controllo di presenza e lunghezza, riconoscimento delle spedizioni soggette (R-01, R-02, R-03) | `ce-dichiarato-ldv`, processo normale (Diego 25-11). Sui flussi PDB, PDW e ILP dell'adapter nessuna verifica fino alle specifiche (PA-14) |
 | Aggiunta dei campi nei messaggi di PDB, PDW e ILP | sistemi sorgente (ADA-01) |
 | Ingresso da file e da API | `ce-dichiarato-builder` (team applicativo, AS-05) |
 | Merge nell'orchestratore dei dati arrivati con gli esiti BEP | `ce-dichiarato-orchestratore` (int. 02, ADA-06) |
@@ -136,7 +136,7 @@ mandano con un nome diverso, il messaggio si elabora come oggi e i campi escono 
 
 | ID | Regola |
 |---|---|
-| RF-01 | Valori copiati **così come arrivano**: niente `trim`, maiuscolo, troncamento, ricalcolo; stringa vuota resta stringa vuota (R-04). La validazione la fa il validatore |
+| RF-01 | Valori copiati **così come arrivano**: niente `trim`, maiuscolo, troncamento, ricalcolo; stringa vuota resta stringa vuota (R-04). L'adapter non valida (sui suoi flussi nessuna verifica fino a PA-14) |
 | RF-02 | Campo assente o `null` nella sorgente → `null` nel tracciato, nessun errore, nessun log WARN (R-05) |
 | RF-03 | Il Product ID resta sull'**articolo da cui viene**: stesso elemento, stessa `posizione`, stesso collo. L'ordine degli articoli non cambia |
 | RF-04 | L'adapter non valida e non scarta: nessun controllo su lunghezza o obbligatorietà, nessun riconoscimento delle spedizioni USA |
@@ -288,8 +288,8 @@ Uscita identica a quella di oggi più `"zonos_account_key": null`, `"zonos_decla
 
 ### UC-06 — Valori "sporchi"
 
-`code_accountKey` = `" AK… "` (con spazi) e `productId` = `""`: escono identici (RF-01). Lo scarto,
-se la spedizione è soggetta, lo decide il validatore.
+`code_accountKey` = `" AK… "` (con spazi) e `productId` = `""`: escono identici (RF-01). Sui flussi
+dell'adapter oggi non c'è verifica di compliance (PA-14): il validatore propaga i campi senza controlli.
 
 ## 7. Configurazione
 
@@ -369,7 +369,7 @@ Nuove (Mary, 16-11):
 | ADA-01 | **Nomi dei campi nei messaggi sorgente.** PDB/BEP, PDW (`PRE_WEB`) e ILP oggi non hanno Account Key, Product ID, Declaration ID: i sistemi sorgente devono aggiungerli. Servono nome, livello (testata/articolo) e formato per ciascuno | provvisori: PDB `code_accountKey` + `customsDeclaration_items[].productId`; PDW `ACCOUNT_KEY` + `PRODUCT_ID`; ILP `content.accountKey` + `customsDeclarationItems[].productId` (5.1–5.3) | Poste (team PDB/BEP, PDW, ILP) |
 | ADA-02 | **Mapping non configurabile.** I nomi provvisori stanno nelle annotazioni Jackson, con alias snake_case; quando arrivano i nomi veri si cambia l'annotazione | `@JsonProperty` + `@JsonAlias`, nessuna proprietà | Diego |
 | ADA-03 | **Omonimi.** `ID_PRODOTTO` (PDW) e `services.product` (ILP) sono codici prodotto SDA, non il Product ID di Entry Type 13: non si riusano | restano su `codice_prodotto` | Poste |
-| ADA-04 | **PDW ha un solo articolo**, senza `posizione`: il Product ID va su quello. R-03 chiede la posizione dell'articolo nell'errore | `posizione` resta `null`; il validatore usa l'indice nella lista. Se PDW deve gestire più articoli, serve una lista nel messaggio (fuori fase 1) | Poste (PDW), funzionale del validatore |
+| ADA-04 | **PDW ha un solo articolo**, senza `posizione`: il Product ID va su quello. R-03 chiede la posizione dell'articolo nell'errore | `posizione` resta `null`; la verifica (quando ci sarà sui flussi PDB) usa l'indice nella lista, come fa oggi `ce-dichiarato-ldv`. Se PDW deve gestire più articoli, serve una lista nel messaggio (fuori fase 1) | Poste (PDW), funzionale del ldv |
 | ADA-05 | **Account Key diverse fra i colli** della stessa spedizione negli esiti BEP | vince la prima non `null`, WARN senza valori | Poste |
 | ADA-06 | **Esiti BEP senza i campi.** Se BEP non rimanda Account Key e Product ID, l'`enrichment_bep` li porta `null`: l'orchestratore non deve cancellare i valori arrivati dal builder | l'adapter pubblica quello che riceve; il merge è nel funzionale dell'orchestratore (int. 02) | Winston / funzionale orchestratore |
 | ADA-07 | **ILP e USA.** ILP elabora solo `inbound`: una spedizione ILP diretta negli USA è improbabile. Il consumer ILP rientra nell'HLD, quindi si adegua | si mappa comunque | Poste |

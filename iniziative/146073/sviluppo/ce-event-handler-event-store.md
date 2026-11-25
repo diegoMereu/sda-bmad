@@ -16,7 +16,7 @@ considerate.
 **Fonti**: [analisi.md](../analisi.md), "Contratto della fase 1" (AS-01…AS-06, **vincolante**);
 `cliente/HLD_146073_dati_preadvising_fase_1.xlsx` (int. 04); `cliente/20261116_descrizione_compliance_usa_entry_type_13.md`
 (§ `ce-event-handler-event-store`); ICD `ce-event-handler-monitoring/icd/ICD_preadvising_eventsource.md`
-(non versionato, copia locale del 13-09); [ce-dichiarato-validatore.md](ce-dichiarato-validatore.md) (codici 1320…1323)
+(non versionato, copia locale del 13-09); [ce-dichiarato-ldv.md](ce-dichiarato-ldv.md) (codici 1320…1323)
 
 Etichette:
 - **[FATTO]**: scritto nell'HLD, nella descrizione, nell'ICD o nel codice; la fonte è indicata.
@@ -56,7 +56,7 @@ riguarda codice di questo servizio (sezione 3.3). Definisce i test che lo dimost
 
 | Fuori perimetro | Chi lo fa |
 |---|---|
-| Mettere i campi nel `DichiaratoDTO` che finisce in `eventData` | i servizi che pubblicano l'evento: validatore (int. 01), orchestratore (int. 02), smistatore (int. 03). `ce-dichiarato-ldv` non è nell'HLD (PA-10) |
+| Mettere i campi nel `DichiaratoDTO` che finisce in `eventData` | i servizi che pubblicano l'evento: validatore (int. 01), orchestratore (int. 02), smistatore (int. 03). `ce-dichiarato-ldv` porta i campi dal commit `1bd3517` (non è nell'HLD, PA-10) |
 | Consultazione dell'event store | `ce-dichiarato-bff` ([ce-dichiarato-bff.md](ce-dichiarato-bff.md)) |
 | Esito e stato della lavorazione Zonos, Declaration ID valorizzato | fase 2 (AS-06) |
 | Altri consumer di `preadvising.evensource` (T&T-Repo, `ce-event-handler-file-pdb`, scarti) | fuori fase 1 (AS-06) o fuori HLD |
@@ -138,7 +138,7 @@ usa una mappa): nessuna incompatibilità.
 | RE-01 | L'evento si salva com'è arrivato: i tre campi nuovi, se presenti in `eventData`, sono nel documento di `event_store` con lo stesso nome, la stessa posizione e lo stesso valore |
 | RE-02 | `zonos_product_id` resta sull'elemento di `articolo[]` in cui è arrivato, con più colli e più articoli |
 | RE-03 | Un evento senza i campi (scenari non USA, eventi `file`, eventi storici) si salva come oggi |
-| RE-04 | Nessuna validazione dei campi: presenza e lunghezza le controlla solo il validatore (R-02) |
+| RE-04 | Nessuna validazione dei campi: presenza e lunghezza le controlla solo `ce-dichiarato-ldv`, nel processo normale (R-02) |
 | RE-05 | Nessun cambio a topic, collection, gruppo consumer, metriche |
 
 ## 5. Esempi [dati inventati]
@@ -181,8 +181,8 @@ Documento in `event_store`: stesso contenuto, con `_id` = `id` e `timestamp` com
 
 ### 5.2 Scarto `ST_R0006` per Product ID mancante
 
-`eventData.errori` = `{"1322": "zonos_product_id: Campo obbligatorio mancante (collo 1 articolo 2)"}` (codice del
-validatore), il secondo articolo senza `zonos_product_id`. Si salva com'è: l'articolo senza `zonos_product_id`
+`eventData.errori` = `{"1322": "zonos_product_id: Campo obbligatorio mancante (collo 1 articolo 2)"}` (codice di
+`ce-dichiarato-ldv`, mandato dall'orchestratore con lo stato `PREADVISING_PARZIALE_E_BLOCCATO`), il secondo articolo senza `zonos_product_id`. Si salva com'è: l'articolo senza `zonos_product_id`
 resta senza la chiave.
 
 ### 5.3 Spedizione non USA
@@ -254,6 +254,6 @@ Valgono AS-01…AS-06 di [analisi.md](../analisi.md). Nuove (Mary, 16-11):
 ## 11. Riferimenti
 
 - [analisi.md](../analisi.md): contratto della fase 1.
-- [ce-dichiarato-validatore.md](ce-dichiarato-validatore.md): codici di errore e forma dell'evento `ST_R0006`.
+- [ce-dichiarato-ldv.md](ce-dichiarato-ldv.md): codici di errore di compliance (verifica spostata dal validatore il 25-11).
 - [ce-dichiarato-bff.md](ce-dichiarato-bff.md), [ce-event-handler-monitoring.md](ce-event-handler-monitoring.md): gli altri due servizi dell'int. 04.
 - [contesto/microservizi-preadvising.md](../../../contesto/microservizi-preadvising.md), [contesto/test-integrati.md](../../../contesto/test-integrati.md).

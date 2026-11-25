@@ -28,7 +28,7 @@ documento lo dettaglia, non lo cambia. Le incoerenze vanno fra le domande aperte
   `contesto/linee-guida-sviluppo.md`, `contesto/test-integrati.md`.
 - `iniziative/146073/analisi.md`; `cliente/HLD_146073_dati_preadvising_fase_1.xlsx` (leggilo con
   `python -I` e openpyxl); `cliente/20261116_descrizione_compliance_usa_entry_type_13.md`.
-- `iniziative/146073/sviluppo/ce-dichiarato-validatore.md` per codici e forma degli errori.
+- `iniziative/146073/sviluppo/ce-dichiarato-ldv.md` per codici e forma degli errori (verifica spostata dal validatore il 25-11).
 - Codice in sola lettura in `C:\Users\diego.mereu\gitposte\SDA\preadvising\ce-event-handler-event-store`:
   la working copy ha modifiche non committate di altri, quindi leggi `origin/develop` con `git show`
   e dichiara il ref. Non modificare, non fare checkout, non committare.

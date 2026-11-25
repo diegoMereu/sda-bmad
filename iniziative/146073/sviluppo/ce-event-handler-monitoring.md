@@ -17,8 +17,8 @@ cartelle non versionate `icd/` e `console di monitoraggio/`: il codice non le co
 **Generato da**: [prompt-ce-event-handler-monitoring.md](prompt-ce-event-handler-monitoring.md)
 **Fonti**: [analisi.md](../analisi.md), "Contratto della fase 1" (AS-01…AS-06, **vincolante**);
 `cliente/HLD_146073_dati_preadvising_fase_1.xlsx` (int. 04, foglio Impatti);
-`ce-event-handler-monitoring/icd/ICD_preadvising_eventsource.md`; [ce-dichiarato-validatore.md](ce-dichiarato-validatore.md)
-(codici 1320…1323 e forma delle descrizioni)
+`ce-event-handler-monitoring/icd/ICD_preadvising_eventsource.md`; [ce-dichiarato-ldv.md](ce-dichiarato-ldv.md)
+(codici 1320…1323 e forma delle descrizioni; la verifica era nel validatore fino al 25-11)
 
 Etichette:
 - **[FATTO]**: scritto nell'HLD, nell'ICD o nel codice; la fonte è indicata.
@@ -27,7 +27,7 @@ Etichette:
 
 > **Verdetto: nessuna modifica di codice nella variante di default (A).** Il monitoring legge
 > l'evento in un DTO tipizzato, ma ne usa solo identificativi, stato, cliente ed errori: i campi
-> nuovi non servono a nulla di ciò che produce, e gli errori nuovi del validatore passano già. Resta
+> nuovi non servono a nulla di ciò che produce, e gli errori nuovi di `ce-dichiarato-ldv` passano già. Resta
 > **verifica e test di non regressione**. Se Poste vuole i campi sul topic di cambio stato
 > (MON-01) si applica la variante B, una modifica piccola descritta in 3.4.
 
@@ -42,7 +42,7 @@ di stato per Datadog.
 
 La fase 1 aggiunge al preavviso `zonos_account_key`, `zonos_declaration_id` (testata di `spedizione[]`) e
 `zonos_product_id` (ogni `spedizione[].collo[].articolo[]`) (AS-01), e quattro errori di validazione nuovi
-(AS-03, codici `1320`…`1323` proposti dal validatore). L'HLD chiede di "ricevere e propagare i nuovi
+(AS-03, codici `1320`…`1323`, prodotti da `ce-dichiarato-ldv` nel processo normale e mandati dall'orchestratore). L'HLD chiede di "ricevere e propagare i nuovi
 campi sul topic" [FATTO, HLD int. 04].
 
 Obiettivo del documento: dire che cosa il monitoring fa oggi con questi dati, perché non serve
@@ -120,7 +120,7 @@ Stima indicativa: tre campi in tre DTO, un metodo di mapping, test unitari in
 | RM-03 | Nessuna validazione dei campi nuovi (R-02) |
 | RM-04 | Nessun cambio a topic, gruppo consumer, filtri, metriche |
 
-### 4.2 Errori nuovi verso la console [FATTO, codice; codici dal validatore]
+### 4.2 Errori nuovi verso la console [FATTO, codice; codici da `ce-dichiarato-ldv`]
 
 L'evento di scarto `ST_R0006` porta `eventData.errori`. Ogni voce diventa un `Errore` di ogni
 `Record` (cioè di ogni collo) della spedizione, con `esito` `KO`:
@@ -133,7 +133,7 @@ L'evento di scarto `ST_R0006` porta `eventData.errori`. Ogni voce diventa un `Er
 | `1323: zonos_product_id: lunghezza non valida, attesi 1-255 caratteri (collo 2 articolo 1)` | `1323` | `zonos_product_id` | `lunghezza non valida, attesi 1-255 caratteri (collo 2 articolo 1)` |
 | `1322: zonos_product_id: Campo obbligatorio mancante (collo 1 articolo 1; collo 2 articolo 3)` | `1322` | `zonos_product_id` | `Campo obbligatorio mancante (collo 1 articolo 1; collo 2 articolo 3)` |
 
-Il taglio al primo `:` è il comportamento di oggi e non cambia. Le descrizioni del validatore
+Il taglio al primo `:` è il comportamento di oggi e non cambia. Le descrizioni di `ce-dichiarato-ldv`
 (AS-03) mettono il nome del campo prima dei due punti e le occorrenze (collo e articolo) fra
 parentesi: il "campo in errore" è quindi `zonos_product_id` e la descrizione le contiene tutte (MON-02). Inoltre ogni collo riceve tutti gli errori della
 spedizione, anche quelli di un altro collo: è il comportamento attuale per tutti gli errori.
@@ -224,7 +224,7 @@ di regressione. In variante A non si aggiungono test al repo; si verifica in svi
 | TC-03 | integrato svil | evento 5.2 | `Record` KO con gli `Errore` di 4.2 | AC-03 |
 | TC-04 | integrato svil | scarto `1322` concatenato, due colli | AC-04 e AC-05 | AC-04, AC-05 |
 | TC-05 | regressione | `mvn -o test` su `origin/develop` | 19 test verdi | AC-06 |
-| TC-06 | integrato svil, catena | preavviso USA da `preadvising.pre-enrichment` (AS-05), valido e con Account Key mancante, dopo i rilasci di validatore, orchestratore e smistatore | stati `ST_R0002`/`ST_R0004` e scarto `ST_R0006` arrivano alla console | AC-01, AC-03 |
+| TC-06 | integrato svil, catena | preavviso USA da `preadvising.pre-enrichment` (AS-05), valido e con Account Key mancante, dopo i rilasci di validatore, `ce-dichiarato-ldv` (flag acceso), orchestratore e smistatore | stati `ST_R0002`/`ST_R0004` e scarto `ST_R0006` arrivano alla console | AC-01, AC-03 |
 | TC-07 | unit, solo variante B | `MacchinaStatiServiceTest`: 1 collo 2 articoli; 2 colli; nessun campo | AC-08…AC-10 | AC-08…AC-10 |
 
 ## 10. Assunzioni e domande aperte
@@ -234,13 +234,13 @@ Valgono AS-01…AS-06 di [analisi.md](../analisi.md). Nuove (Mary, 16-11):
 | ID | Assunzione o domanda | Default adottato | Da confermare con |
 |---|---|---|---|
 | MON-01 | L'HLD dice "propagazione dei nuovi campi sul topic" e il foglio Impatti cita il monitoring con impatto M50. Il topic del monitoring è `PRE-ADV.MONITORAGGIO-CAMBIO-STATO`, verso la console, e il suo contratto non ha dati di spedizione né di articolo. Il contratto della fase 1 (AS-01…AS-06) non lo cita. La console deve ricevere Account Key, Product ID e Declaration ID? Che cos'è M50? | variante A: nessun campo nuovo sul topic. Se sì, variante B (3.4) con nuova versione dell'ICD della console | Poste |
-| MON-02 | [DECISO 2026-11-16, testi decisi da Diego il 23-11] Le descrizioni del validatore (AS-03) mettono il nome del campo prima dei due punti: `zonos_product_id: Campo obbligatorio mancante (collo 1 articolo 2; collo 2 articolo 3)`. La console mostra quindi `zonos_product_id` come campo in errore e tutte le occorrenze nella descrizione | nessuna modifica al monitoring | — |
+| MON-02 | [DECISO 2026-11-16, testi decisi da Diego il 23-11] Le descrizioni degli errori di compliance (AS-03, oggi prodotte da `ce-dichiarato-ldv`) mettono il nome del campo prima dei due punti: `zonos_product_id: Campo obbligatorio mancante (collo 1 articolo 2; collo 2 articolo 3)`. La console mostra quindi `zonos_product_id` come campo in errore e tutte le occorrenze nella descrizione | nessuna modifica al monitoring | — |
 | MON-03 | L'Account Key è un dato riservato? Il servizio logga l'evento intero | non riservata: nessuna modifica | Poste |
 | MON-04 | La stima di 0,40 dell'int. 04 copre tre servizi | quota monitoring = test di non regressione (A); la variante B non è stimata nell'HLD come modifica di DTO | Diego |
 
 ## 11. Riferimenti
 
 - [analisi.md](../analisi.md): contratto della fase 1.
-- [ce-dichiarato-validatore.md](ce-dichiarato-validatore.md): codici e descrizioni degli errori.
+- [ce-dichiarato-ldv.md](ce-dichiarato-ldv.md): codici e descrizioni degli errori.
 - [ce-event-handler-event-store.md](ce-event-handler-event-store.md), [ce-dichiarato-bff.md](ce-dichiarato-bff.md).
 - ICD: `ce-event-handler-monitoring/icd/ICD_preadvising_eventsource.md` (§6, §7.4), `ICD_Event_Store (2).xlsx`.

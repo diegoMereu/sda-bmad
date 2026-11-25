@@ -13,8 +13,8 @@
 
 Sei l'Analyst del progetto sda-iniziative. Iniziativa 146073 "Compliance USA Entry Type 13", **solo
 fase 1**: il preavviso porta `zonos_account_key` (testata di `spedizione[]`), `zonos_product_id` (ogni
-`spedizione[].collo[].articolo[]`) e `zonos_declaration_id` solo predisposto. Il validatore aggiunge quattro
-errori nuovi (codici proposti `1320`…`1323`). L'HLD, intervento 04, chiede di adeguare monitoring,
+`spedizione[].collo[].articolo[]`) e `zonos_declaration_id` solo predisposto. `ce-dichiarato-ldv` (processo normale; fino al 25-11 era il validatore) aggiunge quattro
+errori nuovi (codici `1320`…`1323`). L'HLD, intervento 04, chiede di adeguare monitoring,
 event store e bff per "ricevere e propagare i nuovi campi sul topic"; il foglio Impatti cita
 "Adeguamento ce-dichiarato-monitoring" con impatto M50.
 
@@ -27,7 +27,7 @@ documento lo dettaglia, non lo cambia. Le incoerenze vanno fra le domande aperte
   `contesto/linee-guida-sviluppo.md`, `contesto/test-integrati.md`.
 - `iniziative/146073/analisi.md`; `cliente/HLD_146073_dati_preadvising_fase_1.xlsx` (con `python -I`
   e openpyxl, anche il foglio Impatti); `cliente/20261116_descrizione_compliance_usa_entry_type_13.md`.
-- `iniziative/146073/sviluppo/ce-dichiarato-validatore.md`: codici e descrizioni degli errori.
+- `iniziative/146073/sviluppo/ce-dichiarato-ldv.md`: codici e descrizioni degli errori.
 - Codice in sola lettura in `C:\Users\diego.mereu\gitposte\SDA\preadvising\ce-event-handler-monitoring`:
   la working copy ha modifiche non committate, quindi leggi `origin/develop` con `git show` e dichiara
   il ref. Non modificare, non fare checkout, non committare. ICD non versionate in `icd/`.

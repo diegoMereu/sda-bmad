@@ -1,9 +1,10 @@
 # 146073 — Compliance USA Entry Type 13: nuovi campi e controlli sul preadvising — analisi
 
-Versione 0.5 del 2026-11-25 (decisioni di Diego del 23 e 24-11 su nomi, regola, colonne SEW, branch e
+Versione 0.6 del 2026-11-25 (decisioni di Diego del 23 e 24-11 su nomi, regola, colonne SEW, branch e
 primo passo della fase 1; dal 24-11 anche colonne SDA solo su `sew_spedizioni_work`, spazi di
-riempimento nel producer, nomi su MongoDB e stato dello sviluppo; dal 25-11 verifica di R-01 solo
-sui flussi SDA, flussi PDB rimandati al punto 2).
+riempimento nel producer, nomi su MongoDB e stato dello sviluppo; dal 25-11 flussi PDB rimandati al
+punto 2 e **verifica di R-01 spostata dal validatore a `ce-dichiarato-ldv`, processo normale**: il
+validatore porta solo i campi).
 
 ## Fonti
 
@@ -59,16 +60,17 @@ Declaration ID si predispone nella fase 1 e si valorizza nella fase 2 (PA-01).
   - `codice_prodotto` **oppure** `id_servizio` per i prodotti: 456, 457 (EXPORT BOX), 458, 459
     (EXPORT BOX PCIM), 515, 516 (CRONO INTERNAZIONALE, 516 = assicurato). I codici vengono da
     `ce_prodotto` di ce-rules; l'elenco di CRONO INTERNAZIONALE è da confermare (PA-12).
-  - **Perimetro** [DECISO, Diego 25-11]: la verifica si applica **solo ai flussi SDA**
-    (`SdaFlussoHandler` del validatore: canali a file `IF`, `IS`, `IE`). Sul `PdbPreadvisingHandler`
-    (PDB, PDW, ILP, EUD) non si fa, perché per i flussi PDB non ci sono ancora le informazioni: lì i
-    campi `zonos_*` passano senza controlli. La regola per i flussi PDB va nel punto 2 della fase 1,
-    con adapter e consumer Poste (PA-14).
-  - Nei flussi SDA il prodotto arriva in `codice_prodotto`, con il codice numerico di `ce_prodotto`
-    (es. 517, 311, 449; il `producer-sew-sped` lo legge da `id_prodotto` delle SEW). `id_servizio`
-    nei flussi SDA in genere non è valorizzato: lo usano i flussi PDB (es. 580, 582) [FATTO,
-    verificato sul codice il 25-11].
-- **R-02**: il validatore controlla **solo presenza e lunghezza**. Niente lookup in
+  - **Dove si verifica** [DECISO, Diego 25-11]: in **`ce-dichiarato-ldv`, solo nel processo
+    normale** (`ProcessLdvService.doProcessEvento`, subito dopo `assegnaLdv`), per AutoProduttore
+    (`IS`) e GenerazioneLdv (`IF`, `IE`). Lì `codice_prodotto` è sicuramente valorizzato, perché lo
+    calcola ce-rules sulla LDV; in ingresso al validatore i flussi SDA reali non portano i codici
+    prodotto in modo affidabile. Non si verifica nel processo semplificato del ldv (preadvising dei
+    portali: `MYSDA`, `SDA_WS`, `INVIO_WEB`, `TFI`, `TWS`, `BNC`). Commit `1bd3517` del ldv.
+  - Il **validatore** porta solo i campi, senza controlli, su tutti i canali (commit `6cd722a`, che
+    supera `090d037`, `43f5cbe`, `c7f82eb`).
+  - **Flussi PDB** (PDB, PDW, ILP, EUD): nessuna verifica finché non arrivano le specifiche; passano da
+    `ce-dichiarato-ldv-pdb`, non dal ldv. La regola per i flussi PDB va nel punto 2 della fase 1 (PA-14).
+- **R-02**: la verifica controlla **solo presenza e lunghezza**. Niente lookup in
   anagrafica, niente chiamate a Zonos.
 - **R-03**: l'errore deve indicare il campo e, per il Product ID, **l'articolo** non valido
   (collo e `posizione` dell'articolo).
@@ -132,23 +134,27 @@ con il prefisso `zonos_`. I nomi provvisori `account_key`, `product_id`, `declar
   `456,457,458,459,515,516` (valori normalizzati con trim e maiuscolo; elenco configurabile,
   `COMPLIANCE_USA_PRODOTTI`).
 
-La verifica si fa **solo nei flussi SDA** (`SdaFlussoHandler`) [DECISO, Diego 25-11]. Nel
-`PdbPreadvisingHandler` (PDB, PDW, ILP, EUD) i campi passano senza controlli finché non arriva la
-regola per i flussi PDB (PA-14). Commit `c7f82eb` su `develop` del validatore.
+La verifica si fa **in `ce-dichiarato-ldv`, solo nel processo normale**, dopo l'assegnazione della
+LDV [DECISO, Diego 25-11; commit `1bd3517`]. Il validatore propaga i campi senza controlli
+(`6cd722a`). Sui flussi PDB (PDB, PDW, ILP, EUD) nessuna verifica finché non arriva la regola (PA-14).
 
 La condizione "cliente business" della versione precedente non c'è più. Per le spedizioni
 soggette `zonos_account_key` è obbligatorio (esattamente 52 caratteri) e `zonos_product_id` è
 obbligatorio su ogni articolo di ogni collo (1-255); `zonos_declaration_id` non si controlla.
 
-I valori e un flag di attivazione generale stanno in **configurazione** del validatore
+I valori e un flag di attivazione generale stanno in **configurazione** del ldv
 (prefisso `compliance-usa`: `abilitata`, `tipi-merce-documenti` = `D`, `nazioni-usa` = `US,USA`,
 `prodotti` = `456,457,458,459,515,516`). Con il flag spento la regola non scatta: è il default
-(`abilitata: 'false'` anche in `.helm/values.yaml`) finché il builder non manda i campi.
+(`abilitata: 'false'` in `.helm/values.yaml` e `deploy-coll`; `deploy-svil` e `values_TEMPLATE`
+cert/prod non hanno le variabili, quindi vale il default) finché il builder non manda i campi.
 
-**AS-03, errori.** Seguono il modello delle regole esistenti: `errors.put(codice,
-descrizione)` sul `DichiaratoDTO`, con codici numerici di 4 cifre come `1181` e `1182`.
+**AS-03, errori.** Codici numerici di 4 cifre, come `1181` e `1182` delle regole PDB.
 I codici e le descrizioni sono decisi da Diego il 23-11. L'esito è lo **scarto** della
-spedizione, come per gli altri campi obbligatori mancanti.
+spedizione, come per gli altri campi obbligatori mancanti. Nel ldv vale **un solo errore per
+messaggio**, come per le altre sue verifiche: il primo nell'ordine `1320`, `1321`, `1322`, `1323`,
+con le sue occorrenze, riportato come `result` `KO` e `description` `<codice>-<descrizione>`;
+l'orchestratore lo trasforma nella mappa degli errori dell'evento `PREADVISING_PARZIALE_E_BLOCCATO`.
+Il cliente vede quindi `1322` solo dopo aver corretto `1320`.
 Il nome del campo sta sempre prima dei due punti, perché il monitoring legge così il
 "campo in errore". Le occorrenze di più articoli si elencano fra parentesi, separate da
 `"; "`: la mappa degli errori ha una sola voce per codice.
@@ -188,7 +194,7 @@ Non si sviluppa mai su `master` né su branch di altre iniziative.
 
 **AS-07, campi assenti.** Un campo assente e un campo `null` si trattano allo stesso modo
 in tutta la catena. Ogni servizio serializza i campi nuovi secondo la propria convenzione:
-il validatore scrive i `null`, orchestratore e smistatore li omettono (`NON_NULL`). Nessun
+il validatore scrive i `null`, orchestratore, smistatore e ldv li omettono (`NON_NULL`). Nessun
 consumer deve distinguere i due casi. Nelle SEW un campo assente non entra nello statement e la
 colonna resta al default `''` (AS-04).
 
@@ -201,7 +207,7 @@ colonna resta al default `''` (AS-04).
 
 | Int. | Microservizio | Cosa fa | Indicazioni dalla descrizione | Stima TOW 1.2 | Repo |
 |---|---|---|---|---|---|
-| 01 | `ce-dichiarato-validatore` | Modifica il DTO, riconosce le spedizioni soggette e aggiunge la validazione dedicata | Account Key in testata, Product ID nella lista degli articoli; regole R-01, R-02, R-03 | 0,80 | `ce-dichiarato-validatore` (regole Drools in `rules/`, handler per famiglia di canale) |
+| 01 | `ce-dichiarato-validatore` | Modifica il DTO, riconosce le spedizioni soggette e aggiunge la validazione dedicata | Account Key in testata, Product ID nella lista degli articoli; regole R-01, R-02, R-03 | 0,80 | `ce-dichiarato-validatore` per il DTO; riconoscimento e validazione **spostati in `ce-dichiarato-ldv`** (Diego 25-11), che non è nell'HLD (PA-10) |
 | 02 | `ce-dichiarato-orchestratore` | Modifica il DTO, il salvataggio a DB e il merge | Nessuna perdita dei campi nei rami, nei retry e nelle ripartenze; il Product ID non si appiattisce a livello spedizione | 0,40 | `ce-dichiarato-orchestratore` |
 | 03 | `ce-dichiarato-smistatore` | Riceve e propaga i nuovi campi | Inoltro solo ai destinatari previsti dai contratti; compatibilità con i destinatari non adeguati | 0,40 | `ce-dichiarato-smistatore` |
 | 04 | monitoring, event store, bff | Riceve e propaga i nuovi campi | Event store: cardinalità per articolo nella serializzazione, replay e ricostruzione dello stato, eventi storici senza i campi | 0,40 | `ce-event-handler-monitoring`, `ce-event-handler-event-store`, `ce-dichiarato-bff` |
@@ -229,13 +235,19 @@ sviluppano validatore, orchestratore, smistatore e bff (su `develop`) e `sda-ldv
 smistatore e bff restano nel primo passo su `develop` e ripartono il 24-11. L'adapter (int. 05) e `consumer-sew_sped_poste` (int. 08) sono **rimandati al
 punto 2 della fase 1**: mancano i nomi dei campi nei messaggi sorgente PDB, PDW e ILP e i dettagli
 lato Poste (PA-13). I loro funzionali sono comunque allineati ai nomi `zonos_*`. Nel punto 2 va
-anche la **verifica di compliance sui flussi PDB** (PDB, PDW, ILP, EUD) nel validatore: il 25-11
-Diego ha deciso di applicarla per ora solo ai flussi SDA, perché per i flussi PDB mancano le
-informazioni (PA-14).
+anche la **verifica di compliance sui flussi PDB** (PDB, PDW, ILP, EUD), perché per i flussi PDB
+mancano le informazioni (PA-14).
+
+**Stato al 25-11.** Il 25-11 Diego ha spostato la verifica di R-01 dal validatore a
+**`ce-dichiarato-ldv`**, che entra nel primo passo: `1bd3517` su `develop` del ldv (campi, regola,
+errori, flag spento), `6cd722a` su `develop` del validatore (solo campi, verifica e configurazione
+rimosse). Orchestratore `9a96564`, smistatore `9289aeb`, bff `d2f5027` su `develop`;
+`sda-ldv-preadv-consumer` sul branch `146073_compliance_usa_fase1`.
 
 | Int. | Servizio | Modifica di codice | Sintesi |
 |---|---|---|---|
-| 01 | `ce-dichiarato-validatore` | **sì** | I DTO tipizzati oggi perdono i campi: si aggiungono a `SpedizioneDTO` e `ArticoloDTO`, senza annotazioni Bean Validation. La regola R-01 va in un componente Java configurabile (`ComplianceUsaValidator`), chiamato **solo** da `SdaFlussoHandler` (Diego 25-11, commit `c7f82eb`: nel `PdbPreadvisingHandler` nessun controllo fino alla regola per i flussi PDB, PA-14). I DRL restano come sono. Codici di errore `1320`…`1323` |
+| 01 | `ce-dichiarato-validatore` | **sì**, piccola | I DTO tipizzati oggi perdono i campi: si aggiungono a `SpedizioneDTO` e `ArticoloDTO` (`@JsonProperty`, `@Field`, `@ToString.Exclude`), senza Bean Validation. **Nessuna verifica** su nessun canale (Diego 25-11, `6cd722a`). I DRL restano come sono |
+| — | `ce-dichiarato-ldv` | **sì** | Campi nei DTO e **verifica di R-01** nel processo normale (`doProcessEvento`, dopo `assegnaLdv`), componente `ComplianceUsaValidator` configurabile, errori `1320`…`1323`, un solo errore per messaggio. Non nel processo semplificato dei portali (`1bd3517`). Non è nell'HLD (PA-10) |
 | 02 | `ce-dichiarato-orchestratore` | **sì**, piccola | I campi si perdono in 8 punti (ingresso, Mongo, lavorazioni, merge, uscita): si aggiungono ai DTO. I tre campi vanno esclusi dal merge delle lavorazioni tramite `campi-esclusi` |
 | 03 | `ce-dichiarato-smistatore` | **sì**, piccola | Stesso `SmistatoreDTO` per Poste e SDA: si aggiungono i campi ai DTO. I palmari restano esclusi senza logica nuova |
 | 04 | `ce-event-handler-event-store` | no | `eventData` è un `Object` generico: i campi arrivano su Mongo così come sono. Solo test di non regressione |
@@ -249,14 +261,18 @@ informazioni (PA-14).
 
 **Rischi emersi oltre l'HLD**
 
-- **Il validatore non controlla tutti i canali.** La verifica di compliance gira solo nel flusso
-  SDA (IF, IS, IE). Il flusso PDB/EUD (`PdbPreadvisingHandler`) è escluso dal 25-11 fino alla regola
-  per i flussi PDB (PA-14). I canali dei portali e del web service (MYSDA, SDA_WS, INVIO_WEB),
-  l'adapter e TUP passano senza regole: una spedizione USA che arriva da lì non verrebbe
-  controllata (VAL-DA-04).
-- **Le lavorazioni non conoscono i campi.** `ce-dichiarato-ldv`, `-ldv-pdb` e `-ldv-pdb-sync`
-  restituiscono il tracciato senza i campi. In fase 1 l'orchestratore li conserva da Mongo,
-  ma in fase 2 servono verso BEP. Questi servizi non sono nell'HLD (PA-10).
+- **La verifica non copre tutti i canali.** Gira solo nel processo normale del ldv (IF, IS, IE). I
+  flussi PDB/EUD sono esclusi fino alla regola per i flussi PDB (PA-14). I portali e il web service
+  (MYSDA, SDA_WS, INVIO_WEB, TFI/TWS/BNC) passano dal processo semplificato senza verifica; adapter e
+  TUP non passano dal ldv: una spedizione USA che arriva da lì non viene controllata (VAL-DA-04).
+- **Un solo errore per messaggio.** Il ldv riporta solo il primo errore (in ordine di codice): il
+  cliente scopre gli errori uno alla volta (LDV-AS-01).
+- **LDV consumata in IF/IE.** Il KO di compliance arriva dopo la generazione della LDV, come già oggi
+  per gli altri errori successivi; non si può anticipare, perché il prodotto è noto solo dopo
+  (LDV-AS-03).
+- **Le lavorazioni PDB non conoscono i campi.** `-ldv-pdb` e `-ldv-pdb-sync` restituiscono il
+  tracciato senza i campi (il ldv li porta dal `1bd3517`). In fase 1 l'orchestratore li conserva da
+  Mongo, ma in fase 2 servono verso BEP. Questi servizi non sono nell'HLD (PA-10).
 - **Due retry li perdono.** `retry-eurodis` e `retry-pread-completo` usano un proprio DTO
   tipizzato (ORC-08).
 - **Il merge per indice.** Colli e articoli si fondono per indice nella lista, non per
@@ -266,7 +282,7 @@ informazioni (PA-14).
   sorgente o una destinazione per articolo (SEW-02, PRD-04).
 - **L'Account Key dei portali.** Arriva al producer solo se i portali e il web service, fuori
   perimetro, la scrivono nelle SEW (PRD-05).
-- **Account Key nei log.** Validatore, event store e monitoring loggano il messaggio intero.
+- **Account Key nei log.** Event store e monitoring loggano il messaggio intero (validatore e ldv escludono i campi `zonos_*` dal `toString`).
   Se l'Account Key è un dato riservato va mascherata (VAL-AS-11, EVS-03).
 - **Il carattere non ASCII.** Il consumer Poste toglie i caratteri non ASCII da tutta
   l'istruzione SQL, Product ID compreso (SWP-08).
@@ -312,19 +328,19 @@ Ci sono anche due punti da chiarire nel contenuto:
 | # | Punto | Serve per |
 |---|---|---|
 | PA-01 | **Deciso internamente il 23-11 (Diego)**: `zonos_declaration_id` (13) si predispone in fase 1. Resta la conferma di Poste che i "3 nuovi campi" dell'HLD sono Account Key, Product ID e Declaration ID, e che il Declaration ID si predispone in fase 1 | DTO, DDL, ICD |
-| PA-02 | **Chiuso il 23-11 (Diego).** Regola R-01: niente condizione "business"; USA da `codice_nazione_iso_2` / `codice_nazione`; documenti da `tipo_merce` = `D`; prodotti `456,457,458,459,515,516` su `codice_prodotto` o `id_servizio` (resta PA-12) | Validatore |
+| PA-02 | **Chiuso il 23-11 (Diego).** Regola R-01: niente condizione "business"; USA da `codice_nazione_iso_2` / `codice_nazione`; documenti da `tipo_merce` = `D`; prodotti `456,457,458,459,515,516` su `codice_prodotto` o `id_servizio` (resta PA-12) | `ce-dichiarato-ldv` (configurazione) |
 | PA-03 | **Chiuso il 23-11 (Diego)** per i nomi: `zonos_account_key`, `zonos_product_id`, `zonos_declaration_id`. Resta l'aggiornamento dell'ICD con il team del builder | Tutti |
-| PA-04 | **Chiuso il 23-11 (Diego).** Codici `1320`…`1323` con le descrizioni di AS-03, esito scarto | Validatore, scarti |
+| PA-04 | **Chiuso il 23-11 (Diego).** Codici `1320`…`1323` con le descrizioni di AS-03, esito scarto | `ce-dichiarato-ldv`, scarti |
 | PA-05 | DDL: **colonne, tipi e nomi decisi il 23 e 24-11** (AS-04). **Tabelle SDA chiuse il 24-11 (Diego)**: solo `sew_spedizioni_work` (SEW-01). Restano aperti: chi le esegue su Informix SDA e dove va il Product ID lato SDA, che non ha una tabella articoli (SEW-02) | Int. 07, 08 |
 | PA-06 | Repo del batch producer dei preavvisi da portali e web service | Int. 09 |
 | PA-07 | Fase 2: quali sono i due campi verso BEP, con quale contratto e quale flusso (`ldv-pdb` o `ldv-pdb-sync`) | Int. 06 |
 | PA-08 | Fase 2: contratto del microservizio comune Zonos (sincrono o su topic, chiave di idempotenza, formato di dazi e fee, codici di errore) e punto del processo in cui si avvia la lavorazione | Orchestratore fase 2 |
 | PA-09 | Fase 2: elenco dei campi che la lavorazione Zonos può sovrascrivere nel preavviso; dazi e fee rientrano? | Orchestratore fase 2 |
-| PA-10 | `ce-dichiarato-ldv` e `ce-dichiarato-state-machine-handler` compaiono nella descrizione ma non nell'HLD: chi li fa? | Perimetro |
+| PA-10 | `ce-dichiarato-ldv` e `ce-dichiarato-state-machine-handler` compaiono nella descrizione ma non nell'HLD: chi li fa? **Per il ldv deciso internamente il 25-11 (Diego)**: in fase 1 lo adegua Accenture (campi e verifica di R-01, `1bd3517`). Resta da allineare con Poste la stima, che nell'HLD è sull'intervento 01, e `-ldv-pdb`, `-ldv-pdb-sync` e la state machine | Perimetro, stima |
 | PA-11 | Palmari (`sew_sped_pre_adv_online_out_tot`), T&T-Repo e OneTracking: sono fuori perimetro? | Perimetro |
-| PA-12 | **Nuovo (23-11).** Diego ha elencato CRONO INTERNAZIONALE quattro volte, ma in `ce_prodotto` di ce-rules risultano solo `515` e `516` (516 = assicurato): l'elenco dei prodotti va confermato. Si cambia in configurazione | Validatore |
+| PA-12 | **Nuovo (23-11).** Diego ha elencato CRONO INTERNAZIONALE quattro volte, ma in `ce_prodotto` di ce-rules risultano solo `515` e `516` (516 = assicurato): l'elenco dei prodotti va confermato. Si cambia in configurazione | `ce-dichiarato-ldv` (configurazione) |
 | PA-13 | **Nuovo (24-11).** Punto 2 della fase 1: nomi e livello dei campi nei messaggi sorgente PDB, PDW e ILP (adapter, int. 05) e dettagli lato Poste (`consumer-sew_sped_poste`, int. 08) | Int. 05, 08 |
-| PA-14 | **Nuovo (25-11).** Regola di compliance per i flussi PDB (PDB, PDW, ILP, EUD): dal 25-11 la verifica del validatore vale solo per i flussi SDA e nel `PdbPreadvisingHandler` i campi passano senza controlli. Servono da Poste le informazioni sui flussi PDB (quali spedizioni sono soggette, su quale campo prodotto, es. `id_servizio`). Va nel punto 2 della fase 1 | Validatore, punto 2 |
+| PA-14 | **Nuovo (25-11).** Regola di compliance per i flussi PDB (PDB, PDW, ILP, EUD): la verifica è nel processo normale di `ce-dichiarato-ldv` (flussi SDA) e sui flussi PDB non si fa; il validatore propaga i campi senza controlli. Servono da Poste le informazioni sui flussi PDB (quali spedizioni sono soggette, su quale campo prodotto, es. `id_servizio`) e il punto della catena dove verificarli (`ce-dichiarato-ldv-pdb`?). Va nel punto 2 della fase 1 | Punto 2 |
 
 ## Casi di test minimi (fase 1, dalla descrizione)
 
