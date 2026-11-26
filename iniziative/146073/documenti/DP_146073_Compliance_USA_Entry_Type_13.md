@@ -7,11 +7,12 @@ verifica: {nome: "", struttura: ""}
 approvazione: {nome: "", struttura: ""}
 revisioni:
   - {versione: "0.1", data: "25/11/2026", paragrafi: "Tutti", motivazioni: "Prima emissione, fase 1 primo passo"}
+  - {versione: "0.2", data: "26/11/2026", paragrafi: "1, 1.2, 3.1, Allegati", motivazioni: "Risorse OpenShift di Sviluppo, Collaudo e Produzione lette dai repository dei microservizi, Figure 1 e 2, allineamento alla SF 0.2"}
 ---
 
 # Architettura Applicativa
 
-L'iniziativa adegua la catena di preadvising del Corriere Espresso alla normativa USA Entry Type 13 per le spedizioni con merce dirette negli USA. Nella fase 1, oggetto di questo documento, il tracciato unico porta tre nuovi campi: `zonos_account_key` (per spedizione, 52 caratteri), `zonos_product_id` (per articolo, da 1 a 255 caratteri) e `zonos_declaration_id` (per spedizione, 13 caratteri, solo predisposto per la fase 2). I campi attraversano la catena esistente senza trasformazioni fino alla tabella SEW `sew_spedizioni_work`; la verifica di presenza e lunghezza sulle spedizioni soggette si esegue in `ce-dichiarato-ldv`, nel processo normale dei flussi SDA, e produce gli scarti `1320`…`1323`. Non sono previsti nuovi microservizi né nuove risorse infrastrutturali. La lavorazione Zonos e l'invio dei campi a BEP appartengono alla fase 2 e non sono descritti qui. Le regole funzionali sono descritte nella Specifica Funzionale dell'iniziativa (allegato SF_146073_Compliance_USA_Entry_Type_13, versione 0.1).
+L'iniziativa adegua la catena di preadvising del Corriere Espresso alla normativa USA Entry Type 13 per le spedizioni con merce dirette negli USA. Nella fase 1, oggetto di questo documento, il tracciato unico porta tre nuovi campi: `zonos_account_key` (per spedizione, 52 caratteri), `zonos_product_id` (per articolo, da 1 a 255 caratteri) e `zonos_declaration_id` (per spedizione, 13 caratteri, solo predisposto per la fase 2). I campi attraversano la catena esistente senza trasformazioni fino alla tabella SEW `sew_spedizioni_work`; la verifica di presenza e lunghezza sulle spedizioni soggette si esegue in `ce-dichiarato-ldv`, nel processo normale dei flussi SDA, e produce gli scarti `1320`…`1323`. Non sono previsti nuovi microservizi né nuove risorse infrastrutturali. La lavorazione Zonos e l'invio dei campi a BEP appartengono alla fase 2 e non sono descritti qui. Le regole funzionali sono descritte nella Specifica Funzionale dell'iniziativa (allegato SF_146073_Compliance_USA_Entry_Type_13, versione 0.2).
 
 ## Business Architecture – Preadvising Compliance USA
 
@@ -135,7 +136,7 @@ Tabella 4: Preadvising Compliance USA – dettaglio flussi
 
 # Scheda HW
 
-L'iniziativa non richiede nuove risorse: nessun nuovo microservizio, server, mainframe, HW periferico o risorsa cloud IaaS. I microservizi modificati restano nel namespace esistente `corriere-espresso-preadvising` con il dimensionamento attuale, riportato per riferimento dai chart Helm. L'unico impatto sul dato è la DDL Informix su `sew_spedizioni_work`, a cura del DBA, da eseguire prima che il builder invii i campi (allegato ddl-sew-146073). La collocazione del cluster (on prem o cloud) è DA DEFINIRE: i dimensionamenti sono riportati nella tabella Openshift on prem.
+L'iniziativa non richiede nuove risorse: nessun nuovo microservizio, server, mainframe, HW periferico o risorsa cloud IaaS. I microservizi modificati restano nel namespace esistente `corriere-espresso-preadvising` con il dimensionamento attuale, riportato dai repository dei microservizi. L'unico impatto sul dato è la DDL Informix su `sew_spedizioni_work`, a cura del DBA, da eseguire prima che il builder invii i campi (allegato ddl-sew-146073). La collocazione del cluster (on prem o cloud) è DA DEFINIRE: i dimensionamenti sono riportati nella tabella Openshift on prem.
 
 ## Risorse on Prem
 
@@ -161,25 +162,25 @@ Tabella 7: HW Periferico
 
 ### Openshift
 
-Namespace esistente `corriere-espresso-preadvising`. Nessuna variazione di request, limit e pod rispetto all'esistente. I valori di Sviluppo e Collaudo sono quelli dei values Helm (`deploy-svil`, `deploy-coll`) su `develop`; quelli di Produzione sono gli esempi commentati nei `values_TEMPLATE`, da confermare con l'infrastruttura.
+Namespace esistente `corriere-espresso-preadvising`. Nessuna variazione di request, limit e pod rispetto all'esistente. I valori sono letti dai repository dei microservizi, branch `develop`: Sviluppo da `deploy-svil/values.yaml` (per `ce-dichiarato-ldv`, che non lo valorizza, dai default di `.helm/values.yaml`), Collaudo da `deploy-coll/values.yaml`, Produzione dai valori per ambiente documentati in `deploy-config/values_TEMPLATE.yaml` per la promozione delle configurazioni ALM.
 
 | (AP/PK) | Ambiente | Nome Cluster | Tipologia cluster | Namespace | Gen | Request Core (millicore) | Request Ram (MB) | Limit Core (core) | Limit Ram (MB) | Pod | BlobStorage (GB) |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | AP-00988 / `ce-dichiarato-validatore` (PK-03089) | Sviluppo | DA DEFINIRE (esistente) | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | 100 | 256 | 0,5 | 1024 | 1 | Non applicabile |
 | AP-00988 / `ce-dichiarato-validatore` (PK-03089) | Collaudo | DA DEFINIRE (esistente) | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | 100 | 256 | 0,5 | 1024 | 1 | Non applicabile |
-| AP-00988 / `ce-dichiarato-validatore` (PK-03089) | Produzione | DA DEFINIRE (esistente) | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | 200 (da confermare) | 256 (da confermare) | 1 (da confermare) | 2048 (da confermare) | 12 (da confermare) | Non applicabile |
+| AP-00988 / `ce-dichiarato-validatore` (PK-03089) | Produzione | DA DEFINIRE (esistente) | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | 200 | 256 | 1 | 2048 | 12 | Non applicabile |
 | AP-00988 / `ce-dichiarato-orchestratore` (PK-03089) | Sviluppo | DA DEFINIRE (esistente) | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | 500 | 256 | 2 | 1024 | 1 | Non applicabile |
 | AP-00988 / `ce-dichiarato-orchestratore` (PK-03089) | Collaudo | DA DEFINIRE (esistente) | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | 500 | 256 | 2 | 1024 | 1 | Non applicabile |
-| AP-00988 / `ce-dichiarato-orchestratore` (PK-03089) | Produzione | DA DEFINIRE (esistente) | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | 200 (da confermare) | 256 (da confermare) | 1 (da confermare) | 2048 (da confermare) | 12 (da confermare) | Non applicabile |
-| AP-00988 / `ce-dichiarato-ldv` (PK-03089) | Sviluppo | DA DEFINIRE (esistente) | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | DA DEFINIRE (default del chart) | DA DEFINIRE (default del chart) | DA DEFINIRE (default del chart) | DA DEFINIRE (default del chart) | DA DEFINIRE (default del chart) | Non applicabile |
+| AP-00988 / `ce-dichiarato-orchestratore` (PK-03089) | Produzione | DA DEFINIRE (esistente) | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | 200 | 256 | 1 | 2048 | 12 | Non applicabile |
+| AP-00988 / `ce-dichiarato-ldv` (PK-03089) | Sviluppo | DA DEFINIRE (esistente) | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | 100 | 256 | 0,5 | 1024 | 1 | Non applicabile |
 | AP-00988 / `ce-dichiarato-ldv` (PK-03089) | Collaudo | DA DEFINIRE (esistente) | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | 100 | 256 | 0,5 | 1024 | 1 | Non applicabile |
-| AP-00988 / `ce-dichiarato-ldv` (PK-03089) | Produzione | DA DEFINIRE (esistente) | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | 200 (da confermare) | 256 (da confermare) | 1 (da confermare) | 2048 (da confermare) | 12 (da confermare) | Non applicabile |
+| AP-00988 / `ce-dichiarato-ldv` (PK-03089) | Produzione | DA DEFINIRE (esistente) | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | 200 | 256 | 1 | 2048 | 12 | Non applicabile |
 | AP-00988 / `ce-dichiarato-smistatore` (PK-03089) | Sviluppo | DA DEFINIRE (esistente) | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | 100 | 256 | 0,5 | 1024 | 1 | Non applicabile |
 | AP-00988 / `ce-dichiarato-smistatore` (PK-03089) | Collaudo | DA DEFINIRE (esistente) | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | 100 | 256 | 0,5 | 1024 | 1 | Non applicabile |
-| AP-00988 / `ce-dichiarato-smistatore` (PK-03089) | Produzione | DA DEFINIRE (esistente) | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | 200 (da confermare) | 256 (da confermare) | 0,5 (da confermare) | 1024 (da confermare) | 12 (da confermare) | Non applicabile |
+| AP-00988 / `ce-dichiarato-smistatore` (PK-03089) | Produzione | DA DEFINIRE (esistente) | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | 200 | 256 | 0,5 | 1024 | 12 | Non applicabile |
 | AP-00988 / `ce-dichiarato-bff` (PK-03089) | Sviluppo | DA DEFINIRE (esistente) | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | 100 | 256 | 0,5 | 1024 | 1 | Non applicabile |
 | AP-00988 / `ce-dichiarato-bff` (PK-03089) | Collaudo | DA DEFINIRE (esistente) | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | 100 | 256 | 0,5 | 1024 | 1 | Non applicabile |
-| AP-00988 / `ce-dichiarato-bff` (PK-03089) | Produzione | DA DEFINIRE (esistente) | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | 200 (da confermare) | 256 (da confermare) | 0,5 (da confermare) | 1024 (da confermare) | 2 (da confermare) | Non applicabile |
+| AP-00988 / `ce-dichiarato-bff` (PK-03089) | Produzione | DA DEFINIRE (esistente) | DA DEFINIRE | `corriere-espresso-preadvising` (esistente) | DA DEFINIRE | 200 | 256 | 0,5 | 1024 | 2 | Non applicabile |
 
 Tabella 8: Openshift on Prem
 
@@ -208,9 +209,10 @@ Tabella 10: Openshift Cloud
 
 | Codice Documento | Nome |
 |---|---|
-| SF_146073_Compliance_USA_Entry_Type_13 | Specifica Funzionale dell'iniziativa 146073 - Compliance USA Entry Type 13 — nuovi campi e controlli sul preadvising, versione 0.1 |
+| SF_146073_Compliance_USA_Entry_Type_13 | Specifica Funzionale dell'iniziativa 146073 - Compliance USA Entry Type 13 — nuovi campi e controlli sul preadvising, versione 0.2 |
 | HLD_146073_dati_preadvising_fase_1 | HLD v.1 del 09/11/2026 "Dazi dati preadvising", fase 1 |
 | 20261116_descrizione_compliance_usa_entry_type_13 | Descrizione generale dell'iniziativa Compliance USA Entry Type 13 |
 | ddl-sew-146073 | Script DDL Informix delle colonne `zonos_*` su `sew_spedizioni_work`, con verifica e rollback |
 | ICD_PREADVISING_LDV_EVENT_SOURCE | ICD del tracciato unico preadvising, da aggiornare con i campi `zonos_*` (versione DA DEFINIRE) |
-| fig-1-architettura | Schema drawio della soluzione: Figura 1 e Figura 2 |
+| fig-1-architettura | Schema drawio della catena di preadvising e dei punti di intervento della fase 1 (Figura 1) |
+| fig-2-flussi-dati | Schema drawio dei flussi dati, frecce numerate da 1 a 22 come la Tabella 2 (Figura 2) |
