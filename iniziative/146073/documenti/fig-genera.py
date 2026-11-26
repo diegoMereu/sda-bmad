@@ -32,7 +32,7 @@ NUM = "endArrow=block;html=1;labelBackgroundColor=#ffffff;fontSize=11;fontStyle=
 # Nodi comuni: id -> (etichetta, stile, x, y, w, h)
 NODI = {
     "ns": ("OpenShift - namespace corriere-espresso-preadvising", NS, 210, 50, 1200, 560),
-    "builder": ("<b>ce-dichiarato-builder</b><br>canali a file IF, IS, IE<br>(team applicativo, fuori perimetro)", INV, 20, 70, 170, 70),
+    "builder": ("<b>ce-dichiarato-builder</b><br>canali a file IF, IS, IE", INV, 20, 70, 170, 70),
     "producer": ("<b>producer-sew-sped</b><br>batch portali e web service<br>invia zonos_account_key,<br>zonos_declaration_id", MOD, 20, 190, 170, 80),
     "adapter": ("<b>ce-dichiarato-adapter</b><br>PDB, PDW, ILP<br>seconda tranche", TRANCHE, 20, 320, 170, 70),
     "t_pre": ("topic<br><b>preadvising.pre-enrichment</b>", TOPIC, 230, 90, 170, 60),

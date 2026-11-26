@@ -7,11 +7,12 @@ ticket: null
 compilato_da: "GDL ACN"
 verificato_da: ""
 approvato_da: ""
-versione: "0.2"
+versione: "0.3"
 distribuito_a: "DTO/IT/BASSPDCB/IT AS COR ESPR"
 revisioni:
   - {data: "25/11/2026", versione: "0.1", stato: "Bozza", descrizione: "Prima emissione, fase 1", autore: "ACN"}
   - {data: "25/11/2026", versione: "0.2", stato: "Bozza", descrizione: "Figura 1, allegati allineati al DP (HLD, descrizione, ICD, DDL, schemi drawio)", autore: "ACN"}
+  - {data: "26/11/2026", versione: "0.3", stato: "Bozza", descrizione: "Tolti i vincoli su errore singolo e LDV assegnata; PDB ridotto a un Open Point (informazioni non ancora ricevute); builder non più indicato fuori perimetro; Open Point rinumerati", autore: "ACN"}
 ---
 
 # Introduzione
@@ -50,32 +51,27 @@ Il presente documento contiene l'analisi degli impatti funzionali relativi all'I
 
 | Id | Tipo | Descrizione | Riferimento |
 |---|---|---|---|
-| 1 | Vincolo | I nuovi campi entrano nella catena di preadvising solo se pubblicati dai sistemi di acquisizione: `ce-dichiarato-builder` (fuori perimetro, team applicativo) per i canali a file e i canali portali e web service attraverso le tabelle SEW. Finché il builder non pubblica i campi la verifica resta disattivata. | Acquisizione; team ce-dichiarato-builder |
+| 1 | Vincolo | I nuovi campi entrano nella catena di preadvising solo se pubblicati dai sistemi di acquisizione: `ce-dichiarato-builder` per i canali a file e i canali portali e web service attraverso le tabelle SEW. Finché il builder non pubblica i campi la verifica resta disattivata. | Acquisizione; team ce-dichiarato-builder |
 | 2 | Vincolo | Le modifiche alle tabelle SEW (DDL) devono essere eseguite prima che i sistemi di acquisizione inviino i campi valorizzati. Il software dei consumer può essere rilasciato anche prima, perché le colonne nuove vengono scritte solo quando i campi arrivano valorizzati. | Storicizzazione nelle SEW; SDA (DBA) |
-| 3 | Vincolo | Nella verifica viene riportato un solo errore per preavviso, come per gli altri controlli eseguiti in fase di associazione della LDV: il primo nell'ordine 1320, 1321, 1322, 1323. Un preavviso con più anomalie le evidenzia una alla volta, a ogni nuovo invio. | Verifica Compliance USA; Poste |
-| 4 | Vincolo | Per i preavvisi dei canali che generano la LDV (InvioFile, InvioEasy) la verifica avviene dopo la generazione della LDV, perché solo allora è noto il prodotto: in caso di scarto la LDV risulta già assegnata, come avviene oggi per gli altri controlli successivi alla generazione. | Verifica Compliance USA; Poste |
-| 5 | Assunzione | I tre campi `zonos_account_key`, `zonos_product_id` e `zonos_declaration_id` sono i "3 nuovi campi" del documento di riferimento ID 1; `zonos_declaration_id` viene predisposto in fase 1 (sempre assente) e valorizzato in fase 2. | Dati dell'iniziativa; Poste |
-| 6 | Assunzione | Un campo assente e un campo nullo sono equivalenti in tutta la catena. I valori non vengono mai trasformati (nessun troncamento, conversione o rimozione di spazi), salvo la rimozione degli spazi di riempimento delle colonne Informix in rilettura. | Dati dell'iniziativa; Poste |
-| 7 | Assunzione | Una spedizione soggetta senza articoli non produce errori sul Product ID, non essendovi un articolo da indicare. | Verifica Compliance USA; Poste |
-| 8 | Esclusione | Fase 2 dell'iniziativa: integrazione con il microservizio comune Zonos, valorizzazione del Declaration ID, dazi e fee, invio dei campi a BEP. | Obiettivo; Poste |
-| 9 | Esclusione | `ce-dichiarato-builder`, portali, servizi di spedizione, Internazionale/SLP, componenti Partner, mappe Sterling e microservizio Zonos (documento di riferimento ID 3). | Obiettivo; Poste |
-| 10 | Esclusione | Palmari (`sew_sped_pre_adv_online_out_tot`), T&T-Repo, OneTracking e stampe LDV non ricevono i nuovi campi (da confermare). | Smistamento; Poste |
-| 11 | Esclusione | Verifica sui flussi PDB (PDB, PDW, ILP, EUD): i campi vengono propagati senza controlli fino alla ricezione delle regole per questi flussi (Open Point 15). | Verifica Compliance USA; Poste |
-| 12 | Esclusione | Verifica sui preavvisi dei portali e del web service (MYSDA, INVIO_WEB, SDA_WS, TFI, TWS, BNC) e sui canali TUP: i campi vengono propagati senza controlli (da confermare, Open Point 16). | Verifica Compliance USA; Poste |
-| 13 | Open Point | Elenco dei prodotti interessati: in anagrafica prodotti risultano per CRONO INTERNAZIONALE i soli codici 515 e 516; l'elenco completo è da confermare. L'elenco è configurabile senza modifiche al software. | Verifica Compliance USA; Poste |
-| 14 | Open Point | Nomi e livello di Account Key e Product ID nei messaggi sorgente PDB, PDW e ILP, e numero di articoli previsto per PDW. Servono per l'adeguamento di `ce-dichiarato-adapter` e del consumer `sew_spedizioni_poste`, rimandati a una seconda tranche della fase 1. | Acquisizione; Storicizzazione nelle SEW; Poste |
-| 15 | Open Point | Regola di Compliance USA per i flussi PDB (PDB, PDW, ILP, EUD): quali spedizioni sono soggette, su quale campo prodotto e in quale punto della catena eseguire la verifica. | Verifica Compliance USA; Poste |
-| 16 | Open Point | Necessità di verificare anche i preavvisi dei portali, del web service e dei canali TUP. | Verifica Compliance USA; Poste |
-| 17 | Open Point | Accettabilità del vincolo 3 (un solo errore per preavviso) e del vincolo 4 (LDV già assegnata in caso di scarto per i canali che la generano). | Verifica Compliance USA; Poste |
-| 18 | Open Point | Account Key: la lunghezza di 52 caratteri viene verificata sul valore così come ricevuto, spazi compresi. Da confermare se esista un formato (es. solo alfanumerico) e se l'Account Key sia un dato riservato da mascherare nei log dei sistemi esistenti. | Verifica Compliance USA; Poste |
-| 19 | Open Point | Product ID lato SDA: le tabelle SEW SDA hanno una riga per LDV e nessuna tabella articoli. Si propone, se confermato, una nuova tabella figlia di `sew_spedizioni_work` con una riga per articolo; in attesa il Product ID non viene storicizzato lato SDA. | Storicizzazione nelle SEW; Poste |
-| 20 | Open Point | Account Key dai portali e dal web service: arriva alla catena solo se i portali (fuori perimetro) la scrivono in `sew_spedizioni_work`. È DA DEFINIRE chi adegua i portali. | Acquisizione; Poste |
-| 21 | Open Point | Console di monitoraggio: se debba ricevere anche i nuovi campi sul topic `PRE-ADV.MONITORAGGIO-CAMBIO-STATO`, oggi privo di dati di spedizione e articolo. In assenza di richiesta riceve solo i nuovi errori. | Tracciamento; Poste |
-| 22 | Open Point | `ce-dichiarato-ldv` non è presente nel documento di riferimento ID 1: la verifica è stata collocata in questo ms (sezione Verifica Compliance USA) e va riconosciuta nella stima dell'intervento 01. Sono DA DEFINIRE i responsabili dell'adeguamento di `ce-dichiarato-ldv-pdb`, `ce-dichiarato-ldv-pdb-sync` e dei servizi di retry che oggi non conservano i nuovi campi. | Elenco Sistemi Impattati; Poste |
-| 23 | Open Point | PRJ e owner dell'iniziativa lato cliente DA DEFINIRE. | Introduzione; Poste |
-| 24 | Open Point | Esecuzione delle DDL sulle istanze Informix SDA di sviluppo, collaudo e produzione: referente e modalità di richiesta. | Storicizzazione nelle SEW; SDA (DBA) |
-| 25 | Open Point | Aggiornamento dell'ICD del tracciato unico (documento di riferimento ID 4) con i nomi `zonos_account_key`, `zonos_product_id`, `zonos_declaration_id` e pubblicazione dei campi da parte del builder. | Acquisizione; team ce-dichiarato-builder |
-| 26 | Open Point | Altri consumatori dei topic `preadvising.completed.poste` e `preadvising.completed.sda`, oltre ai consumer SEW: va verificato che tollerino la presenza dei nuovi campi. | Smistamento; responsabili dei sistemi consumatori |
+| 3 | Assunzione | I tre campi `zonos_account_key`, `zonos_product_id` e `zonos_declaration_id` sono i "3 nuovi campi" del documento di riferimento ID 1; `zonos_declaration_id` viene predisposto in fase 1 (sempre assente) e valorizzato in fase 2. | Dati dell'iniziativa; Poste |
+| 4 | Assunzione | Un campo assente e un campo nullo sono equivalenti in tutta la catena. I valori non vengono mai trasformati (nessun troncamento, conversione o rimozione di spazi), salvo la rimozione degli spazi di riempimento delle colonne Informix in rilettura. | Dati dell'iniziativa; Poste |
+| 5 | Assunzione | Una spedizione soggetta senza articoli non produce errori sul Product ID, non essendovi un articolo da indicare. | Verifica Compliance USA; Poste |
+| 6 | Esclusione | Fase 2 dell'iniziativa: integrazione con il microservizio comune Zonos, valorizzazione del Declaration ID, dazi e fee, invio dei campi a BEP. | Obiettivo; Poste |
+| 7 | Esclusione | Portali, servizi di spedizione, Internazionale/SLP, componenti Partner, mappe Sterling e microservizio Zonos (documento di riferimento ID 3). | Obiettivo; Poste |
+| 8 | Esclusione | Palmari (`sew_sped_pre_adv_online_out_tot`), T&T-Repo, OneTracking e stampe LDV non ricevono i nuovi campi (da confermare). | Smistamento; Poste |
+| 9 | Esclusione | Verifica sui preavvisi dei portali e del web service (MYSDA, INVIO_WEB, SDA_WS, TFI, TWS, BNC) e sui canali TUP: i campi vengono propagati senza controlli (da confermare, Open Point 12). | Verifica Compliance USA; Poste |
+| 10 | Open Point | Elenco dei prodotti interessati: in anagrafica prodotti risultano per CRONO INTERNAZIONALE i soli codici 515 e 516; l'elenco completo è da confermare. L'elenco è configurabile senza modifiche al software. | Verifica Compliance USA; Poste |
+| 11 | Open Point | Flussi PDB (PDB, PDW, ILP, EUD): non sono ancora state ricevute le informazioni necessarie (nomi e livello di Account Key e Product ID nei messaggi sorgente, regola di verifica). Fino alla ricezione i campi vengono propagati senza controlli e l'adeguamento di `ce-dichiarato-adapter` e del consumer `sew_spedizioni_poste` è rimandato a una seconda tranche della fase 1. | Acquisizione; Verifica Compliance USA; Storicizzazione nelle SEW; Poste |
+| 12 | Open Point | Necessità di verificare anche i preavvisi dei portali, del web service e dei canali TUP. | Verifica Compliance USA; Poste |
+| 13 | Open Point | Account Key: la lunghezza di 52 caratteri viene verificata sul valore così come ricevuto, spazi compresi. Da confermare se esista un formato (es. solo alfanumerico) e se l'Account Key sia un dato riservato da mascherare nei log dei sistemi esistenti. | Verifica Compliance USA; Poste |
+| 14 | Open Point | Product ID lato SDA: le tabelle SEW SDA hanno una riga per LDV e nessuna tabella articoli. Si propone, se confermato, una nuova tabella figlia di `sew_spedizioni_work` con una riga per articolo; in attesa il Product ID non viene storicizzato lato SDA. | Storicizzazione nelle SEW; Poste |
+| 15 | Open Point | Account Key dai portali e dal web service: arriva alla catena solo se i portali (fuori perimetro) la scrivono in `sew_spedizioni_work`. È DA DEFINIRE chi adegua i portali. | Acquisizione; Poste |
+| 16 | Open Point | Console di monitoraggio: se debba ricevere anche i nuovi campi sul topic `PRE-ADV.MONITORAGGIO-CAMBIO-STATO`, oggi privo di dati di spedizione e articolo. In assenza di richiesta riceve solo i nuovi errori. | Tracciamento; Poste |
+| 17 | Open Point | `ce-dichiarato-ldv` non è presente nel documento di riferimento ID 1: la verifica è stata collocata in questo ms (sezione Verifica Compliance USA) e va riconosciuta nella stima dell'intervento 01. Sono DA DEFINIRE i responsabili dell'adeguamento di `ce-dichiarato-ldv-pdb`, `ce-dichiarato-ldv-pdb-sync` e dei servizi di retry che oggi non conservano i nuovi campi. | Elenco Sistemi Impattati; Poste |
+| 18 | Open Point | PRJ e owner dell'iniziativa lato cliente DA DEFINIRE. | Introduzione; Poste |
+| 19 | Open Point | Esecuzione delle DDL sulle istanze Informix SDA di sviluppo, collaudo e produzione: referente e modalità di richiesta. | Storicizzazione nelle SEW; SDA (DBA) |
+| 20 | Open Point | Aggiornamento dell'ICD del tracciato unico (documento di riferimento ID 4) con i nomi `zonos_account_key`, `zonos_product_id`, `zonos_declaration_id` e pubblicazione dei campi da parte del builder. | Acquisizione; team ce-dichiarato-builder |
+| 21 | Open Point | Altri consumatori dei topic `preadvising.completed.poste` e `preadvising.completed.sda`, oltre ai consumer SEW: va verificato che tollerino la presenza dei nuovi campi. | Smistamento; responsabili dei sistemi consumatori |
 
 # Obiettivo dell'iniziativa
 
@@ -141,23 +137,23 @@ Esempio, con valori fittizi:
 }
 ```
 
-I servizi di preadvising non richiedono nuovamente i campi e non ne modificano il valore. Il Product ID resta legato al proprio articolo anche in presenza di più colli, di più articoli, di nuovi tentativi e di risottomissioni (documento di riferimento ID 3). L'aggiornamento dell'ICD del tracciato unico è descritto nell'Open Point 25.
+I servizi di preadvising non richiedono nuovamente i campi e non ne modificano il valore. Il Product ID resta legato al proprio articolo anche in presenza di più colli, di più articoli, di nuovi tentativi e di risottomissioni (documento di riferimento ID 3). L'aggiornamento dell'ICD del tracciato unico è descritto nell'Open Point 20.
 
 ## Acquisizione
 
 ### Canali a file
 
-I canali a file (InvioFile, InvioSystem, InvioEasy) sono acquisiti da `ce-dichiarato-builder`, fuori dal perimetro dell'iniziativa, che pubblica i campi su `preadvising.pre-enrichment` (vincolo 1).
+I canali a file (InvioFile, InvioSystem, InvioEasy) sono acquisiti da `ce-dichiarato-builder`, che pubblica i campi su `preadvising.pre-enrichment` (vincolo 1).
 
 ### Portali e web service
 
 I preavvisi dei portali (MYSDA, INVIO_WEB) e del web service (SDA_WS) vengono scritti dai portali nelle tabelle SEW SDA e da lì inviati alla catena da un processo periodico (`producer-sew-sped`). Il processo viene adeguato per leggere `zonos_account_key` e `zonos_declaration_id` dalla tabella `sew_spedizioni_work` e inviarli nel tracciato unico solo se valorizzati, senza gli spazi di riempimento delle colonne Informix; un valore vuoto o di soli spazi equivale a campo assente.
 
-N.B. L'Account Key arriva alla catena solo se i portali la scrivono nella tabella (Open Point 20). Il Product ID non viene inviato, perché le tabelle sorgente hanno una riga per LDV e non contengono gli articoli (Open Point 19).
+N.B. L'Account Key arriva alla catena solo se i portali la scrivono nella tabella (Open Point 15). Il Product ID non viene inviato, perché le tabelle sorgente hanno una riga per LDV e non contengono gli articoli (Open Point 14).
 
 ### Canali PDB, PDW e ILP
 
-L'adeguamento di `ce-dichiarato-adapter`, che acquisisce i preavvisi di PDB, PDW e ILP, è rimandato a una seconda tranche della fase 1, in attesa dei nomi dei campi nei messaggi sorgente (Open Point 14). Si prevede che l'adapter riporti l'Account Key sulla spedizione e ogni Product ID sul proprio articolo, senza trasformazioni.
+L'adeguamento di `ce-dichiarato-adapter`, che acquisisce i preavvisi di PDB, PDW e ILP, è rimandato a una seconda tranche della fase 1, in attesa dei nomi dei campi nei messaggi sorgente (Open Point 11). Si prevede che l'adapter riporti l'Account Key sulla spedizione e ogni Product ID sul proprio articolo, senza trasformazioni.
 
 Ulteriori dettagli: il processo periodico è il modulo `producer-sew-sped` del repository `sda-ldv-preadv-consumer`; legge la tabella `sew_spedizioni_work` di Informix SDA e pubblica il tracciato unico sul topic di ingresso della catena.
 
@@ -183,8 +179,8 @@ La verifica viene eseguita da `ce-dichiarato-ldv`, la lavorazione che assegna o 
 
 La verifica non si applica:
 
-- ai preavvisi dei portali e del web service, lavorati da `ce-dichiarato-ldv` con il processo semplificato (esclusione 12);
-- ai flussi PDB (PDB, PDW, ILP, EUD), che non passano da `ce-dichiarato-ldv` (esclusione 11).
+- ai preavvisi dei portali e del web service, lavorati da `ce-dichiarato-ldv` con il processo semplificato (esclusione 9);
+- ai flussi PDB (PDB, PDW, ILP, EUD), che non passano da `ce-dichiarato-ldv` (Open Point 11).
 
 ### Spedizioni soggette
 
@@ -198,7 +194,7 @@ La verifica considera ogni spedizione del preavviso. Una spedizione è soggetta 
 
 Tabella 2: Condizioni di assoggettamento
 
-I confronti non distinguono maiuscole e minuscole e ignorano gli spazi iniziali e finali dei campi di riconoscimento. L'elenco dei prodotti è configurabile senza modifiche al software ed è da confermare (Open Point 13). La verifica è attivabile da configurazione e resta disattivata finché i sistemi di acquisizione non pubblicano i nuovi campi (vincolo 1): da disattivata, nessuna spedizione è soggetta e i campi vengono comunque propagati.
+I confronti non distinguono maiuscole e minuscole e ignorano gli spazi iniziali e finali dei campi di riconoscimento. L'elenco dei prodotti è configurabile senza modifiche al software ed è da confermare (Open Point 10). La verifica è attivabile da configurazione e resta disattivata finché i sistemi di acquisizione non pubblicano i nuovi campi (vincolo 1): da disattivata, nessuna spedizione è soggetta e i campi vengono comunque propagati.
 
 ### Controlli ed errori
 
@@ -215,8 +211,6 @@ Tabella 3: Errori della verifica Compliance USA
 
 Il nome del campo precede sempre i due punti, perché la console di monitoraggio legge così il campo in errore. Per il Product ID la descrizione indica il collo (numero d'ordine, da 1) e la posizione dell'articolo (se assente, il numero d'ordine dell'articolo preceduto da `#`); più articoli con lo stesso errore vengono elencati nella stessa descrizione, separati da punto e virgola, per esempio `(collo 1 articolo 2; collo 2 articolo #1)`. Le descrizioni non riportano mai i valori dei campi.
 
-Per ogni preavviso viene riportato un solo errore, il primo nell'ordine dei codici, con tutte le sue occorrenze (vincolo 3).
-
 ### Esiti
 
 | Esito/Stato | Descrizione |
@@ -228,13 +222,11 @@ Per ogni preavviso viene riportato un solo errore, il primo nell'ordine dei codi
 
 Tabella 4: Esiti della verifica
 
-N.B. Per i canali che generano la LDV lo scarto avviene dopo la generazione (vincolo 4).
-
 Ulteriori dettagli: il ms `ce-dichiarato-ldv`, namespace OpenShift `corriere-espresso-preadvising`, legge `preadvising.enrichment.ldv` e scrive l'esito della lavorazione, con i nuovi campi, su `preadvising.enrichment`.
 
 ## Smistamento
 
-`ce-dichiarato-smistatore` legge il preavviso completato e lo inoltra su `preadvising.completed.poste` o su `preadvising.completed.sda` secondo il canale. I nuovi campi vengono inoltrati identici su entrambi i topic, ciascuno nella propria posizione; per i preavvisi che non li contengono il messaggio resta quello di oggi, senza le nuove chiavi. Il tracciato verso i palmari non riceve i nuovi campi (esclusione 10).
+`ce-dichiarato-smistatore` legge il preavviso completato e lo inoltra su `preadvising.completed.poste` o su `preadvising.completed.sda` secondo il canale. I nuovi campi vengono inoltrati identici su entrambi i topic, ciascuno nella propria posizione; per i preavvisi che non li contengono il messaggio resta quello di oggi, senza le nuove chiavi. Il tracciato verso i palmari non riceve i nuovi campi (esclusione 8).
 
 Ulteriori dettagli: il ms `ce-dichiarato-smistatore`, namespace OpenShift `corriere-espresso-preadvising`, legge `preadvising.completed` e scrive `preadvising.completed.poste`, `preadvising.completed.sda` e il flusso verso i palmari, invariato.
 
@@ -246,7 +238,7 @@ Gli eventi di stato pubblicati su `preadvising.evensource` contengono il preavvi
 
 ### Monitoraggio
 
-`ce-event-handler-monitoring` trasforma gli eventi di stato in messaggi per la console di monitoraggio sul topic `PRE-ADV.MONITORAGGIO-CAMBIO-STATO`. I nuovi errori 1320-1323 arrivano alla console senza modifiche, con codice, campo in errore (il testo prima dei due punti) e descrizione. Il messaggio verso la console non contiene dati di spedizione e di articolo e non riceve i nuovi campi, salvo diversa richiesta (Open Point 21).
+`ce-event-handler-monitoring` trasforma gli eventi di stato in messaggi per la console di monitoraggio sul topic `PRE-ADV.MONITORAGGIO-CAMBIO-STATO`. I nuovi errori 1320-1323 arrivano alla console senza modifiche, con codice, campo in errore (il testo prima dei due punti) e descrizione. Il messaggio verso la console non contiene dati di spedizione e di articolo e non riceve i nuovi campi, salvo diversa richiesta (Open Point 16).
 
 ### Persistenza e consultazione
 
@@ -267,11 +259,11 @@ Il consumer `sew_spedizioni` legge i preavvisi SDA completati e li scrive nelle 
 
 Tabella 5: Nuove colonne lato SDA
 
-Le colonne vengono aggiunte con istruzioni DDL eseguite dal DBA prima che i campi arrivino valorizzati (vincolo 2, Open Point 24); lo script è nell'allegato 4. Il Product ID non viene storicizzato lato SDA, perché il consumer non scrive una tabella articoli (Open Point 19).
+Le colonne vengono aggiunte con istruzioni DDL eseguite dal DBA prima che i campi arrivino valorizzati (vincolo 2, Open Point 19); lo script è nell'allegato 4. Il Product ID non viene storicizzato lato SDA, perché il consumer non scrive una tabella articoli (Open Point 14).
 
 ### Tabelle Poste
 
-L'adeguamento del consumer `sew_spedizioni_poste` è rimandato alla seconda tranche della fase 1 (Open Point 14). Si prevede di scrivere Account Key e Declaration ID in `sew_spedizioni_poste` e il Product ID nella tabella degli articoli internazionali che il consumer già alimenta (`sew_spedizioni_poste_inter`), con le stesse colonne e la stessa regola di scrittura.
+L'adeguamento del consumer `sew_spedizioni_poste` è rimandato alla seconda tranche della fase 1 (Open Point 11). Si prevede di scrivere Account Key e Declaration ID in `sew_spedizioni_poste` e il Product ID nella tabella degli articoli internazionali che il consumer già alimenta (`sew_spedizioni_poste_inter`), con le stesse colonne e la stessa regola di scrittura.
 
 Ulteriori dettagli: il consumer `consumer-sew_sped` del repository `sda-ldv-preadv-consumer` legge `preadvising.completed.sda` e scrive `sew_spedizioni_work`; il consumer `consumer-sew_sped_poste` del repository `poste-ldv-preadv-consumer` legge `preadvising.completed.poste` e scrive le tabelle SEW Poste.
 
@@ -301,7 +293,7 @@ Tabella 6: Sistemi impattati
 |---|---|---|---|
 | 1 | HLD | HLD v.1 del 09/11/2026 "Dazi dati preadvising", fase 1 | HLD_146073_dati_preadvising_fase_1.xlsx |
 | 2 | Descrizione | Descrizione generale dell'iniziativa Compliance USA Entry Type 13 | 20261116_descrizione_compliance_usa_entry_type_13 |
-| 3 | ICD | ICD del tracciato unico di preadvising, da aggiornare con i campi `zonos_*`; versione DA DEFINIRE (Open Point 25) | ICD_PREADVISING_LDV_EVENT_SOURCE |
+| 3 | ICD | ICD del tracciato unico di preadvising, da aggiornare con i campi `zonos_*`; versione DA DEFINIRE (Open Point 20) | ICD_PREADVISING_LDV_EVENT_SOURCE |
 | 4 | DDL | Script DDL Informix delle colonne `zonos_*` su `sew_spedizioni_work`, con verifica e rollback, versione 0.3 | ddl-sew-146073.md |
 | 5 | Figura | Schema drawio della soluzione: catena di preadvising e punti di intervento (Figura 1) | fig-1-architettura.drawio |
 | 6 | Figura | Schema drawio dei flussi dati, con la numerazione del Documento di Progettazione | fig-2-flussi-dati.drawio |
