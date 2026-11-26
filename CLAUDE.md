@@ -48,6 +48,7 @@ _bmad-output/          output dei workflow BMAD
 ## Dove trovare cosa
 
 - Glossario dominio (LDV, preadvising, EAD, scarti...): `contesto/glossario-ce.md`
+- Unità di pesi e importi lungo la catena (g/kg, euro/centesimi, incoerenze): `contesto/pesi-importi.md`
 - Microservizi della catena preadvising, topic, canali, eventi di stato: `contesto/microservizi-preadvising.md`
 - Ambienti svil e collaudo (Kafka, PostgreSQL, cluster, secret per nome, deploy): `contesto/ambienti.md`
 - Linee guida per lo sviluppo (stack, Sonar, osservabilita', lavoro in parallelo): `contesto/linee-guida-sviluppo.md`
