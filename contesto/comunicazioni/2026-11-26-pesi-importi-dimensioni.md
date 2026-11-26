@@ -5,9 +5,17 @@ Nota tecnica – 26/11/2026
 ## 1. Premessa
 
 La nota descrive le unità di misura con cui pesi, dimensioni e importi del tracciato unico
-preadvising attraversano oggi la catena dei microservizi, dall'acquisizione fino ai sistemi a valle
-(BEP/PDB, SEW, palmari). Riporta le incoerenze rilevate e, nella seconda parte, gli impatti di
-un'eventuale uniformazione degli importi in centesimi di euro e delle dimensioni in centimetri interi.
+preadvising attraversano oggi la catena dei microservizi.
+
+I sistemi esterni coinvolti hanno ruoli diversi:
+
+- **BEP/PDB** ha due ruoli: è una **sorgente** per i canali PDB, PDW e ILP, i cui preadvising nascono
+  dalle anagrafiche LDV di PDB, ed è un **sistema intermedio**, perché durante l'arricchimento la
+  catena vi crea la LDV e ne riceve l'esito;
+- **SEW, palmari e i consumatori dei topic .completed.poste e .completed.sda** sono i sistemi a valle.
+
+La nota riporta le incoerenze rilevate e, nella seconda parte, gli impatti di un'eventuale
+uniformazione degli importi in centesimi di euro e delle dimensioni in centimetri interi.
 
 Fonti dell'analisi:
 
@@ -19,45 +27,47 @@ Fonti dell'analisi:
 
 ## 2. Stato attuale dei campi
 
-Nella tabella:
+Colonne delle tabelle:
 
-- **Ingresso** indica il messaggio pubblicato su `preadvising.pre-enrichment` dai servizi di
-  acquisizione (file cliente, API EURODIS, esiti PDB/PDW/ILP, TUP);
-- **Completed** indica il messaggio finale su `preadvising.completed`, da cui derivano
-  `.completed.poste` e `.completed.sda`.
+- **Ingresso**: il messaggio pubblicato su `preadvising.pre-enrichment` dai servizi di acquisizione
+  (file cliente, API EURODIS, anagrafiche LDV di PDB per i canali PDB, PDW e ILP, TUP);
+- **Verso BEP**: la richiesta di creazione della LDV inviata a BEP durante l'arricchimento;
+- **Completed**: il messaggio finale su `preadvising.completed`, da cui derivano `.completed.poste` e
+  `.completed.sda`;
+- **A valle**: SEW e palmari.
 
 ### 2.1 Pesi
 
-| Campo | ICD v12 | Ingresso | Completed (osservato in collaudo) | Sistemi a valle |
-|---|---|---|---|---|
-| `spedizione/collo/peso` | unità non indicata | grammi | **kg**, fino a 3 decimali, su tutti i canali | BEP: grammi interi. SEW: kg. Palmari: grammi |
-| `spedizione/internazionale/peso` | grammi | grammi | **misto**: kg per PDB, grammi per EUD_INVIOSYSTEM | non utilizzato |
-| `spedizione/collo/articolo/peso_totale` | grammi | grammi | grammi | BEP: grammi |
-| `ritiro/contenuto/peso` | unità non indicata | grammi | grammi | non utilizzato |
+| Campo | ICD v12 | Ingresso | Verso BEP | Completed (osservato in collaudo) | A valle |
+|---|---|---|---|---|---|
+| `spedizione/collo/peso` | unità non indicata | grammi | grammi interi | **kg**, fino a 3 decimali, su tutti i canali | SEW: kg. Palmari: grammi |
+| `spedizione/internazionale/peso` | grammi | grammi | non inviato | **misto**: kg per PDB, grammi per EUD_INVIOSYSTEM | non utilizzato |
+| `spedizione/collo/articolo/peso_totale` | grammi | grammi | grammi | grammi | non utilizzato |
+| `ritiro/contenuto/peso` | unità non indicata | grammi | non inviato | grammi | non utilizzato |
 
 Il peso del collo passa da grammi a kg in due punti:
 
 - nella validazione, per i soli canali SDA (IF, IS, IE);
-- negli esiti della creazione LDV su BEP, per gli altri canali.
+- nella lettura dell'esito della creazione LDV su BEP, per gli altri canali.
 
 ### 2.2 Dimensioni
 
-| Campo | ICD v12 | Ingresso | Completed (osservato in collaudo) | Sistemi a valle |
-|---|---|---|---|---|
-| `spedizione/collo/lunghezza`, `altezza`, `profondita` | unità non indicata | cm, a volte con decimali | cm (es. `"50.0"` e `"50"`) | BEP: cm. SEW: cm. Palmari: cm interi, con i decimali troncati |
-| `ritiro/contenuto/altezza`, `larghezza`, `profondita` | unità non indicata | cm | non presenti nel campione | non utilizzati |
+| Campo | ICD v12 | Ingresso | Verso BEP | Completed (osservato in collaudo) | A valle |
+|---|---|---|---|---|---|
+| `spedizione/collo/lunghezza`, `altezza`, `profondita` | unità non indicata | cm, a volte con decimali | cm | cm (es. `"50.0"` e `"50"`) | SEW: cm. Palmari: cm interi, con i decimali troncati |
+| `ritiro/contenuto/altezza`, `larghezza`, `profondita` | unità non indicata | cm | non inviati | non presenti nel campione | non utilizzati |
 
 ### 2.3 Importi
 
-| Campo | ICD v12 | Ingresso | Completed (osservato in collaudo) | Sistemi a valle |
-|---|---|---|---|---|
-| `spedizione/contrassegno/importo_contrassegno` | unità non indicata | euro, 2 decimali | euro (es. 123.45) | BEP: euro. SEW: euro. Palmari: centesimi |
-| `spedizione/assicurata/importo_assicurata` | euro | euro | euro (es. 258.23) | BEP: euro. SEW: euro. Palmari: centesimi |
-| `spedizione/internazionale/valore_spedizione` | euro | euro | euro | BEP: euro. Palmari: centesimi |
-| `spedizione/valore` | centesimi | **misto** | **misto**: euro per i canali SDA (IS: 200.0), centesimi per PDB (fino a 31545) | SEW (`valore_dich`): scritto senza conversione |
-| `spedizione/collo/articolo/valore` | centesimi | centesimi | centesimi (in euro dopo alcune fasi di esito PDB) | BEP: centesimi |
-| `spedizione/internazionale/importo_oneri` | centesimi | centesimi interi | non valorizzato nel campione | Palmari: intero |
-| `spedizione/importi/*` (diritti postali e doganali, tassa di ritorno, incassi) | centesimi | centesimi interi | non valorizzati nel campione | non inviati a SEW né ai palmari |
+| Campo | ICD v12 | Ingresso | Verso BEP | Completed (osservato in collaudo) | A valle |
+|---|---|---|---|---|---|
+| `spedizione/contrassegno/importo_contrassegno` | unità non indicata | euro, 2 decimali | euro, 2 decimali | euro (es. 123.45) | SEW: euro. Palmari: centesimi |
+| `spedizione/assicurata/importo_assicurata` | euro | euro | euro, 2 decimali | euro (es. 258.23) | SEW: euro. Palmari: centesimi |
+| `spedizione/internazionale/valore_spedizione` | euro | euro | euro, 2 decimali | euro | Palmari: centesimi |
+| `spedizione/valore` | centesimi | **misto** | non inviato | **misto**: euro per i canali SDA (IS: 200.0), centesimi per PDB (fino a 31545) | SEW (`valore_dich`): scritto senza conversione |
+| `spedizione/collo/articolo/valore` | centesimi | centesimi | centesimi | centesimi (in euro dopo alcune fasi di esito PDB) | non utilizzato |
+| `spedizione/internazionale/importo_oneri` | centesimi | centesimi interi | non inviato | non valorizzato nel campione | Palmari: intero |
+| `spedizione/importi/*` (diritti postali e doganali, tassa di ritorno, incassi) | centesimi | centesimi interi | non inviati | non valorizzati nel campione | non inviati a SEW né ai palmari |
 
 ### 2.4 Incoerenze rilevate
 
@@ -128,10 +138,10 @@ Restano invariati `importo_oneri` e `importi/*`, già in centesimi interi.
 
 | Ambito | Impatto |
 |---|---|
-| Consumatori di `.completed.poste` e `.completed.sda` | **Impatto principale.** Gli importi passano da euro a centesimi: ogni consumatore deve adeguarsi oppure leggere `versione_tracciato` |
-| BEP/PDB | Nessuno: la conversione in euro avviene nei servizi di creazione LDV |
-| SEW | Nessuno sulle tabelle: la conversione in euro avviene nel consumer |
-| Palmari | Nessuno: ricevono già i centesimi |
+| Consumatori di `.completed.poste` e `.completed.sda` (a valle) | **Impatto principale.** Gli importi passano da euro a centesimi: ogni consumatore deve adeguarsi oppure leggere `versione_tracciato` |
+| BEP/PDB (sorgente e sistema intermedio) | Nessuno: le richieste di creazione LDV restano in euro, perché la conversione avviene nei servizi ldv-pdb; gli esiti e le anagrafiche ricevute da PDB vengono convertiti dalla catena |
+| SEW (a valle) | Nessuno sulle tabelle: la conversione in euro avviene nel consumer |
+| Palmari (a valle) | Nessuno: ricevono già i centesimi |
 | ICD | Nuova versione con le unità esplicite di tutti i campi (centesimi, cm interi, unità del peso del collo) e il significato di `versione_tracciato = 2`. Va indicato che `preadvising.pre-enrichment` resta in euro |
 
 ### 3.5 Rilascio
