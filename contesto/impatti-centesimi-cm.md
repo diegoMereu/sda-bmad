@@ -1,5 +1,11 @@
 # Importi in centesimi e dimensioni in cm: impatti
 
+> **Aggiornamento 26/11/2026.** Il perimetro è stato allargato: anche i pesi vanno uniformati, in grammi interi,
+> e tutte le conversioni interne alla catena vanno tolte. Restano solo quelle verso i sistemi esterni che non si
+> adeguano (BEP, SAP-EM, SEW, ce-contratti, ce-vendite). La versione aggiornata, con l'elenco delle conversioni, è
+> nella nota per il cliente [comunicazioni/2026-11-26-pesi-importi-dimensioni.md](comunicazioni/2026-11-26-pesi-importi-dimensioni.md).
+> Da analizzare anche il file impianti, generato dal completed, il cui generatore non è nei repo in locale.
+
 Analisi d'impatto, novembre 2026. Nessuno sviluppo avviato. Si basa sullo stato attuale descritto in
 [pesi-importi.md](pesi-importi.md).
 

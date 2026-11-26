@@ -16,8 +16,8 @@ Fonti:
 | `contrassegno.importo_contrassegno` | euro, 2 decimali | euro | centesimi (`IMPORTO_CONTRASS`, non arrotondato) |
 | `assicurata.importo_assicurata` | euro | euro | centesimi (`IMPORTO_ASS`) |
 | `internazionale.valore_spedizione` | euro | euro | centesimi (`VALORE_DICH`) |
-| `articolo.valore` | centesimi | centesimi; in euro solo dopo la fase 2 dell'adapter | — |
-| `articolo.peso_totale` | grammi | grammi; in kg solo dopo la fase 2 dell'adapter | — |
+| `articolo.valore` | centesimi | centesimi per il canale PDB e per EUD_INVIOFILE (sync); **euro** per PDB_INVIO* ed EUD_INVIOSYSTEM (esito asincrono di ldv-pdb, `BepResponseMapper` ÷100) e nella fase 2 dell'adapter | — |
+| `articolo.peso_totale` | grammi | grammi per il canale PDB e per EUD_INVIOFILE; **kg** per PDB_INVIO* ed EUD_INVIOSYSTEM (esito asincrono di ldv-pdb, ÷1000) e nella fase 2 dell'adapter | — |
 | `internazionale.importo_oneri` | centesimi interi | centesimi interi | `IMPORTO_ONERI` intero |
 | `importi.*` (diritti, `tassa_ritorno`, incassi) | centesimi interi (ICD) | idem; nel campione non sono mai valorizzati | — |
 
