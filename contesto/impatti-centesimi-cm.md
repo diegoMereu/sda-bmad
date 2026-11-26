@@ -34,6 +34,155 @@ Il marcatore serve per tre motivi:
 - i retry che rileggono Mongo;
 - lo storico.
 
+## 2bis. Campi da cambiare e impatti per campo
+
+Legenda:
+- **M** = modifica necessaria;
+- **V** = da verificare;
+- **—** = punto che tocca il campo ma resta invariato.
+
+I percorsi sono relativi ai repo in `gitposte/SDA/preadvising`.
+
+### A. Importi da euro a centesimi
+
+#### A1. `spedizione/contrassegno/importo_contrassegno`
+
+Oggi è in euro con 2 decimali. Nuova unità: centesimi interi.
+
+| Componente | Punto | Impatto |
+|---|---|---|
+| builder | `.ini` per cliente, formato `IIIIII.DD`; template `json_output_template.ftl:161` | — |
+| eurodis-mapper | `EurodisToIcdMapper.java:496` `setScale(2)` | — |
+| adapter, flusso normale | `PdbMapper.java:485-500` (APT000918), `PdwMapper.java:95` (÷100) | — (resta in euro) |
+| adapter, fase 2 | stesso mapping, pubblicato su `enrichment` | **M** ×100 |
+| validatore | `ContrassegnoDTO:13` `@Digits(9,2)`; `validation-procedure.drl:49` (99999.999, errore 004); `ce-pdb-rules.drl:608-635` (punto decimale) | — (girano in euro); **M** conversione in uscita |
+| orchestratore | `ContrassegnoDTO` BigDecimal; `OrchestratoreMongoService:344-357` | — |
+| ce-dichiarato-ldv | `ProcessLdvService.java:710-725` contro `limiti-pagamento-incasso.properties` (`CON.importo=4999.990`, `CEC=258.530`) | **M** ÷100 prima del confronto |
+| ldv-pdb asincrono | `BepRequestMapper.java:336-341, 527-529` APT000918 `money()` | **M** ÷100 a scala 2 |
+| ldv-pdb-sync | `PdbRequestMapper.java:289, 467` | **M** ÷100 a scala 2 |
+| smistatore, topic | `ContrassegnoDTO:11`, invariato verso `.completed.poste` e `.sda` | **contratto esterno** |
+| smistatore, palmari | `PalmariMapperService.java:487` ×100 | **M** niente ×100 se v2 |
+| consumer SEW | `QueriesManagerDao.java:408-412` `importo_contrass`; `temp_ritiri_clienti` (`:1044-1128`); `CliDatiStampaTfDao.java:252-369` | **M** ÷100 se v2 |
+| consumer SEW on-out-tot | `QueriesManagerDao` del modulo (`sew_sped_pre_adv_online_out_tot`) | **M** ÷100 se v2 |
+| ttrepo | `@Digits(9,2)` | — |
+| bff, preavviso, monitoraggio FE | `ContrassegnoDTO:19`; `PreadvisingDettaglioResponseDTO` (Double) | **M** visualizzazione ÷100 |
+| palmari-comparatore | esclude `IMPORTO_CONTRASS` | **M** includerlo |
+
+#### A2. `spedizione/assicurata/importo_assicurata`
+
+Oggi è in euro. Nuova unità: centesimi interi.
+
+| Componente | Punto | Impatto |
+|---|---|---|
+| builder | formato `IIIIIII.DD`; template `:156` | — |
+| adapter, flusso normale | `PdbMapper.java:503-512` (APT000919, 955, 956), `PdwMapper.java:117` | — |
+| adapter, fase 2 | idem | **M** ×100 |
+| validatore | `AssicurataDTO:14` `@Digits(10,2)`; `dominio-rules.drl:227` (99999.999, errore 415), `:181-185` (CIN sopra 1500, in double), `:211` (copia da `valore`); `VenditeClient.java:132,163` verso `ce-vendite` | — (girano in euro); **M** conversione in uscita |
+| ce-dichiarato-ldv | `VenditeClient.java:185` `importoAssicurata` verso `ce-vendite` | **M** ÷100 prima della chiamata |
+| ldv-pdb asincrono | `BepRequestMapper.java:419-425` | **M** ÷100 a scala 2 |
+| ldv-pdb-sync | `PdbRequestMapper.java:371` | **M** ÷100 a scala 2 |
+| smistatore, palmari | `PalmariMapperService.java:505-508` ×100 | **M** niente ×100 se v2 |
+| consumer SEW (+ on-out-tot) | `QueriesManagerDao.java:402-406` `importo_ass`; `temp_ritiri_clienti.importoassicurata`; `cli_dati_stampa_tf_2` | **M** ÷100 se v2 |
+| tipi | `@Digits(10,2)`: fino a 10^12 centesimi, non entra in `Integer` | **M** `Long` o `BigDecimal` a scala 0 dove si tipizza in centesimi |
+| bff, preavviso, monitoraggio FE | come A1 | **M** visualizzazione |
+
+#### A3. `spedizione/internazionale/valore_spedizione`
+
+Oggi è in euro. Nuova unità: centesimi interi.
+
+| Componente | Punto | Impatto |
+|---|---|---|
+| builder | `Valore_Spedizione`, template `:150` (lo stesso valore va anche in `spedizione/valore`) | — |
+| eurodis-mapper | valorizzato a 0 (`InternazionaleDTO.java:20`) | — |
+| adapter, flusso normale | `PdbMapper.java:527` (euristica in `PdbMapperUtils.java:119-138`), `PdwMapper.java:200`, `IlpMapper.java:208` | — |
+| adapter, fase 2 | idem | **M** ×100 |
+| validatore | `dominio-rules.drl:541` (lunghezza > 10), `validation-procedure.drl:314` (> 0 per EUD, INT, CIN, EXB) | — (girano in euro); **M** conversione in uscita |
+| ldv-pdb asincrono | `BepRequestMapper.java:196` `waybillTotalValue` | **M** ÷100 a scala 2 |
+| ldv-pdb-sync | `PdbRequestMapper.java:173` | **M** ÷100 a scala 2 |
+| smistatore, palmari | `PalmariMapperService.java:173-176` `VALORE_DICH` ×100 | **M** niente ×100 se v2 |
+| SEW | non scritto | — |
+| bff, ttrepo | `@Digits(10,2)` | **M** visualizzazione (bff) |
+
+#### A4. `spedizione/valore`
+
+Oggi è misto: euro dai canali SDA, centesimi dall'adapter PDB. Nuova unità: centesimi interi.
+
+| Componente | Punto | Impatto |
+|---|---|---|
+| builder | template `:89` (euro) | — |
+| adapter, flusso normale | `PdbMapper.java:516-520` `customsDeclaration_totalValue` (centesimi) | **M** ÷100 (decisione D1) |
+| adapter, fase 2 | idem | — (è già in centesimi) |
+| eurodis-mapper, TUP | 0, oppure null (`TUPMapper.java:110`) | — |
+| OMP | produttore sconosciuto, interi da 1030 a 3279 | **V** (Q2) |
+| validatore | `SpedizioneDTO` BigDecimal; `dominio-rules.drl:211` lo copia in `importo_assicurata` | **M** conversione in uscita |
+| orchestratore, smistatore | String, invariato | — |
+| consumer SEW (+ on-out-tot) | `QueriesManagerDao.java:497` `valore_dich`; `temp_ritiri_clienti.valore_spedizione` | **M** ÷100 se v2. Si corregge così l'errore attuale per PDB |
+| ICD | v12 lo dichiara già in centesimi | — |
+
+### B. Importi già in centesimi, toccati dai percorsi di ritorno
+
+#### B1. `spedizione/collo/articolo/valore`
+
+Resta in centesimi.
+
+| Componente | Punto | Impatto |
+|---|---|---|
+| ldv-pdb asincrono, esito | `BepResponseMapper.java:102` ÷100 | **M** togliere |
+| adapter, fase 2 | `PdbMapper.java:247-266` `convertiPesiEValoriArticoli` ÷100 | **M** togliere la ÷100 (la ÷1000 del peso resta) |
+| adapter ILP | `IlpMapper.java:241-242`, in euro | **V** ×100 (Q4) |
+| BEP | `BepRequestMapper.java:272`, `PdbRequestMapper.java:241` `toString()` | **V** arrotondare a scala 0 (oggi può partire `"1500.0"`) |
+| Effetto a valle | sui flussi PDB in fase 2 o con esito asincrono, `articolo/valore` su `completed` passa da euro a centesimi | **contratto esterno** |
+
+#### B2. `internazionale/importo_oneri` e `importi/*`
+
+`importi/*` comprende i diritti postali e doganali (5 campi), `tassa_ritorno` e gli incassi (2 campi).
+
+Nessuna modifica: sono già centesimi interi. Resta il rischio che un decimale in ingresso venga
+troncato senza errore (Jackson `ACCEPT_FLOAT_AS_INT` è attivo), oppure dia `NumberFormatException` in
+`PdbMapper.java:293-295` dell'adapter.
+
+### C. Dimensioni in cm interi
+
+#### C1. `spedizione/collo/lunghezza`, `altezza`, `profondita`
+
+| Componente | Punto | Impatto |
+|---|---|---|
+| builder | `Dimensioni_*`, template `:189-191` | — |
+| eurodis-mapper | `EurodisToIcdMapper.java:547-549`, HALF_UP; la larghezza (`width`) va in `profondita` | — (da documentare) |
+| adapter | `PdbMapperUtils.java:143` `setScale(0)` | — |
+| validatore | `ColloDTO` `@Digits(5,2)`, soglia 999.99 | **M** `setScale(0, HALF_UP)` in uscita |
+| orchestratore | String | — |
+| BEP | `BepRequestMapper.java:248-250`, `PdbRequestMapper` | — (riceve `"50"` invece di `"50.0"`) |
+| smistatore, palmari | `PalmariMapperService.java:630-639` troncatura | — (non ha più effetto) |
+| SEW | `QueriesManagerDao.java:246-248` `dim_h`, `dim_l`, `dim_w`; `temp_ritiri_clienti.volume` = l×a×p | il volume cambia leggermente quando arrivavano decimali; **V** unità del volume (Q5) |
+| bff | `@Digits(5,2)` | — |
+
+#### C2. `ritiro/contenuto/altezza`, `larghezza`, `profondita` (e `spedizione/ritiro/contenuto/*`)
+
+| Componente | Punto | Impatto |
+|---|---|---|
+| validatore | `ContenutoDTO`, `PickupContenutoDTO` | **M** `setScale(0, HALF_UP)` in uscita |
+| a valle | nessun uso trovato; nel campione di collaudo non compaiono | **V** su un file reale |
+
+### D. Campo tecnico
+
+#### D1. `versione_tracciato`
+
+Oggi vale 1. Diventa 2 quando gli importi sono in centesimi. Un valore assente o pari a 1 resta
+**euro**.
+
+| Componente | Punto | Impatto |
+|---|---|---|
+| produttori | builder (lo imposta a 1 se null), adapter (`setVersioneTracciato(1)` alle righe 51 e 318), eurodis-mapper (`:59`), pacchi-tracking (`VERSIONE_TRACCIATO = 1`) | — |
+| validatore, adapter fase 2 | — | **M** impostare 2 |
+| ldv-pdb, ldv-pdb-sync | il campo **non è nei DTO**: deserializzando e ripubblicando su `enrichment` si perde, e a valle il messaggio sembra v1 | **M** aggiungerlo ai DTO e propagarlo |
+| retry-id-cliente | campo assente | **M/V** propagarlo da Mongo verso `completed` |
+| retry-eurodis, orchestratore, smistatore, ce-dichiarato-ldv | il campo c'è | **V** che venga propagato invariato |
+| consumer SEW (sew_sped e on-out-tot) | campo assente | **M** aggiungerlo, serve a decidere la ÷100 |
+| producer-sew-sped (vecchio flusso, da SEW verso il tracciato) | rilegge importi in euro e non imposta la versione | — (null = euro); **V** su quale topic pubblica |
+| bff, preavviso, monitoraggio FE | campo assente | **M** aggiungerlo per la visualizzazione |
+| ICD | — | **M** definire il significato del valore 2 |
+
 ## 3. Come lavora il validatore
 
 1. **Ingresso.** Se il messaggio ha `versione_tracciato >= 2`, cioè viene da un retry o da un
