@@ -7,10 +7,11 @@ ticket: null
 compilato_da: "GDL ACN"
 verificato_da: ""
 approvato_da: ""
-versione: "0.1"
+versione: "0.2"
 distribuito_a: "DTO/IT/BASSPDCB/IT AS COR ESPR"
 revisioni:
   - {data: "25/11/2026", versione: "0.1", stato: "Bozza", descrizione: "Prima emissione, fase 1", autore: "ACN"}
+  - {data: "25/11/2026", versione: "0.2", stato: "Bozza", descrizione: "Figura 1, allegati allineati al DP (HLD, descrizione, ICD, DDL, schemi drawio)", autore: "ACN"}
 ---
 
 # Introduzione
@@ -40,11 +41,10 @@ Il presente documento contiene l'analisi degli impatti funzionali relativi all'I
 
 | Id. Documento | Tipo di Documento | Titolo Documento | Allegato |
 |---|---|---|---|
-| 1 | HLD | HLD 146073 "Dazi dati preadvising", fase 1, v.1 del 09/11/2026 (HLD_146073_dati_preadvising_fase_1.xlsx) | non disponibile |
+| 1 | HLD | HLD 146073 "Dazi dati preadvising", fase 1, v.1 del 09/11/2026 (HLD_146073_dati_preadvising_fase_1.xlsx) | Allegato 1 |
 | 2 | HLD | HLD 146073 "Dazi dati preadvising", fase 2, v.1 del 09/11/2026 (HLD_146073_dati_preadvising_fase_2.xlsx) | non disponibile |
-| 3 | Descrizione | Descrizione delle attività sui servizi Preadvising per la Compliance USA Entry Type 13, ricevuta il 16/11/2026 | non disponibile |
-| 4 | ICD | ICD del tracciato unico di preadvising (ICD_PREADVISING_V5) | non disponibile |
-| 5 | ICD | ICD degli eventi di stato del preadvising (`preadvising.evensource`) | non disponibile |
+| 3 | Descrizione | Descrizione delle attività sui servizi Preadvising per la Compliance USA Entry Type 13, ricevuta il 16/11/2026 (20261116_descrizione_compliance_usa_entry_type_13) | Allegato 2 |
+| 4 | ICD | ICD del tracciato unico di preadvising (ICD_PREADVISING_LDV_EVENT_SOURCE), da aggiornare con i campi `zonos_*` | Allegato 3 |
 
 ## Vincoli, Assunzioni, Esclusioni ed Open Point
 
@@ -104,7 +104,7 @@ La soluzione descritta di seguito tratta i seguenti temi:
 - il tracciamento, la persistenza e la consultazione;
 - la storicizzazione nelle tabelle SEW.
 
-La soluzione è riportata nella figura successiva.
+La soluzione è riportata nella figura successiva e nell'allegato 5.
 
 ![Figura 1: Catena di preadvising e punti di intervento della fase 1](fig-1-architettura.png)
 
@@ -267,7 +267,7 @@ Il consumer `sew_spedizioni` legge i preavvisi SDA completati e li scrive nelle 
 
 Tabella 5: Nuove colonne lato SDA
 
-Le colonne vengono aggiunte con istruzioni DDL eseguite dal DBA prima che i campi arrivino valorizzati (vincolo 2, Open Point 24). Il Product ID non viene storicizzato lato SDA, perché il consumer non scrive una tabella articoli (Open Point 19).
+Le colonne vengono aggiunte con istruzioni DDL eseguite dal DBA prima che i campi arrivino valorizzati (vincolo 2, Open Point 24); lo script è nell'allegato 4. Il Product ID non viene storicizzato lato SDA, perché il consumer non scrive una tabella articoli (Open Point 19).
 
 ### Tabelle Poste
 
@@ -299,5 +299,9 @@ Tabella 6: Sistemi impattati
 
 | ID Documento | Tipo Documento | Titolo e Contenuto | Allegato |
 |---|---|---|---|
-| 1 | DDL | Script DDL delle nuove colonne SEW, con verifica e rollback | in preparazione |
-| 2 | Figura | Catena di preadvising e punti di intervento della fase 1 (fig-1-architettura.drawio) | in preparazione |
+| 1 | HLD | HLD v.1 del 09/11/2026 "Dazi dati preadvising", fase 1 | HLD_146073_dati_preadvising_fase_1.xlsx |
+| 2 | Descrizione | Descrizione generale dell'iniziativa Compliance USA Entry Type 13 | 20261116_descrizione_compliance_usa_entry_type_13 |
+| 3 | ICD | ICD del tracciato unico di preadvising, da aggiornare con i campi `zonos_*`; versione DA DEFINIRE (Open Point 25) | ICD_PREADVISING_LDV_EVENT_SOURCE |
+| 4 | DDL | Script DDL Informix delle colonne `zonos_*` su `sew_spedizioni_work`, con verifica e rollback, versione 0.3 | ddl-sew-146073.md |
+| 5 | Figura | Schema drawio della soluzione: catena di preadvising e punti di intervento (Figura 1) | fig-1-architettura.drawio |
+| 6 | Figura | Schema drawio dei flussi dati, con la numerazione del Documento di Progettazione | fig-2-flussi-dati.drawio |
