@@ -1,14 +1,17 @@
 # `ce-dichiarato-eurodis-in` — Persistenza su PostgreSQL: DDL e ambiente
 
-**Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.2 · **Data**: 2026-11-18
+**Iniziativa**: 136596 — Eurodis autoproduttore · **Versione**: 0.3 · **Data**: 2026-11-27
 **Autore**: Winston (architect) · **Destinatari**: DBA e piattaforma (script e secret), Amelia (dev)
 **Specifica di riferimento**: [ce-dichiarato-eurodis-in.md](ce-dichiarato-eurodis-in.md) 0.6, sezione 3.4
+**0.3 (27-11)**: allineato a `sql/ddl/` dopo la code review di Amelia. Tolto dallo script 1 il
+`GRANT ... ON SCHEMA public` (con `OWNER = ce_user` non serve; il `REVOKE` per svil e collaudo è nella
+sezione 7); `eurodis_postazioni` diventa lo script 6 e i permessi lo script 7, nell'ordine di esecuzione.
 
 **[DECISO 10-11, Diego]** Lo scarico EURODIS passa da MongoDB a PostgreSQL, sul database dedicato
 `ce_eud_api_in`. Le tre collezioni Mongo diventano tre tabelle, più la tabella del lock dei job. Le
 credenziali sono quelle già usate da `ce-db-sync`, nello stesso secret.
 
-**[DECISO 18-11, Diego]** Sullo stesso database c'è anche `eurodis_postazioni` (script 7): la
+**[DECISO 18-11, Diego]** Sullo stesso database c'è anche `eurodis_postazioni` (script 6): la
 postazione di ogni seme LDV PDB visto nelle spedizioni EURODIS. **Non la usa `-in`**: la scrive
 `ce-dichiarato-eurodis-mapper` (che riempie contratto e centro di costo e chiama già ce-vendite) e la
 legge `ce-eurodis-send-tracking`, per sapere se una LDV è entrata da questo flusso senza chiamare
@@ -22,7 +25,7 @@ ce-vendite. Lo script sta in `sql/ddl/` di `-in` perché `ce_eud_api_in` è il d
 |---|---|
 | **Accesso con `spring-boot-starter-jdbc` (`NamedParameterJdbcTemplate`)**, niente JPA | È come lavorano tutti i servizi `ce-` su PostgreSQL (`ce-db-sync`, `ce-anagrafica`, `ce-ldv`, `ce-dichiarato-state-machine-handler`). Le query sono poche e note (sezione 6) |
 | **Niente Flyway o Liquibase**: le DDL le esegue il DBA | Nessun servizio `ce-` usa uno strumento di migrazione; `ce-db-sync` tiene gli script in `sql/ddl/`. Si fa lo stesso: gli script di questo documento vanno anche nel repository, in `sql/ddl/` |
-| **Schema `public`** | Il database `ce_eud_api_in` è dedicato al solo `-in`, quindi uno schema in più non isola niente. La DDL di Diego dà già `USAGE, CREATE` su `public` a `ce_user`, e anche gli script di `ce-db-sync` usano `public`. Così l'URL non ha bisogno di `currentSchema`. Gli script qualificano comunque ogni oggetto con `public.` |
+| **Schema `public`** | Il database `ce_eud_api_in` è dedicato al solo `-in`, quindi uno schema in più non isola niente. Con il database creato `OWNER = ce_user`, `ce_user` crea già in `public` senza grant (script 1), e anche gli script di `ce-db-sync` usano `public`. Così l'URL non ha bisogno di `currentSchema`. Gli script qualificano comunque ogni oggetto con `public.` |
 | **Grezzo e JSON per spedizione in `text`**, non `jsonb` | `jsonb` riscrive il testo (spazi, ordine delle chiavi, chiavi duplicate, numeri come `7319003746401.0`). La specifica vuole il testo **identico** a quello ricevuto (RF-06, RF-14) |
 | **Niente GridFS** | `text` regge fino a 1 GB ed è compresso dal TOAST di PostgreSQL. Il grezzo sta sempre nella colonna `corpo`. Resta la soglia di guardia a 100 MB (warning e metrica, sezione 9 della specifica) |
 | **Identificativo dello scarico `uuid`, generato dal servizio** | Il servizio lo conosce prima dell'`INSERT`, senza leggere chiavi generate e senza dipendere da `gen_random_uuid()` (PostgreSQL 13+). Diventa `idEsecuzione` negli header e la parte finale di `rifGrezzo` (`eurodis_scarichi/<uuid>`) |
@@ -47,13 +50,16 @@ CREATE DATABASE ce_eud_api_in
     CONNECTION LIMIT = -1
     TEMPLATE = template0;
 GRANT ALL PRIVILEGES ON DATABASE ce_eud_api_in TO ce_user;
-GRANT USAGE, CREATE ON SCHEMA public TO ce_user;
 ```
 
-Nota: `GRANT ... ON SCHEMA public` agisce sul database a cui si è connessi. Va eseguito **dopo**
-essersi connessi a `ce_eud_api_in` (`\c ce_eud_api_in`), altrimenti dà i permessi sullo schema
-`public` del database `postgres`. Da PostgreSQL 15 `public` non concede più `CREATE` a tutti: il
-grant serve.
+Nota (27-11): niente `GRANT ... ON SCHEMA public`. Un grant sullo schema vale per il database a cui
+si è connessi: qui finirebbe sullo schema `public` del database `postgres` (un permesso di troppo sul
+database di sistema). Su `ce_eud_api_in` non serve: da PostgreSQL 15 `public` appartiene a
+`pg_database_owner`, cioè al proprietario del database, `ce_user`. **[DA VERIFICARE]** La versione di
+PostgreSQL dei server Azure non è stata controllata: è un'ipotesi (prima della 15 `public` concede
+`CREATE` a tutti, quindi il grant non servirebbe comunque). Solo se il database viene creato con un
+altro proprietario, connessi a `ce_eud_api_in` (`\c ce_eud_api_in`):
+`GRANT USAGE, CREATE ON SCHEMA public TO ce_user;`.
 
 ### Script 2 — `eurodis_scarichi`
 
@@ -218,7 +224,7 @@ COMMENT ON TABLE public.shedlock IS 'Lock dei job schedulati (ShedLock): ogni jo
 Il provider va configurato con `usingDbTime()`: i tempi del lock li decide il database, non
 l'orologio dei pod.
 
-### Script 7 — `eurodis_postazioni`
+### Script 6 — `eurodis_postazioni`
 
 Una riga per seme LDV (chiave seme + tipo seme), con la postazione restituita da ce-vendite
 (`GET /vendite/configurazione-postazione-da-seme?idSemeLdv=..&idTipoSemeLdv=PPTT`). Il seme è
@@ -244,7 +250,7 @@ CREATE TABLE IF NOT EXISTS public.eurodis_postazioni (
 );
 ```
 
-Più i `COMMENT` su tabella e colonne (nel file `sql/ddl/07_ddl_eurodis_postazioni.sql`).
+Più i `COMMENT` su tabella e colonne (nel file `sql/ddl/06_ddl_eurodis_postazioni.sql`).
 
 | Colonna | Significato |
 |---|---|
@@ -281,7 +287,7 @@ Mapper e send-tracking si collegano a `ce_eud_api_in` con lo stesso utente di `-
 due usasse un altro utente servono `SELECT, INSERT, UPDATE` (mapper) o `SELECT` (send-tracking) su
 `eurodis_postazioni`.
 
-### Script 6 — Permessi
+### Script 7 — Permessi
 
 Gli oggetti sono creati da `ce_user`, che ne è proprietario: non servono altri grant. Se il DBA li
 crea con un altro utente:
@@ -291,7 +297,7 @@ ALTER TABLE public.eurodis_scarichi          OWNER TO ce_user;
 ALTER TABLE public.eurodis_spedizioni        OWNER TO ce_user;
 ALTER TABLE public.eurodis_richieste_manuali OWNER TO ce_user;
 ALTER TABLE public.shedlock                  OWNER TO ce_user;
-ALTER TABLE public.eurodis_postazioni        OWNER TO ce_user;   -- dopo lo script 7
+ALTER TABLE public.eurodis_postazioni        OWNER TO ce_user;   -- dopo lo script 6
 ```
 
 ## 3. Dimensioni attese
@@ -444,19 +450,23 @@ da una ripresa concorrente.
 
 ## 7. Cosa serve dal DBA e dalla piattaforma
 
-**Script DDL eseguiti dal DBA** (secondo Diego, 10-11; ambiente non specificato). Restano i punti 3, 4 e 5.
+**Script DDL eseguiti dal DBA** (secondo Diego, 10-11; ambiente non specificato). Restano i punti 3, 4, 5 e 6.
 
 1. Script 1 sul server svil (`strkevoldb01azwe`) e su quello di collaudo (`ttrkevoldb01azwe`),
-   con il `GRANT ... ON SCHEMA public` eseguito connessi a `ce_eud_api_in`.
-2. Script 2, 3, 4 e 5 come `ce_user` su `ce_eud_api_in`, in entrambi gli ambienti (lo script 6
+   connessi a `postgres`, senza grant sullo schema `public` (27-11, sezione 2).
+2. Script 2, 3, 4, 5 e 6 come `ce_user` su `ce_eud_api_in`, in entrambi gli ambienti (lo script 7
    solo se le tabelle le crea un altro utente).
 3. Conferma che l'utente nel secret `ce-postgres` (chiave `datasource-name`) è `ce_user`, cioè il
    proprietario del nuovo database.
 4. ~~Togliere la chiave `mongo-string-connection`~~ (superato): Mongo di `preadvising_file` dal secret
    `ce-dichiarato-validatore-secret`, chiave `mongo-string-connection` (19-11).
-5. **Script 7 (18-11)** come `ce_user` su `ce_eud_api_in`, in svil e collaudo: dove gli script 1-6
-   sono già stati eseguiti si esegue solo questo (e la riga di `eurodis_postazioni` dello script 6,
-   se le tabelle non le crea `ce_user`). Serve prima del rilascio del mapper che la scrive.
+5. **Script 6 (18-11)** come `ce_user` su `ce_eud_api_in`, in svil e collaudo (si chiamava
+   `07_ddl_eurodis_postazioni.sql`, contenuto invariato): dove le tabelle 2-5 esistono già si esegue
+   solo questo (e la riga di `eurodis_postazioni` dello script 7, prima `06_permessi.sql`, se le
+   tabelle non le crea `ce_user`). Serve prima del rilascio del mapper che la scrive.
+6. **Revoca (27-11)** in svil e collaudo, dove lo script 1 è stato eseguito nella versione con il
+   grant su `public`: connessi a `postgres`, `REVOKE CREATE ON SCHEMA public FROM ce_user;` (toglie il
+   permesso finito sullo schema `public` del database `postgres`).
 
 ## 8. Domande per Diego
 
