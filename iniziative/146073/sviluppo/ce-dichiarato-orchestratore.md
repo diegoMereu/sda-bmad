@@ -43,14 +43,14 @@ lavorazioni completate, pubblica su `preadvising.completed`.
 Obiettivo: i tre campi **arrivano su `preadvising.completed` e su Mongo identici a come sono
 entrati**, con `zonos_product_id` sul suo articolo, in tutti i rami (salvataggio, fan-out, merge,
 retry per conflitto, completamento, KO). L'orchestratore non li valida e non li trasforma (R-02,
-R-04): la validazione è del validatore (int. 01).
+R-04): la verifica è di `ce-dichiarato-ldv`, nel processo normale (Diego 25-11).
 
 **Non fa**:
 
 | Fuori perimetro | Chi lo fa |
 |---|---|
-| Validazione di presenza e lunghezza, riconoscimento delle spedizioni soggette | `ce-dichiarato-validatore` (int. 01) |
-| Passaggio dei campi dentro le lavorazioni (`ce-dichiarato-ldv`, `-ldv-pdb`, `-ldv-pdb-sync`, normalizzatore) | nessuno in fase 1 (ORC-06, ORC-07) |
+| Validazione di presenza e lunghezza, riconoscimento delle spedizioni soggette | `ce-dichiarato-ldv`, processo normale (Diego 25-11, commit `1bd3517`); il validatore porta solo i campi |
+| Passaggio dei campi dentro le lavorazioni (`ce-dichiarato-ldv`, `-ldv-pdb`, `-ldv-pdb-sync`, normalizzatore) | `ce-dichiarato-ldv` dal 25-11 (`1bd3517`, insieme alla verifica); gli altri nessuno in fase 1 (ORC-06, ORC-07). I campi restano comunque protetti da `campi-esclusi` |
 | Nuova lavorazione Zonos, valorizzazione di `zonos_declaration_id` | fase 2 (AS-06) |
 | Instradamento verso Poste, SDA, palmari | `ce-dichiarato-smistatore` (int. 03, documento gemello) |
 
@@ -103,7 +103,7 @@ Regole sui campi nuovi (AS-01, R-04, R-05):
 - `String`, senza default, senza `@JsonProperty` diverso dal nome, senza trasformazioni (niente `trim`, maiuscole, troncamenti);
 - **nessun vincolo Bean Validation** (`@Size`, `@NotNull`): `processEvento` fa `validator.validate(dto)` e,
   con una violazione, scarta il messaggio con un WARN. Un vincolo qui farebbe perdere il preavviso
-  invece di scartarlo con l'errore del validatore (ORC-03);
+  invece di scartarlo con l'errore di compliance di `ce-dichiarato-ldv` (ORC-03);
 - serializzazione `NON_NULL` come il resto (`ObjectMapper` di `AppConfig`): un campo assente o `null`
   non compare nel JSON. Per `zonos_declaration_id`, sempre `null` in fase 1, l'uscita non ha la chiave (ORC-04).
 
@@ -354,7 +354,7 @@ Nuove (Mary, 16-11):
 |---|---|---|---|
 | ORC-01 | I tre campi vanno solo in `SpedizioneDTO` e `ArticoloDTO`: radice del messaggio, `OrchestratoreDTO` e documenti Mongo non cambiano perché riusano `SpedizioneDTO` | come detto | — |
 | ORC-02 | **Protezione dal merge**: in fase 1 nessuna lavorazione può scrivere i tre campi (`campi-esclusi` per `check-ldv`, `ldv-pdb`, `ldv-bep-sync`, `enrichment_bep`). È un'estensione di R-04, non chiesta in modo esplicito dall'HLD | adottata, solo configurazione | Diego |
-| ORC-03 | Nessun vincolo Bean Validation sui campi nell'orchestratore: la regola di lunghezza è del validatore | nessun vincolo | — |
+| ORC-03 | Nessun vincolo Bean Validation sui campi nell'orchestratore: la regola di lunghezza è di `ce-dichiarato-ldv` | nessun vincolo | — |
 | ORC-04 | Con `NON_NULL` un `zonos_declaration_id` `null` non compare in uscita né su Mongo. AS-01 ammette "assente o `null`" | chiave assente | Diego |
 | ORC-05 | **Rischio merge per indice**: `collo[]` e `articolo[]` si fondono per posizione nella lista, non per `posizione` dell'articolo. Se una lavorazione restituisce gli articoli riordinati, filtrati o un collo in meno, `zonos_product_id` resta sull'indice e i dati dell'articolo si mescolano. Nel codice letto non succede, ma non è un vincolo dichiarato delle lavorazioni (rami andata/ritorno di `ldv-pdb`, multicollo `IS`/`IF` non verificati in dettaglio) | nessuna modifica del merge; test di caratterizzazione | Diego, team delle lavorazioni |
 | ORC-06 | **Le lavorazioni non passano i campi**: `ce-dichiarato-ldv`, `-ldv-pdb`, `-ldv-pdb-sync` hanno DTO tipizzati con `ignoreUnknown` e restituiscono il tracciato senza i campi. Per la fase 1 basta il merge; la descrizione però chiede a `ce-dichiarato-ldv` di "mantenere i campi nell'associazione della LDV" e la fase 2 (int. 06) li vuole verso BEP. Chi aggiorna i DTO delle lavorazioni e quando? (si collega a PA-10) | in fase 1 nessuna modifica alle lavorazioni | Diego / Poste |

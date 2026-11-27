@@ -4,9 +4,10 @@
 > Output: `iniziative/146073/sviluppo/ce-dichiarato-validatore.md`, da passare allo sviluppatore (Amelia).
 > Regola di progetto: un documento funzionale per microservizio.
 >
-> Aggiornato il 2026-11-24: nomi dei campi `zonos_account_key`, `zonos_product_id`,
-> `zonos_declaration_id` e colonne SEW `zonos_*` (decisioni di Diego del 23 e 24-11), branch del 24-11,
-> nomi delle chiavi su MongoDB (Diego, 24-11).
+> Aggiornato il 2026-11-25: la verifica Compliance USA è stata spostata in `ce-dichiarato-ldv`
+> (decisione di Diego); il validatore porta solo i campi. Versioni precedenti: nomi `zonos_*` e
+> colonne SEW (23 e 24-11), branch (24-11), chiavi su MongoDB (24-11), verifica solo sui flussi SDA
+> (25-11 mattina, superata).
 
 ---
 
@@ -16,88 +17,55 @@ Sei l'Analyst del progetto. Scrivi il **documento funzionale per lo sviluppo** d
 `ce-dichiarato-validatore` (intervento 01 dell'HLD) per l'iniziativa 146073 "Compliance USA Entry
 Type 13" (AP-00988 Corriere Espresso / PK-03089 ce-dichiarato), **solo fase 1**.
 
-Nella fase 1 il preavviso porta due campi nuovi: **Account Key** sulla testata della spedizione
-(52 caratteri) e **Product ID** su ogni articolo (da 1 a 255). C'è anche `zonos_declaration_id`, solo
-predisposto. Il validatore deve estendere i DTO, riconoscere le spedizioni soggette (USA, con merce,
-prodotti interessati su `codice_prodotto` o `id_servizio`; la condizione "business" non c'è più) e controllare presenza e lunghezza dei due campi, con un errore che
-indica il campo e, per il Product ID, l'articolo.
+Nella fase 1 il preavviso porta **Account Key** sulla testata della spedizione (52 caratteri),
+**Product ID** su ogni articolo (1-255) e `zonos_declaration_id`, solo predisposto.
 
-Il **contratto della fase 1** (`analisi.md`, AS-01…AS-06) è **vincolante**: il documento lo dettaglia,
-non lo cambia. Incoerenze e buchi vanno fra le assunzioni e le domande aperte.
+**Decisione di Diego del 2026-11-25**: la verifica Compliance USA (spedizioni soggette ed errori
+`1320`…`1323`) **non è più nel validatore**. È in `ce-dichiarato-ldv`, nel processo normale, perché
+solo lì `codice_prodotto` è sicuramente valorizzato (calcolato da ce-rules sulla LDV); in ingresso al
+validatore i flussi SDA reali non portano i codici prodotto in modo affidabile. Il validatore:
 
-**Nomi su MongoDB (decisione di Diego del 2026-11-24)**: in `dichiarato_events` i campi si salvano con i
-nomi del tracciato `zonos_account_key`, `zonos_declaration_id`, `zonos_product_id`, non camelCase.
-Spring Data usa il nome del campo Java e ignora `@JsonProperty`: con nomi Java camelCase serve anche
-`@Field("zonos_…")`. Il documento lo dice nei DTO, nelle regole, nei criteri di accettazione e nei test.
+- aggiunge `zonos_account_key`, `zonos_declaration_id` (`SpedizioneDTO`) e `zonos_product_id`
+  (`ArticoloDTO`), con `@JsonProperty`, `@Field` con il nome del tracciato e `@ToString.Exclude`;
+- li propaga senza controlli e senza trasformazioni su tutti i canali, SDA e PDB, verso
+  `preadvising.enrichment`, l'event store e Mongo `dichiarato_events`;
+- non ha regola, errori, metrica né configurazione di compliance (rimossi con il commit `6cd722a`, che
+  supera `090d037`, `43f5cbe` e `c7f82eb`).
 
-**Perimetro della verifica (decisione di Diego del 2026-11-25)**: la verifica Compliance USA si applica
-**solo ai flussi SDA** (`SdaFlussoHandler`). Sul `PdbPreadvisingHandler` (PDB, PDW, ILP, EUD) non si
-fa, perché per i flussi PDB non ci sono ancora le informazioni: lì i campi `zonos_*` passano senza
-controlli e si propagano (commit `c7f82eb` su `develop`). Nei flussi SDA il prodotto arriva in
-`codice_prodotto` (codice numerico di `ce_prodotto`, letto dal `producer-sew-sped` da `id_prodotto`
-delle SEW); `id_servizio` in genere non è valorizzato ed è usato dai flussi PDB. Il confronto resta su
-`codice_prodotto` oppure `id_servizio`, normalizzati (trim, maiuscolo), con l'elenco
-`COMPLIANCE_USA_PRODOTTI`.
+Il **contratto della fase 1** (`analisi.md`, AS-01…AS-07) è **vincolante**. Il documento deve avere in
+testa una nota storica breve sullo spostamento della verifica e sui commit.
 
 # Fonti
 
-- `iniziative/146073/analisi.md`: soprattutto "Contratto della fase 1", regole R-01…R-05, punti aperti.
-- `iniziative/146073/cliente/HLD_146073_dati_preadvising_fase_1.xlsx` (con `python -I` e openpyxl):
-  intervento 01.
-- `iniziative/146073/cliente/20261116_descrizione_compliance_usa_entry_type_13.md`: §2, §4 (validatore),
-  §5, §6.
-- `contesto/microservizi-preadvising.md`, `contesto/linee-guida-sviluppo.md`, `contesto/modo-di-lavorare.md`.
-- Codice in **sola lettura** (non modificare, non fare checkout, non committare):
-  `gitposte/SDA/preadvising/ce-dichiarato-validatore`. La copia locale può essere su un branch di
-  un'altra iniziativa: leggi `origin/develop` con `git show origin/develop:<path>` o `git archive`
-  nello scratchpad, e scrivi nell'intestazione il ref e il commit letti.
-- Modello di forma: `iniziative/144216/sviluppo/shipment-info.md` e `prompt-shipment-info.md`.
+- `iniziative/146073/analisi.md`: "Contratto della fase 1", regole R-01…R-05, punti aperti.
+- `iniziative/146073/sviluppo/ce-dichiarato-ldv.md`: dove sta la verifica.
+- `iniziative/146073/cliente/HLD_146073_dati_preadvising_fase_1.xlsx` (intervento 01) e
+  `cliente/20261116_descrizione_compliance_usa_entry_type_13.md`.
+- `contesto/microservizi-preadvising.md`, `contesto/linee-guida-sviluppo.md`.
+- Codice in **sola lettura**: `gitposte/SDA/preadvising/ce-dichiarato-validatore`, `origin/develop`
+  con `git show` (non fare checkout); dichiara il ref letto.
 
 # Cosa ti chiedo
 
-Intestazione come nel modello. Deve contenere anche il **branch di sviluppo**: `develop`
-(decisione di Diego del 2026-11-24, sostituisce il branch dedicato `146073_compliance_usa_fase1`).
-Non si sviluppa mai su `master` né su branch di altre iniziative (es. il branch EURODIS in checkout).
-
-Sezioni: contesto e obiettivo, requisiti e interventi HLD coperti, dove si interviene nel codice,
-dati usati, regole, esempi di messaggi, casi d'uso, configurazione, RNF e osservabilità, criteri di
-accettazione numerati, casi di test, assunzioni e domande aperte, riferimenti.
+Intestazione con **branch** `develop` (decisione del 2026-11-24) e stato del commit. Sezioni:
+contesto e obiettivo, interventi HLD coperti, dove si interviene nel codice (DTO, serializzazione,
+handler, cosa è stato rimosso), dati, regole, esempi JSON inventati, configurazione (nessuna),
+criteri di accettazione, casi di test, assunzioni e domande aperte (indica quali VAL-AS sono
+superate), riferimenti.
 
 Approfondisci:
 
-1. **DTO** (`SpedizioneDTO`, `ColloDTO`, `ArticoloDTO`, `DichiaratoDTO` in `kafka/dto`): dove si
-   aggiungono `zonos_account_key`, `zonos_declaration_id` e `zonos_product_id`; nomi JSON con Jackson; cosa succede
-   oggi ai campi sconosciuti (`FAIL_ON_UNKNOWN_PROPERTIES`); se il validatore ripubblica il DTO
-   tipizzato su `preadvising.enrichment`, sull'event store e su Mongo, e quindi se i campi non
-   dichiarati si perdono. Effetto delle annotazioni Bean Validation (regola semantica generica) e
-   dei log del DTO (`toString`).
-2. **Regole**: Drools semantic (`validation-rules*.drl`), logic, PDB generate
-   (`rules/pdb/generated/ce-pdb-rules.drl`, `pdb/dsl/`, `FieldPathMapper`, `PdbRuleHelpers`: da dove si
-   generano, se c'è un generatore nel repo), copie in `.helm/config/files/rules` (configmap e
-   `DROOLS_RULES_DIR` nei values di ogni ambiente), handler per famiglia di canale
-   (`CanaleFlussoResolver`, `PdbPreadvisingHandler`, `SdaFlussoHandler`, `PdbPdwFlussoHandler`,
-   `TfiFlussoHandler`, `TupFlussoHandler`). R-01 si applica solo in `SdaFlussoHandler` (decisione
-   del 2026-11-25): indica dove metterla e come il `PdbPreadvisingHandler` resta senza controlli di
-   compliance fino alle specifiche dei flussi PDB.
-3. **Configurazione di AS-02** (flag, valori, elenco prodotti) nel modo in cui il servizio legge le
-   proprietà (`application.yaml` con `${ENV:default}`, `envFrom` dei values `.helm`, svil, coll,
-   template di prod con `_#VAR`).
-4. **Codici di errore**: proponi codici nuovi verificando nel codice e nelle regole (anche negli altri
-   repo della catena) che siano liberi. Spiega come si indicano collo e articolo nella descrizione,
-   come si gestiscono più occorrenze dello stesso codice (la mappa degli errori ha come chiave il
-   codice) e qual è l'effetto dello scarto (eventi, stati, Mongo, metriche, topic).
-5. **Esempi JSON inventati** (niente dati reali) e casi di test che coprono i casi minimi della
-   descrizione e ogni condizione di AS-02: non USA, documenti, prodotto fuori elenco (su `codice_prodotto` e su `id_servizio`),
-   flag spento. Aggiungi i casi limite: lunghezze 51/52/53 e 255/256, più colli, più spedizioni,
-   articolo senza posizione, multicollo, canali di passaggio.
+1. Perché senza i campi nei DTO si perdono (`FAIL_ON_UNKNOWN_PROPERTIES`, DTO tipizzato in uscita,
+   event store, Mongo, cloni del multicollo).
+2. Perché servono `@Field` (Spring Data ignora `@JsonProperty`) e `@ToString.Exclude` (log).
+3. Perché niente Bean Validation (regola semantica generica in cascata).
+4. Che nessun handler (`SdaFlussoHandler`, `PdbPreadvisingHandler`, `PdbPdwFlussoHandler`,
+   `TfiFlussoHandler`, `TupFlussoHandler`) produce errori `1320`…`1323`.
 
 # Regole
 
 - Distingui **[FATTO]** (con la fonte), **[DECISO]** (data e riferimento), **[ASSUNTO]** (ID e default).
-- Riprendi AS-01…AS-06 e aggiungi le tue con prefisso `VAL-` e numerazione da 10 (`VAL-AS-10`…).
-  Domande aperte con `VAL-DA-01`…
-- Niente dati di produzione e niente valori di secret: identificativi, Account Key e Product ID
-  d'esempio inventati.
-- Non cambiare il contratto della fase 1: le incoerenze vanno fra le domande aperte.
+- Assunzioni con prefisso `VAL-AS-`, domande con `VAL-DA-`.
+- Niente dati di produzione e niente valori di secret: esempi inventati.
 - Nei repo dei servizi solo lettura. Il commit in `sda-iniziative` lo fa chi ti ha chiamato.
 - Lingua italiana, prosa chiara e concisa; nomi file e ID ASCII.

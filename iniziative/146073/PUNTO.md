@@ -6,7 +6,8 @@
 ## In una riga
 La fase 1 (Account Key per spedizione, Product ID per articolo, Declaration ID predisposto) ha
 nomi, regola, errori e colonne SEW decisi da Diego. Lo sviluppo del primo passo è in corso:
-- validatore su `develop` (`090d037`, `43f5cbe`, `c7f82eb`), verifica di compliance solo sui flussi SDA; orchestratore (`9a96564`), smistatore (`9289aeb`) e bff (`d2f5027`) su `develop`;
+- verifica Compliance USA in `ce-dichiarato-ldv`, solo nel processo normale (`1bd3517` su `develop`); il validatore propaga solo i campi (`6cd722a` su `develop`, supera `090d037`, `43f5cbe`, `c7f82eb`);
+- orchestratore (`9a96564`), smistatore (`9289aeb`) e bff (`d2f5027`) su `develop`;
 - `sda-ldv-preadv-consumer` (`consumer-sew_sped`, `producer-sew-sped`) sul branch dedicato (`990503a` + `ef0a5ce`,
   pubblicati), scrive solo su `sew_spedizioni_work`; da compilare in Eclipse.
 
@@ -31,6 +32,8 @@ regola per i flussi PDB.
 - 2026-11-24 — Documenti aggiornati con le decisioni del giorno (Mary): analisi 0.4, DDL 0.3 (script 2 su `sew_spedizioni_work_2` eliminato), funzionali 0.3 di `consumer-sew_sped`, `producer-sew-sped`, validatore e orchestratore; note su bff ed event store; prompt.
 - 2026-11-25 — Validatore su `develop`, commit `c7f82eb`: tolta la verifica di compliance dal `PdbPreadvisingHandler`; test PDB riscritti (con flag acceso nessun errore `1320`…`1323`, nessuna metrica, campi propagati).
 - 2026-11-25 — Analisi 0.5 (perimetro di R-01, PA-14), funzionale del validatore 0.4 e prompt aggiornati, Mary.
+- 2026-11-25 — Verifica Compliance USA spostata nel ldv. `ce-dichiarato-ldv` `1bd3517` su `develop`: campi `zonos_*`, regola, errori `1320`…`1323`, aggancio in `doProcessEvento` dopo `assegnaLdv` (IS, IF, IE), non nel processo semplificato dei portali; flag spento; 78 test verdi. Validatore `6cd722a` su `develop`: rimossi verifica, metrica e configurazione `COMPLIANCE_USA_*`, restano i tre campi nei DTO.
+- 2026-11-25 — Documenti allineati (Mary): analisi 0.6, funzionale del validatore 0.5 (solo campi, nota storica), nuovo funzionale `ce-dichiarato-ldv.md` 0.1 con prompt, riferimenti corretti in adapter, orchestratore, bff, event store, monitoring, `consumer-sew_sped`, DDL.
 
 ## Prossimi passi
 - Segnalare i 4 test `PalmariMapper*` rossi su `develop` dello smistatore all'autore di `3d91ac5` — Diego — fuori dalla 146073
@@ -38,12 +41,17 @@ regola per i flussi PDB.
 - Sistemare a parte i 153 test `regoledrools/Invio*Test` già rotti su `develop` del validatore — da assegnare — fuori dalla 146073
 - Chiedere a Poste la conferma dell'elenco CRONO INTERNAZIONALE (PA-12) — Diego — prossimo passo
 - Richiedere al DBA Informix lo script 1 delle DDL in svil, solo `sew_spedizioni_work` — Diego / Winston — prima che il builder mandi i campi
-- Test integrati in svil con messaggi costruiti a mano su `preadvising.pre-enrichment`, con il flag `compliance-usa.abilitata` acceso solo per il test — test manager — dopo lo sviluppo
-- Punto 2 della fase 1: adapter (int. 05), `consumer-sew_sped_poste` (int. 08) e verifica di compliance sui flussi PDB nel validatore — Amelia — quando arrivano i nomi dei campi sorgente, i dettagli lato Poste e la regola per i flussi PDB (PA-13, PA-14)
+- Rilascio del primo passo: `ce-dichiarato-ldv` (verifica), validatore (solo mapping dei campi), orchestratore, smistatore, bff, `sda-ldv-preadv-consumer` — Diego — dopo i test integrati
+- Test integrati in svil con messaggi costruiti a mano su `preadvising.pre-enrichment`, con `COMPLIANCE_USA_ABILITATA` acceso nel ldv solo per il test (in `deploy-svil` del ldv le variabili non ci sono) — test manager — dopo lo sviluppo
+- Valorizzare `COMPLIANCE_USA_*` in `values_TEMPLATE` (cert/prod) del ldv — Diego — quando si decide di accendere la verifica
+- Punto 2 della fase 1: adapter (int. 05), `consumer-sew_sped_poste` (int. 08) e verifica di compliance sui flussi PDB — Amelia — quando arrivano i nomi dei campi sorgente, i dettagli lato Poste e la regola per i flussi PDB (PA-13, PA-14)
 
 ## Blocchi e rischi
-- 🟡 Il validatore controlla solo i flussi SDA (IF, IS, IE). PDB, PDW, ILP ed EUD passano senza controlli finché Poste non dà la regola per i flussi PDB; portali e web service (MYSDA, SDA_WS, INVIO_WEB), adapter e TUP passano senza regole.
-- 🟡 `ce-dichiarato-ldv`, `-ldv-pdb` e `-ldv-pdb-sync` non conoscono i campi e non sono nell'HLD. In fase 1 basta l'orchestratore, in fase 2 servono.
+- 🟡 La verifica gira solo nel processo normale del ldv (IF, IS, IE). PDB, PDW, ILP ed EUD passano senza controlli finché Poste non dà la regola per i flussi PDB; portali e web service (MYSDA, SDA_WS, INVIO_WEB, TFI/TWS/BNC) passano dal processo semplificato senza verifica; adapter e TUP senza regole.
+- 🟡 Un solo errore per messaggio, come per le altre verifiche del ldv: il cliente vede `1322` solo dopo aver corretto `1320`.
+- 🟡 In IF/IE il KO di compliance arriva dopo `generaLdv`: la LDV risulta già consumata (come oggi per gli altri errori successivi). Non si può anticipare, il prodotto è noto solo dopo la generazione.
+- 🟡 `values_TEMPLATE` (cert/prod) del ldv non ha le variabili `COMPLIANCE_USA_*`: vale il default spento. Vanno valorizzate quando si accende.
+- 🟡 `ce-dichiarato-ldv` non è nell'HLD: la verifica è a carico della stima dell'intervento 01 (validatore), da allineare con Poste (PA-10). `-ldv-pdb` e `-ldv-pdb-sync` non conoscono i campi: in fase 1 basta l'orchestratore, in fase 2 servono.
 - 🟡 Lato SDA il Product ID non ha una tabella articoli (né consumer né producer): va deciso con Poste.
 - 🟡 L'Account Key dei portali arriva solo se i portali, fuori perimetro, la scrivono nelle SEW.
 - 🟡 Due retry (`retry-eurodis`, `retry-pread-completo`) perderebbero i campi.
@@ -54,11 +62,12 @@ regola per i flussi PDB.
 - Elenco dei prodotti CRONO INTERNAZIONALE: in `ce_prodotto` ci sono solo `515` e `516` (PA-12).
 - Nomi e livello di Account Key e Product ID nei messaggi PDB, PDW e ILP; PDW avrà più articoli? Serve per il punto 2 (PA-13).
 - Regola di compliance per i flussi PDB (PDB, PDW, ILP, EUD): quali spedizioni sono soggette e su quale campo prodotto (es. `id_servizio`). Fino ad allora lì nessun controllo (PA-14).
-- Il validatore deve controllare anche portali, web service, adapter e TUP?
+- La verifica deve valere anche per portali e web service (processo semplificato del ldv), adapter e TUP?
+- Va bene un solo errore di compliance per messaggio (il primo in ordine di codice)?
 - Dove va il Product ID lato SDA (nuova tabella `sew_spedizioni_work_art`?) e chi adegua i portali per l'Account Key.
 - L'Account Key è un dato riservato? Se sì va mascherata nei log.
 - La console di monitoraggio deve ricevere i campi (variante B)?
-- Chi adegua `ce-dichiarato-ldv`, `-ldv-pdb`, `-ldv-pdb-sync` e i retry?
+- `ce-dichiarato-ldv` lo adegua Accenture (fatto): va riconosciuto nella stima. Chi adegua `-ldv-pdb`, `-ldv-pdb-sync` e i retry?
 - Aggiornamento dell'ICD con i nomi `zonos_*` (team del builder).
 - PRJ e owner cliente.
 
@@ -81,4 +90,5 @@ regola per i flussi PDB.
 - 2026-11-24 — Il producer toglie gli spazi di riempimento a destra dei campi `char`: un valore vuoto o di soli spazi vale come campo assente (PRD-02) (Diego).
 - 2026-11-24 — Su MongoDB validatore e orchestratore salvano i campi con i nomi del tracciato `zonos_account_key`, `zonos_declaration_id`, `zonos_product_id`, non camelCase (Diego).
 - 2026-11-24 — Orchestratore, smistatore e bff restano nel primo passo su `develop`; lo sviluppo riparte oggi (Diego).
-- 2026-11-25 — La verifica Compliance USA del validatore si applica solo ai flussi SDA (`SdaFlussoHandler`). Sul `PdbPreadvisingHandler` (PDB, PDW, ILP, EUD) non si fa finché mancano le informazioni sui flussi PDB: i campi `zonos_*` passano senza controlli (Diego).
+- 2026-11-25 — La verifica Compliance USA del validatore si applica solo ai flussi SDA (`SdaFlussoHandler`). Sul `PdbPreadvisingHandler` (PDB, PDW, ILP, EUD) non si fa finché mancano le informazioni sui flussi PDB: i campi `zonos_*` passano senza controlli (Diego). Superata dalla decisione successiva.
+- 2026-11-25 — La verifica Compliance USA si sposta in `ce-dichiarato-ldv`, solo nel processo normale (dopo `assegnaLdv`), perché solo lì `codice_prodotto` è sicuramente valorizzato. Il validatore porta solo i campi, senza controlli, su tutti i canali. PDB senza verifica fino alle specifiche (Diego).

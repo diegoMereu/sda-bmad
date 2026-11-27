@@ -47,7 +47,7 @@ il preavviso, e **non perderli** quando il preavviso viene risottomesso (R-04).
 | Fuori perimetro | Chi lo fa |
 |---|---|
 | Scrivere i campi in `dichiarato_events` | validatore e orchestratore (int. 01, 02): il BFF mostra solo ciò che trova su Mongo |
-| Validare presenza e lunghezza | validatore (R-02) |
+| Validare presenza e lunghezza | `ce-dichiarato-ldv`, processo normale (R-02; Diego 25-11) |
 | Mostrare i campi a video | nessun front-end in fase 1 (BFF-02) |
 | Filtri di ricerca per Account Key o Product ID | non richiesti (BFF-03) |
 

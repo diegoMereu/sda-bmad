@@ -51,7 +51,7 @@ Con l'int. 07 il consumer deve **storicizzare in `sew_spedizioni_work` i 3 nuovi
 | `zonos_declaration_id` | `spedizione[]` (testata) | solo predisposto: sempre assente o `null` |
 | `zonos_product_id` | `spedizione[].collo[].articolo[]` | valorizzato per ogni articolo delle spedizioni soggette, da 1 a 255 caratteri |
 
-**Non fa**: validazione dei campi (è del validatore), Zonos, palmari (`consumer-sew-sped-pre-adv-on-out-tot`,
+**Non fa**: validazione dei campi (è di `ce-dichiarato-ldv`, processo normale), Zonos, palmari (`consumer-sew-sped-pre-adv-on-out-tot`,
 AS-06), stampe.
 
 ## 2. Interventi HLD coperti
@@ -108,7 +108,7 @@ quindi passa l'LDV dove il metodo si aspetta il nome della tabella. Il ramo fini
 | `spedizione[0].zonos_declaration_id` | `SpedizioneDTO.zonos_declaration_id` | `sew_spedizioni_work.zonos_declaration_id` | `char(13) default ''` | come sopra. In fase 1 di norma è assente, quindi resta `''` |
 | `spedizione[0].collo[].articolo[].zonos_product_id` | `ArticoloColloDTO.zonos_product_id` | **nessuna** nella variante A di default (SEW-02). Variante B: `sew_spedizioni_work_art.zonos_product_id` | `char(255) default ''` | una riga per articolo, con `posizione` |
 
-"Vuoto" vale per la stringa `""`. Una stringa di soli spazi si scrive com'è: il validatore la scarta
+"Vuoto" vale per la stringa `""`. Una stringa di soli spazi si scrive com'è: sulle spedizioni soggette `ce-dichiarato-ldv` la scarta
 prima (AS-03). Le colonne sono `char`: Informix completa con spazi a destra fino alla lunghezza, quindi
 chi le legge (es. il producer) toglie gli spazi finali prima di confrontarle.
 
@@ -149,7 +149,7 @@ Lo stesso messaggio senza `zonos_account_key` (spedizione non USA): lo statement
 
 - **DDL** (vedi [ddl-sew-146073.md](ddl-sew-146073.md), script 1, solo `sew_spedizioni_work`). Le colonne entrano nell'insert
   solo se i campi arrivano valorizzati, quindi il codice si può rilasciare anche prima della DDL. La
-  DDL deve però essere eseguita **prima** che il builder mandi i campi e che il validatore accenda la
+  DDL deve però essere eseguita **prima** che il builder mandi i campi e che `ce-dichiarato-ldv` accenda la
   regola: un insert con le colonne nuove su una tabella senza colonne va in errore e, dopo i retry, il
   record viene saltato.
 - Nessuna property nuova. `kafka.tabella` resta com'è.
@@ -203,7 +203,7 @@ Nuove (Mary, 16-11):
 | SEW-03 | **Lunghezza di `zonos_declaration_id`** | **[DECISO, Diego 23-11]** `char(13) default ''` | chiusa |
 | SEW-04 | **Update.** Per i messaggi senza `id_file` il consumer aggiorna solo indirizzi e telefoni. I campi nuovi in quella riga li ha già scritti chi ha creato il record (portali e web service, vedi PRD-05) | update invariati | Diego |
 | SEW-05 | **Campi assenti.** Superata dalla decisione di Diego del 23-11: le colonne hanno default `''` ed entrano nello statement solo se il campo è valorizzato | **[DECISO]** colonna fuori dallo statement, resta `''` | chiusa |
-| SEW-06 | **Lunghezze.** Il consumer non controlla le lunghezze, che sono garantite dal validatore (52, 1-255). Se un valore più lungo arrivasse lo stesso, l'esito dipende da Informix (troncamento o errore e poi skip) | nessun controllo nel consumer | — |
+| SEW-06 | **Lunghezze.** Il consumer non controlla le lunghezze, che `ce-dichiarato-ldv` verifica sulle spedizioni soggette (52, 1-255). Se un valore più lungo arrivasse lo stesso, l'esito dipende da Informix (troncamento o errore e poi skip) | nessun controllo nel consumer | — |
 | SEW-07 | **Branch base**: il repo non ha `develop` | **[DECISO, Diego 24-11]** `146073_compliance_usa_fase1` da `origin/dev202508_preadvising` | chiusa |
 | SEW-08 | **Topic e tabella in ambiente**: le properties sono esterne al repo | `preadvising.completed.sda`, `kafka.tabella=sew_spedizioni_work`. Da verificare sul file dell'ambiente | Diego |
 
